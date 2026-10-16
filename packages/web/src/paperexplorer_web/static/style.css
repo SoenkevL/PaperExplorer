@@ -1,0 +1,4 @@
+:root { color-scheme: light dark; font-family: Georgia, serif; }
+main { max-width: 42rem; margin: 3rem auto; padding: 0 1rem; line-height: 1.6; }
+.status.ok { color: #2e7d32; }
+.status.down { color: #c62828; }

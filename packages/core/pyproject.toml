@@ -1,0 +1,18 @@
+[project]
+name = "paperexplorer"
+version = "0.1.0"
+description = "PaperExplorer core: domain, pipeline stages, store and the explore CLI."
+requires-python = ">=3.14"
+dependencies = [
+    "pydantic>=2.12",
+    "pydantic-settings>=2.11",
+    "psycopg[binary]>=3.2.10",
+    "typer>=0.19",
+]
+
+[project.scripts]
+paperexplorer = "paperexplorer.cli:app"
+
+[build-system]
+requires = ["uv_build>=0.9,<1"]
+build-backend = "uv_build"

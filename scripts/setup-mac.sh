@@ -185,7 +185,7 @@ finish() {
 # ──────────────────────────────────────────────────────────────────────────
 
 cd "$(dirname "$0")/.."
-TOTAL_STAGES=7
+TOTAL_STAGES=6
 SEED_TITLE_QUERY="brain entropy psychedelic"
 
 banner "PaperExplorer · Mac setup"
@@ -213,45 +213,51 @@ fi
 pause
 
 # ── 2 ─────────────────────────────────────────────────────────────────────
-stage "Sign in to GitHub"
-if gh auth status >/dev/null 2>&1; then
-  printf '  %s✓%s already signed in as %s\n' "$GREEN" "$RESET" "$(gh api user --jq .login)"
-else
-  say "gh will open a browser: choose GitHub.com, HTTPS, and 'Login with a web browser'."
-  gh auth login --hostname github.com --git-protocol https --web
+stage "Connect the existing GitHub repo and push"
+if ! gh auth status >/dev/null 2>&1; then
+  warn "gh isn't signed in on this Mac; it's needed for the PR and the default branch."
+  gh auth login --hostname github.com --web
 fi
-gh auth setup-git
-note "git now uses gh for GitHub credentials."
-pause
-
-# ── 3 ─────────────────────────────────────────────────────────────────────
-stage "Create the GitHub repository and push"
+gh_user=$(gh api user --jq .login)
+printf '  %s✓%s GitHub: signed in as %s\n' "$GREEN" "$RESET" "$gh_user"
 if git remote get-url origin >/dev/null 2>&1; then
   printf '  %s✓%s remote origin already set: %s\n' "$GREEN" "$RESET" "$(git remote get-url origin)"
 else
-  ask GH_REPO "Repository name (e.g. PaperExplorer):"
-  GH_REPO="${GH_REPO:-PaperExplorer}"
-  visibility="--private"
-  confirm "Make it public instead of private?" && visibility="--public"
-  confirm "Create github.com/$(gh api user --jq .login)/$GH_REPO now?" || { warn "stopped before creating the repo"; exit 1; }
-  gh repo create "$GH_REPO" "$visibility" --source=. --remote=origin \
-    --description "Follow a paper's citations into the cited works' own words."
+  repo="$gh_user/PaperExplorer"
+  gh repo view "$repo" >/dev/null 2>&1 || { warn "can't see github.com/$repo; check the name and re-run"; exit 1; }
+  if [[ "$(gh config get git_protocol 2>/dev/null)" == "ssh" ]]; then field=sshUrl; else field=url; fi
+  remote_url=$(gh repo view "$repo" --json "$field" --jq ".$field")
+  git remote add origin "$remote_url"
+  printf '  %s✓%s origin → %s\n' "$GREEN" "$RESET" "$remote_url"
+fi
+force=()
+if [[ "$(gh repo view --json isEmpty --jq .isEmpty)" == "false" ]]; then
+  git fetch -q origin
+  warn "the GitHub repo already has commits (e.g. an auto-created README or licence):"
+  git log --oneline origin/main 2>/dev/null | sed 's/^/      /' | head -5 || true
+  if git merge-base --is-ancestor origin/main main 2>/dev/null; then
+    note "they're already part of local main; a normal push works."
+  elif confirm "Replace them with the local history (they will be lost on GitHub)?"; then
+    force=(--force-with-lease)
+  else
+    warn "stopped: merge origin/main into main by hand, then re-run"; exit 1
+  fi
 fi
 say "Pushing main, dev and feat/repo-skeleton…"
-git push -u origin main dev feat/repo-skeleton
+git push -u "${force[@]}" origin main dev feat/repo-skeleton
 gh repo edit --default-branch dev
 printf '  %s✓%s default branch set to dev, so PRs target it by default\n' "$GREEN" "$RESET"
 note "Optional: protect dev and main under Settings → Rules (rulesets on private repos need GitHub Pro)."
 pause
 
-# ── 4 ─────────────────────────────────────────────────────────────────────
+# ── 3 ─────────────────────────────────────────────────────────────────────
 stage "Local Python environment"
 say "Installing Python 3.14 and all packages into .venv, then the pre-commit hooks."
 uv sync
 uv run pre-commit install
 pause
 
-# ── 5 ─────────────────────────────────────────────────────────────────────
+# ── 4 ─────────────────────────────────────────────────────────────────────
 stage "Docker and the full test suite"
 until docker info >/dev/null 2>&1; do
   warn "Docker isn't running."
@@ -271,7 +277,7 @@ else
 fi
 pause
 
-# ── 6 ─────────────────────────────────────────────────────────────────────
+# ── 5 ─────────────────────────────────────────────────────────────────────
 stage "Zotero Web API key"
 [[ -f "$ENV_FILE" ]] || { cp .env.example "$ENV_FILE"; note "created $ENV_FILE from .env.example"; }
 open_url "https://www.zotero.org/settings/keys"
@@ -300,7 +306,7 @@ else
 fi
 pause
 
-# ── 7 ─────────────────────────────────────────────────────────────────────
+# ── 6 ─────────────────────────────────────────────────────────────────────
 stage "Find the Seed paper and open the first PR"
 say "Searching your Zotero library for: $SEED_TITLE_QUERY"
 curl -fsS -G -H "Zotero-API-Key: $PE_ZOTERO_API_KEY" \

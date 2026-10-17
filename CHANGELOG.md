@@ -10,5 +10,5 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - SQL migration runner with pgvector migration; store tests on real Postgres via testcontainers.
 - API `/health` with typed client; web index page showing API status.
 - `compose.yaml` for the tower (Postgres, Ollama, API, web, pipeline) and Dockerfiles.
-- `scripts/setup-mac.sh`: interactive Mac setup (GitHub repo and first PR, uv, pre-commit, Docker + tests, Zotero key).
+- `scripts/setup-mac.sh`: interactive Mac setup (connect the GitHub repo and open the first PR, uv, pre-commit, Docker + tests, Zotero key).
 - Design docs: `CONTEXT.md`, `CLAUDE.md`, architecture, ADRs 0001–0005, logbook.

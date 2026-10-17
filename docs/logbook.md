@@ -20,3 +20,5 @@ Key decisions, newest last. Hard-to-reverse ones link to an ADR.
 - 2026-10-16 — API returns structured JSON (blocks + Citation offsets), never HTML
 - 2026-10-16 — Pipeline = chain of independent, re-runnable Stages
 - 2026-10-17 — Remote moves from Codeberg to GitHub: Codeberg restricts LLM-generated code. PRs via `gh`
+- 2026-10-17 — Ollama runs natively on the tower, not in compose; listens on the LAN; containers use host.docker.internal
+- 2026-10-17 — Seed of the first Exploration: Zotero item `YAAC9XCX`

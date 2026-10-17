@@ -6,6 +6,9 @@ Start with `docs/design-v1.md` (what v1 is), `CONTEXT.md` (the language) and `do
 
 ## Develop (Mac or tower)
 
+First time on the Mac: run `scripts/setup-mac.sh`. It walks you through GitHub, the Python environment, Docker and the Zotero key.
+
+
 ```sh
 uv sync                     # Python 3.14 + all packages
 uv run pre-commit install

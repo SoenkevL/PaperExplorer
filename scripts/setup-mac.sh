@@ -220,6 +220,8 @@ if ! gh auth status >/dev/null 2>&1; then
 fi
 gh_user=$(gh api user --jq .login)
 printf '  %s✓%s GitHub: signed in as %s\n' "$GREEN" "$RESET" "$gh_user"
+gh auth setup-git
+note "git now uses gh's token for HTTPS pushes (GitHub no longer accepts passwords)."
 if git remote get-url origin >/dev/null 2>&1; then
   printf '  %s✓%s remote origin already set: %s\n' "$GREEN" "$RESET" "$(git remote get-url origin)"
 else

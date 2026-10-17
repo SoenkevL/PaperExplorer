@@ -19,3 +19,4 @@ Key decisions, newest last. Hard-to-reverse ones link to an ADR.
 - 2026-10-16 — External HTTP: hand-written cases for likely/harmful scenarios first; every real failure becomes a recorded regression test
 - 2026-10-16 — API returns structured JSON (blocks + Citation offsets), never HTML
 - 2026-10-16 — Pipeline = chain of independent, re-runnable Stages
+- 2026-10-17 — Remote moves from Codeberg to GitHub: Codeberg restricts LLM-generated code. PRs via `gh`

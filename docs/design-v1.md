@@ -55,7 +55,7 @@ The seed paper is "A critical review of brain entropy as a biomarker of the psyc
 
 **Engineering**
 - Python 3.14, a uv workspace, ruff, pyright in strict mode, pytest and pre-commit, written in a pydantic style.
-- Git branches: `main` is stable, `dev` is where work comes together, and `feat/*` branches enter `dev` only by PR. You merge, and you promote `dev` to `main`. PRs are opened via `tea` or the Forgejo API on Codeberg.
+- Git branches: `main` is stable, `dev` is where work comes together, and `feat/*` branches enter `dev` only by PR. You merge, and you promote `dev` to `main`. The remote is a GitHub repository; PRs are opened with the `gh` CLI.
 - The changelog follows Keep a Changelog. ADRs live in `docs/adr/`, and `docs/logbook.md` indexes them in one line each.
 - Tests:
   - Unit tests run on the Mac, offline, against recorded HTTP responses (pytest-recording) and fake `Embedder` and `ZoteroClient` implementations.
@@ -67,8 +67,8 @@ The seed paper is "A critical review of brain entropy as a biomarker of the psyc
 1. **domain-modeling**: `CONTEXT.md` with Work, Exploration, Chunk, Reference, Citation, CitationLink and RetrievalRun, plus ADRs 0001–00xx taken from the decisions above.
 2. **codebase-design**: package boundaries for core, db, ingest, pipeline, api and web, and where the fakes and test mocks plug in. `data/` sits at the top level.
 3. **writing-for-agents**: `CLAUDE.md` with the conventions above.
-4. Repo skeleton: git init, `main` and `dev` branches, the Codeberg remote, uv workspace, tooling, compose file. Delivered as a PR into `dev`.
-5. **wizard**: a setup script for the steps only you can do on the tower (Docker with GPU support, Zotero desktop and API key, Codeberg token).
+4. Repo skeleton: git init, `main` and `dev` branches, uv workspace, tooling, compose file. Delivered as a PR into `dev`.
+5. **wizard**: a setup script for the steps only you can do on the tower (GitHub repo and remote, Docker with GPU support, Zotero desktop and API key).
 6. **tdd**: first slice, the seed PDF rendered with clickable citations that show reference metadata.
 
 ## Verification

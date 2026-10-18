@@ -48,7 +48,7 @@ The seed paper is "A critical review of brain entropy as a biomarker of the psyc
 - Database access uses psycopg 3 with hand-written SQL, results mapped into pydantic models, and numbered `.sql` migration files.
 
 **Infrastructure**
-- The tower runs docker compose with Postgres (pgvector), Ollama, the API, the web app, and Zotero desktop for file sync.
+- The tower runs docker compose with Postgres (pgvector), the API and the web app. Ollama and Zotero desktop (file sync) run natively on the tower; Ollama listens on the home network so containers and the Mac can embed.
 - The web app and API are reachable on your home network with no login. Postgres is only reachable from inside Docker or through an SSH tunnel.
 - Secrets live in a gitignored `.env`, with a committed `.env.example`, and are loaded through `pydantic-settings`.
 - Logging uses Python's built-in `logging`, configured in one module, with a logger per module. Output is text or JSON lines depending on a setting, and `--verbose` switches on DEBUG.

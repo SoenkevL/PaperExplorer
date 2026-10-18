@@ -18,9 +18,11 @@ uv run ruff check && uv run ruff format --check && uv run pyright
 
 ## Run (tower)
 
+First time: run `scripts/setup-tower.sh` from the Mac. It checks and sets up the tower over SSH.
+
 ```sh
 cp .env.example .env        # fill in secrets
-docker compose up -d        # db, ollama, api :8000, web :8080
-docker compose exec ollama ollama pull bge-m3
+ollama pull bge-m3          # Ollama runs natively on the tower
+docker compose up -d        # db, api :8000, web :8080
 docker compose run --rm pipeline version
 ```

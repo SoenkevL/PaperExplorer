@@ -203,6 +203,18 @@ tower_env() {
   printf '  %s✓ wrote%s %s → tower:%s/.env\n' "$GREEN" "$RESET" "$1" "$REMOTE_DIR"
 }
 
+# as_admin "what" "CMD" runs CMD as the tower's admin (the SSH user has no sudo).
+# It offers `su` over SSH (asks the admin's password); otherwise prints CMD to run by hand.
+as_admin() {
+  say "$1 needs sudo, which $(tw whoami) doesn't have. As $ADMIN_USER it is:"
+  note "  $2"
+  if confirm "Run it now as $ADMIN_USER via su (asks $ADMIN_USER's password, then sudo's)?"; then
+    ssh -t "$TOWER" "su - $ADMIN_USER -c $(printf '%q' "$2")"
+  else
+    pause "Run it as $ADMIN_USER on the tower, then press Enter."
+  fi
+}
+
 banner "PaperExplorer · Tower setup (from the Mac)"
 
 # ── 1 ─────────────────────────────────────────────────────────────────────
@@ -216,6 +228,9 @@ else
   warn "can't reach '$TOWER' over SSH; is it on and is the alias in ~/.ssh/config?"; exit 1
 fi
 TOWER_HOST=$(ssh -G "$TOWER" | awk '/^hostname /{print $2; exit}')
+ask ADMIN_USER "Tower user with sudo rights (your admin account, e.g. Admin):"
+[[ -n "$ADMIN_USER" ]] || { warn "an admin user is needed for the few sudo steps"; exit 1; }
+tw "id $ADMIN_USER >/dev/null 2>&1" && ok "admin user $ADMIN_USER exists" || { warn "no user $ADMIN_USER on the tower"; exit 1; }
 note "tower address on the network: $TOWER_HOST"
 tw 'echo "  $(. /etc/os-release && echo "$PRETTY_NAME") · $(uname -m)"'
 tw 'nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader 2>/dev/null | sed "s/^/  GPU: /"' \
@@ -224,22 +239,28 @@ pause
 
 # ── 2 ─────────────────────────────────────────────────────────────────────
 stage "Tools on the tower"
+me=$(tw whoami)
+if ! tw "command -v uv >/dev/null"; then
+  say "uv isn't installed for $me; it installs per user, no sudo needed."
+  confirm "Install uv for $me now?" && tw "curl -LsSf https://astral.sh/uv/install.sh | sh" >/dev/null
+fi
 missing=()
 for tool in git gh uv docker ollama curl; do
   if tw "command -v $tool >/dev/null"; then ok "$tool"; else printf '  %s✗%s %s\n' "$RED" "$RESET" "$tool"; missing+=("$tool"); fi
 done
-if tw "docker compose version >/dev/null 2>&1"; then ok "docker compose"; else missing+=("docker-compose-plugin"); warn "docker compose plugin missing"; fi
-if tw "docker info >/dev/null 2>&1"; then ok "docker runs without sudo"; else
-  warn "docker isn't usable as your user (not running, or you're not in the 'docker' group)"
-  note "  fix: sudo usermod -aG docker \$USER, then log out and back in on the tower"
-  missing+=("docker access")
-fi
+if tw "docker compose version >/dev/null 2>&1"; then ok "docker compose"; else missing+=("docker compose"); warn "docker compose plugin missing"; fi
 if (( ${#missing[@]} )); then
   say ""
-  step "On the tower (pop-os), install what's missing, e.g.:"
-  note "  sudo apt install git gh curl docker.io docker-compose-plugin"
-  note "  curl -LsSf https://astral.sh/uv/install.sh | sh"
+  step "Missing: ${missing[*]}. Install them as $ADMIN_USER on the tower (pop-os), e.g.:"
+  note "  sudo apt install git gh curl docker.io docker-compose-v2   (Ollama: ollama.com/download)"
   warn "re-run this wizard once they're installed"; exit 1
+fi
+if tw "docker info >/dev/null 2>&1"; then ok "docker runs as $me without sudo"; else
+  warn "docker isn't usable as $me (not running, or $me isn't in the 'docker' group)"
+  as_admin "Adding $me to the docker group" "sudo usermod -aG docker $me && sudo systemctl enable --now docker"
+  if tw "docker info >/dev/null 2>&1"; then ok "docker runs as $me"; else
+    warn "still no docker access for $me; check 'systemctl status docker' as $ADMIN_USER, then re-run"; exit 1
+  fi
 fi
 pause
 
@@ -281,8 +302,8 @@ if curl -fsS --max-time 4 "http://$TOWER_HOST:11434/api/version" >/dev/null 2>&1
   ok "Ollama is reachable from the Mac and from containers"
 else
   say "Ollama only listens on the tower's loopback. Containers and the Mac need it on the network."
-  if tw "systemctl is-enabled ollama >/dev/null 2>&1" && confirm "Set OLLAMA_HOST=0.0.0.0:11434 (systemd override, needs sudo on the tower)?"; then
-    twt "sudo mkdir -p /etc/systemd/system/ollama.service.d && printf '[Service]\nEnvironment=\"OLLAMA_HOST=0.0.0.0:11434\"\n' | sudo tee /etc/systemd/system/ollama.service.d/paperexplorer.conf >/dev/null && sudo systemctl daemon-reload && sudo systemctl restart ollama"
+  if tw "systemctl is-enabled ollama >/dev/null 2>&1" && confirm "Make Ollama listen on the network (OLLAMA_HOST=0.0.0.0:11434)?"; then
+    as_admin "A systemd override for Ollama" "sudo mkdir -p /etc/systemd/system/ollama.service.d && printf '[Service]\nEnvironment=OLLAMA_HOST=0.0.0.0:11434\n' | sudo tee /etc/systemd/system/ollama.service.d/paperexplorer.conf >/dev/null && sudo systemctl daemon-reload && sudo systemctl restart ollama"
     sleep 3
     if curl -fsS --max-time 4 "http://$TOWER_HOST:11434/api/version" >/dev/null 2>&1; then ok "Ollama now reachable at http://$TOWER_HOST:11434"
     else warn "still not reachable from the Mac (firewall?)"; SKIPPED+=("make Ollama reachable on the LAN"); fi

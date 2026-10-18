@@ -305,10 +305,13 @@ fi
 step "On the tower, open Zotero → Settings → Sync: sign in, and tick 'Sync attachment files in My Library'."
 step "Let it sync once (green arrow in the toolbar)."
 pause "Press Enter once Zotero has synced."
-STORAGE_DIR=$(tw 'echo "$HOME/Zotero/storage"')
+# Zotero may run as another desktop user (e.g. the admin), with storage shared read-only via ACL.
+STORAGE_DIR=$(tw 'for d in "$HOME/Zotero/storage" /home/*/Zotero/storage; do [ -r "$d" ] && [ -x "$d" ] && { echo "$d"; break; }; done')
+STORAGE_DIR="${STORAGE_DIR:-/home/ADMIN/Zotero/storage}"
 ask STORAGE_IN "Zotero storage folder on the tower [$STORAGE_DIR]:"
 STORAGE_DIR="${STORAGE_IN:-$STORAGE_DIR}"
-tw "test -d '$STORAGE_DIR'" && ok "storage folder exists" || { warn "no folder at $STORAGE_DIR"; exit 1; }
+tw "test -r '$STORAGE_DIR' && test -x '$STORAGE_DIR'" && ok "storage folder readable by $(tw whoami)" \
+  || { warn "can't read $STORAGE_DIR as $(tw whoami); grant read access (setfacl -R -m u:<you>:rX …)"; exit 1; }
 zid=$(_existing PE_ZOTERO_LIBRARY_ID || true); zkey=$(_existing PE_ZOTERO_API_KEY || true)
 [[ -n "$zid" && -n "$zkey" ]] || { warn "Zotero values missing in the Mac's .env; run scripts/setup-mac.sh first"; exit 1; }
 say "Looking up the Seed ($SEED_ITEM_KEY) and its PDF attachment…"

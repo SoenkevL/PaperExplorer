@@ -22,3 +22,4 @@ Key decisions, newest last. Hard-to-reverse ones link to an ADR.
 - 2026-10-17 — Remote moves from Codeberg to GitHub: Codeberg restricts LLM-generated code. PRs via `gh`
 - 2026-10-17 — Ollama runs natively on the tower, not in compose; listens on the LAN; containers use host.docker.internal
 - 2026-10-17 — Seed of the first Exploration: Zotero item `YAAC9XCX`
+- 2026-10-18 — Zotero desktop runs as the tower's admin user; netinc (SSH user) reads `/home/Admin/Zotero/storage` read-only via ACL

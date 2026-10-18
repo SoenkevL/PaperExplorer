@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>PaperExplorer</h1>
+{% if api_version %}
+<p class="status ok">API connected (v{{ api_version }})</p>
+{% else %}
+<p class="status down">API unreachable</p>
+{% endif %}
+{% endblock %}

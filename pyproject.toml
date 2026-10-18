@@ -1,0 +1,57 @@
+[project]
+name = "paperexplorer-workspace"
+version = "0.0.0"
+description = "Workspace root for PaperExplorer; the code lives in packages/."
+requires-python = ">=3.14"
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+paperexplorer = { workspace = true }
+paperexplorer-api = { workspace = true }
+paperexplorer-web = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "paperexplorer",
+    "paperexplorer-api",
+    "paperexplorer-web",
+    "pytest>=8.4",
+    "ruff>=0.14",
+    "pyright>=1.1.407",
+    "pre-commit>=4.3",
+    "testcontainers[postgres]>=4.13",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+src = ["packages/*/src"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "N", "UP", "B", "SIM", "PTH", "RUF", "D"]
+ignore = ["D105", "D107"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"packages/*/tests/**" = ["D"]
+"tests/**" = ["D"]
+
+[tool.pyright]
+pythonVersion = "3.14"
+venvPath = "."
+venv = ".venv"
+include = ["packages"]
+typeCheckingMode = "standard"
+strict = ["packages/*/src"]
+
+[tool.pytest.ini_options]
+addopts = ["--import-mode=importlib", "--strict-markers"]
+testpaths = ["packages", "tests"]
+markers = ["tower: needs tower-only services (Ollama, real Zotero, GPU)"]

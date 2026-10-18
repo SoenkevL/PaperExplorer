@@ -12,7 +12,7 @@ A reader for following a paper's citations into the cited Works' own words. Ever
 ## Workflow
 
 - Design happens with the user, in plan mode. Implementation runs autonomously; check in at milestones and whenever intent is unclear.
-- Work on `feat/<slug>` branched from `dev`, then open a PR into `dev` on Codeberg (remote `origin`, via `tea` or the Forgejo API). Only the user merges and promotes `dev` → `main`; push only to your feature branch.
+- Work on `feat/<slug>` branched from `dev`, then open a PR into `dev` on GitHub (remote `origin`, via `gh pr create --base dev`). Only the user merges and promotes `dev` → `main`; push only to your feature branch.
 - Every PR carries: a `CHANGELOG.md` line under *Unreleased* (Keep a Changelog), a `docs/logbook.md` line for any key decision, and an ADR when a decision is hard to reverse, surprising and a real trade-off.
 - Build test-first (tdd skill). A PR opens only on a green gate: `ruff check`, `ruff format --check`, `pyright`, `pytest`.
 

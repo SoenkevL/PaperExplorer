@@ -23,3 +23,4 @@ Key decisions, newest last. Hard-to-reverse ones link to an ADR.
 - 2026-10-17 — Ollama runs natively on the tower, not in compose; listens on the LAN; containers use host.docker.internal
 - 2026-10-17 — Seed of the first Exploration: Zotero item `YAAC9XCX`
 - 2026-10-18 — Zotero desktop runs as the tower's admin user; netinc (SSH user) reads `/home/Admin/Zotero/storage` read-only via ACL
+- 2026-10-18 — Milestone 0 done: Mac and tower set up; tower runs db, api, web; Ollama (bge-m3) on the LAN; Seed PDF synced; tests green on both machines

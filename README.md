@@ -33,3 +33,5 @@ ollama pull bge-m3          # Ollama runs natively on the tower
 docker compose up -d        # db, grobid :8070, api :8000, web :8080
 docker compose run --rm pipeline version
 ```
+
+Tower-only tests (real Zotero storage, GROBID, the Seed) run there with `uv run pytest -m tower`.

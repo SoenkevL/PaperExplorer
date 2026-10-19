@@ -202,6 +202,15 @@ class _Rules:
                 break
             narrowed = [r for r in candidates if self._names[r.id][i : i + 1] == [name]]
             candidates = narrowed or candidates
+        if len(candidates) > 1:  # "et al." means three or more authors, "X and Y" exactly two
+            cue = marker.cue or marker.text
+            if re.search(r"\bet\.?\s*al", cue):
+                fits = [r for r in candidates if len(self._names[r.id]) >= 3]
+            elif re.search(r"\s(?:and|&)\s", cue):
+                fits = [r for r in candidates if len(self._names[r.id]) == 2]
+            else:
+                fits = [r for r in candidates if len(self._names[r.id]) == 1]
+            candidates = fits or candidates
         if len(candidates) > 1 and year[-1].isalpha():
             candidates = [r for r in candidates if self._years[r.id] == year]
         return (candidates[0].id, Evidence.AUTHOR_YEAR) if len(candidates) == 1 else None

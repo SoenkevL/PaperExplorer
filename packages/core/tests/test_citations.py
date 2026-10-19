@@ -136,3 +136,46 @@ def test_citation_without_evidence_is_reported_as_unlinked() -> None:
 
     assert [c.text for c in graph.unlinked()] == ["Nobody et al., 1999"]
     assert [c.text for c in graph.low_confidence()] == ["Smith (2020)"]  # a rule alone
+
+
+def test_author_count_in_the_cue_tells_same_year_entries_apart() -> None:
+    text = "One view (Yaden and Griffiths, 2021) and another (Yaden et al., 2021)."
+    two, many = text.index("Yaden and"), text.index("Yaden et")
+    doc = ParsedWork(
+        text_origin=TextOrigin.PRINTED,
+        blocks=[
+            Block(
+                kind=BlockKind.PARAGRAPH,
+                heading_path=[],
+                page=1,
+                boxes=[],
+                text=text,
+                citation_markers=[
+                    CitationMarker(
+                        span=Span(start=two, end=two + 25),
+                        text="Yaden and Griffiths, 2021",
+                        cue="(Yaden and Griffiths, 2021)",
+                    ),
+                    CitationMarker(
+                        span=Span(start=many, end=many + 18),
+                        text="Yaden et al., 2021",
+                        cue="(Yaden et al., 2021)",
+                    ),
+                ],
+            )
+        ],
+        references=[
+            Reference(
+                id="b0", text="Yaden, D.B., Griffiths, R.R., 2021. The subjective effects.", page=9
+            ),
+            Reference(
+                id="b1",
+                text="Yaden, D.B., Johnson, M.W., Griffiths, R.R., Doss, M.K., 2021. Psychedelics.",
+                page=9,
+            ),
+        ],
+    )
+
+    graph = extract(doc)
+
+    assert [c.link.reference_id if c.link else None for c in graph.citations] == ["b0", "b1"]

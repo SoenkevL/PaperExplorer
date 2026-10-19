@@ -27,6 +27,18 @@ def test_zotero_storage_dir_is_optional(monkeypatch: pytest.MonkeyPatch) -> None
     assert Settings(_env_file=None).zotero_storage_dir is None  # pyright: ignore[reportCallIssue]
 
 
+def test_an_optional_folder_left_empty_in_env_is_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Regression: `.env.example` ships `PE_ZOTERO_STORAGE_DIR=` and `PE_TESSDATA_DIR=` empty,
+    # which read as Path("."), so the Seed was looked for in the current folder.
+    monkeypatch.setenv("PE_ZOTERO_STORAGE_DIR", "")
+    monkeypatch.setenv("PE_TESSDATA_DIR", "")
+
+    settings = Settings(_env_file=None)  # pyright: ignore[reportCallIssue]
+
+    assert settings.zotero_storage_dir is None
+    assert settings.tessdata_dir is None
+
+
 def test_json_logging_emits_one_parseable_line(capsys: pytest.CaptureFixture[str]) -> None:
     configure_logging("INFO", "json")
 

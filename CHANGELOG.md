@@ -18,3 +18,12 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - `paperexplorer parse <pdf>` prints what a PDF parses into; compose `grobid` service; the pipeline image ships Tesseract's English model.
 - CC BY test fixtures with recorded GROBID output, a synthetic scan, and a live GROBID check.
 - `scripts/tower-check.sh`: checks a branch on the tower (gate, GROBID, tower tests, the Seed, pipeline image with OCR) and logs it for review from the Mac.
+- The Seed in the browser: every Citation is a link that opens a side panel with its Reference as printed, its Citation Link's confidence and evidence, and its Citing Sentence; low-confidence and Unlinked Citations and OCR Text are marked.
+- Store: migration 0002 with Works (Library Item snapshot, ADR 0007), blocks, References, Citations, Citation Links and per-Work Stage status; repositories `Works`, `WorkTexts`, `CitationGraphs`, `StageStatuses`.
+- Library port with `InMemoryLibrary` and a Zotero Web API adapter (PDFs from Zotero storage, else downloaded once).
+- Pipeline Stages `fetch`, `parse` and `extract_citations`, re-runnable with their status recorded; `paperexplorer migrate` and `paperexplorer run <stage> <zotero_key>`.
+- API: `GET /works`, `GET /works/{id}` (blocks with Citation spans as character offsets) and `GET /citations/{id}`, with a typed client.
+- `scripts/check_reader.py`, run by tower-check: the running reader links every Citation of the Seed.
+
+### Fixed
+- An optional folder left empty in `.env` (`PE_ZOTERO_STORAGE_DIR=`, `PE_TESSDATA_DIR=`) read as the current folder; it is now unset.

@@ -31,8 +31,13 @@ First time: run `scripts/setup-tower.sh` from the Mac. It checks and sets up the
 cp .env.example .env        # fill in secrets
 ollama pull bge-m3          # Ollama runs natively on the tower
 docker compose up -d        # db, grobid :8070, api :8000, web :8080
-docker compose run --rm pipeline version
+docker compose run --rm pipeline migrate
+for stage in fetch parse extract_citations; do
+  docker compose run --rm pipeline run "$stage" YAAC9XCX   # the Seed's Zotero item key
+done
 ```
+
+Then open `http://tower:8080`: the Seed's page links every Citation to a panel with its Reference.
 
 Tower-only tests (real Zotero storage, GROBID, the Seed) run there with `uv run pytest -m tower`.
 `scripts/tower-check.sh` runs those, the gate, the Seed and the pipeline image in one go and writes `tower-check.log` to commit back to the branch.

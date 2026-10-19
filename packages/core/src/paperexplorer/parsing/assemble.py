@@ -109,6 +109,7 @@ def _block(tb: TeiBlock, layer: TextLayer, references: list[Reference]) -> Block
                 )
             )
 
+    linked = _join_fragments(linked, reading.text)
     markers = list(linked)
     for sentence in tb.sentences:
         for ref in sentence.refs:
@@ -165,6 +166,23 @@ def _block(tb: TeiBlock, layer: TextLayer, references: list[Reference]) -> Block
         sentences=sentences,
         citation_markers=markers,
     )
+
+
+def _join_fragments(linked: list[CitationMarker], text: str) -> list[CitationMarker]:
+    """One marker per Citation: LaTeX links an author-year's names and year separately."""
+    out: list[CitationMarker] = []
+    for m in sorted(linked, key=lambda m: m.span.start):
+        prev = out[-1] if out else None
+        if (
+            prev is not None
+            and prev.link_target == m.link_target
+            and not text[prev.span.end : m.span.start].strip()
+        ):
+            prev.span = Span(start=prev.span.start, end=max(prev.span.end, m.span.end))
+            prev.text = text[prev.span.start : prev.span.end]
+        else:
+            out.append(m)
+    return out
 
 
 def _span(read: Reading, positions: dict[tuple[int, int], int]) -> Span | None:

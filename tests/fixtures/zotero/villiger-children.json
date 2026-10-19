@@ -1,0 +1,84 @@
+[
+  {
+    "key": "N0TE2345",
+    "version": 1204,
+    "library": {"type": "user", "id": 1234567, "name": "example"},
+    "links": {},
+    "meta": {},
+    "data": {
+      "key": "N0TE2345",
+      "version": 1204,
+      "parentItem": "QW3RT5YU",
+      "itemType": "note",
+      "note": "<p>A reading note.</p>",
+      "tags": [],
+      "relations": {},
+      "dateAdded": "2026-10-18T09:13:00Z",
+      "dateModified": "2026-10-18T09:13:00Z"
+    }
+  },
+  {
+    "key": "SNAP6789",
+    "version": 1205,
+    "library": {"type": "user", "id": 1234567, "name": "example"},
+    "links": {
+      "enclosure": {
+        "type": "text/html",
+        "href": "https://api.zotero.org/users/1234567/items/SNAP6789/file/view",
+        "title": "Snapshot.html",
+        "length": 90210
+      }
+    },
+    "meta": {},
+    "data": {
+      "key": "SNAP6789",
+      "version": 1205,
+      "parentItem": "QW3RT5YU",
+      "itemType": "attachment",
+      "linkMode": "imported_url",
+      "title": "Snapshot",
+      "url": "https://www.tandfonline.com/doi/full/10.1080/09540261.2024.2357669",
+      "contentType": "text/html",
+      "charset": "utf-8",
+      "filename": "Snapshot.html",
+      "md5": "0cc175b9c0f1b6a831c399e269772661",
+      "mtime": 1729242764000,
+      "tags": [],
+      "relations": {},
+      "dateAdded": "2026-10-18T09:12:44Z",
+      "dateModified": "2026-10-18T09:12:44Z"
+    }
+  },
+  {
+    "key": "A7B8C9D2",
+    "version": 1206,
+    "library": {"type": "user", "id": 1234567, "name": "example"},
+    "links": {
+      "enclosure": {
+        "type": "application/pdf",
+        "href": "https://api.zotero.org/users/1234567/items/A7B8C9D2/file/view",
+        "title": "Villiger - 2024 - Personal psychedelic experience of psychedelic therapists.pdf",
+        "length": 412345
+      }
+    },
+    "meta": {},
+    "data": {
+      "key": "A7B8C9D2",
+      "version": 1206,
+      "parentItem": "QW3RT5YU",
+      "itemType": "attachment",
+      "linkMode": "imported_url",
+      "title": "Full Text PDF",
+      "url": "https://www.tandfonline.com/doi/pdf/10.1080/09540261.2024.2357669",
+      "contentType": "application/pdf",
+      "charset": "",
+      "filename": "Villiger - 2024 - Personal psychedelic experience of psychedelic therapists.pdf",
+      "md5": "92eb5ffee6ae2fec3ad71c777531578f",
+      "mtime": 1729242764000,
+      "tags": [],
+      "relations": {},
+      "dateAdded": "2026-10-18T09:12:44Z",
+      "dateModified": "2026-10-18T09:12:44Z"
+    }
+  }
+]

@@ -1,8 +1,9 @@
-"""Build `tests/fixtures/pdfs/scan-villiger2024.pdf`: two pages of a CC BY paper as images only.
+"""Build `tests/fixtures/pdfs/scan-villiger2024.pdf`: three pages of a CC BY paper as images only.
 
 Usage: uv run python scripts/make_scan_fixture.py
-Pages 2 (abstract and introduction, with Citations) and 8 (References) of villiger2024-tandf.pdf
-are rendered to greyscale JPEGs at 150 dpi, so the result has no text layer, like a scan.
+Pages 2 (abstract and introduction, with Citations), 7 (end of the text, the References heading)
+and 8 (References) of villiger2024-tandf.pdf are rendered to greyscale JPEGs at 150 dpi, so the
+result has no text layer, like a scan.
 """
 
 from pathlib import Path
@@ -10,7 +11,7 @@ from pathlib import Path
 import pypdfium2 as pdfium  # pyright: ignore[reportMissingTypeStubs]
 
 FIXTURES = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "pdfs"
-PAGES = (2, 8)
+PAGES = (2, 7, 8)
 DPI = 150
 
 

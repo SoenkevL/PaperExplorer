@@ -35,7 +35,12 @@ def recorded_settings(tmp_path: Path) -> Settings:
         pdf = fixture_pdf(tei.name.removesuffix(".tei.xml"))
         digest = hashlib.sha256(pdf.read_bytes()).hexdigest()
         shutil.copy(tei, cache / f"{digest}.tei.xml")
-    return Settings(_env_file=None, data_dir=tmp_path, grobid_url=UNREACHABLE)  # pyright: ignore[reportCallIssue]
+    return Settings(
+        _env_file=None,  # pyright: ignore[reportCallIssue]
+        data_dir=tmp_path,
+        grobid_url=UNREACHABLE,
+        tessdata_dir=FIXTURES / "tessdata",
+    )
 
 
 @pytest.fixture

@@ -4,6 +4,7 @@
 
 import bisect
 import ctypes
+import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,6 +17,25 @@ import pypdfium2.raw as raw
 from paperexplorer.parsing.models import Box
 
 _TOLERANCE = 0.8  # points a character's centre may lie outside a GROBID box
+_SCAN_MAX_GLYPHS = 20  # a page with fewer printed characters has no real text layer
+_SCAN_MIN_IMAGE = 0.7  # ...and is a scan when one image covers this share of it
+# How text layers encode a hyphen that only breaks a word across lines.
+_SOFT_HYPHENS = frozenset("\ufffe\u00ad\u0002")
+# TeX fonts print accents as separate spacing glyphs before the letter; map each to its
+# combining mark.
+_COMBINING = {
+    "\u00b4": "\u0301",  # acute
+    "\u0060": "\u0300",  # grave
+    "\u02c6": "\u0302",  # circumflex
+    "\u02dc": "\u0303",  # tilde
+    "\u00a8": "\u0308",  # diaeresis
+    "\u00b8": "\u0327",  # cedilla
+    "\u02c7": "\u030c",  # caron
+    "\u02d8": "\u0306",  # breve
+    "\u02d9": "\u0307",  # dot above
+    "\u02da": "\u030a",  # ring above
+    "\u02dd": "\u030b",  # double acute
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,6 +47,7 @@ class Glyph:
     char: str
     x: float
     y: float
+    height: float
     generated: bool
     hyphen: bool
     map_error: bool
@@ -69,8 +90,18 @@ class TextLayer:
             )
             self._by_y[i + 1] = ([g.y for g in printed], printed)
         self.links: list[InternalLink] = []
+        self._scanned_pages = 0
         for i in range(len(self._pdf)):
             self.links += _links(self._pdf, i, self.page_sizes)
+            if (
+                len(self._by_y[i + 1][1]) < _SCAN_MAX_GLYPHS
+                and _image_cover(self._pdf[i]) >= _SCAN_MIN_IMAGE
+            ):
+                self._scanned_pages += 1
+
+    def is_scan(self) -> bool:
+        """Whether most pages are images without a text layer, so only OCR can read them."""
+        return self._scanned_pages * 2 >= max(len(self.page_sizes), 1)
 
     def __enter__(self) -> Self:
         return self
@@ -92,6 +123,7 @@ class TextLayer:
         chars: list[str] = []
         sources: list[Glyph | None] = []
         seen: set[tuple[int, int]] = set()
+        soft = False  # the last glyph was a soft hyphen: join the next one directly
         for box in boxes:
             page = self.glyphs.get(box.page, [])
             ys, printed = self._by_y.get(box.page, ([], []))
@@ -107,7 +139,12 @@ class TextLayer:
             prev: Glyph | None = None
             for g in inside:
                 seen.add((g.page, g.index))
-                if prev is None:
+                if g.char in _SOFT_HYPHENS:
+                    soft = True
+                    continue
+                if soft:
+                    soft = False
+                elif prev is None:
                     if chars and chars[-1] != " ":
                         last = sources[-1]
                         if chars[-1] == "-" and last is not None and last.hyphen:
@@ -124,7 +161,51 @@ class TextLayer:
                 chars.append(g.char)
                 sources.append(g)
                 prev = g
+        _compose_accents(chars, sources)
         return Reading("".join(chars), sources)
+
+
+def _compose_accents(chars: list[str], sources: list[Glyph | None]) -> None:
+    """Merge each spacing accent into the letter it sits on (next letter, else previous one)."""
+    i = 0
+    while i < len(chars):
+        mark = _COMBINING.get(chars[i])
+        if mark is None:
+            i += 1
+            continue
+        for j in (i + 1, i - 1):
+            if 0 <= j < len(chars) and chars[j].isalpha():
+                base = "i" if chars[j] == "\u0131" else chars[j]  # TeX's dotless i takes the accent
+                composed = unicodedata.normalize("NFC", base + mark)
+                if len(composed) == 1:
+                    chars[j] = composed
+                    del chars[i]
+                    del sources[i]
+                    break
+        else:
+            i += 1
+
+
+def _image_cover(page: pdfium.PdfPage) -> float:
+    """The share of the page covered by its largest image."""
+    width, height = page.get_width(), page.get_height()
+    largest = 0.0
+    left, bottom, right, top = (ctypes.c_float() for _ in range(4))
+    for i in range(raw.FPDFPage_CountObjects(page.raw)):
+        obj = raw.FPDFPage_GetObject(page.raw, i)
+        if raw.FPDFPageObj_GetType(obj) != raw.FPDF_PAGEOBJ_IMAGE:
+            continue
+        raw.FPDFPageObj_GetBounds(
+            obj, ctypes.byref(left), ctypes.byref(bottom), ctypes.byref(right), ctypes.byref(top)
+        )
+        largest = max(largest, (right.value - left.value) * (top.value - bottom.value))
+    return largest / (width * height) if width and height else 0.0
+
+
+def _loose_height(tp: pdfium.PdfTextPage, index: int, rect: Any) -> float:
+    """The glyph's printed height, ascent to descent: its font size as rendered."""
+    raw.FPDFText_GetLooseCharBox(tp.raw, index, ctypes.byref(rect))
+    return float(rect.top - rect.bottom)
 
 
 def _contains(box: Box, g: Glyph) -> bool:
@@ -139,6 +220,7 @@ def _glyphs(page: pdfium.PdfPage, number: int, height: float) -> list[Glyph]:
     n: int = raw.FPDFText_CountChars(tp.raw)
     units: list[int] = [raw.FPDFText_GetUnicode(tp.raw, i) for i in range(n)]
     left, right, bottom, top = (ctypes.c_double() for _ in range(4))
+    loose = raw.FS_RECTF()
     out: list[Glyph] = []
     for i in range(n):
         u = units[i]
@@ -162,6 +244,7 @@ def _glyphs(page: pdfium.PdfPage, number: int, height: float) -> list[Glyph]:
                 chr(u) if u else "",
                 (left.value + right.value) / 2,
                 height - (bottom.value + top.value) / 2,
+                _loose_height(tp, i, loose),
                 bool(raw.FPDFText_IsGenerated(tp.raw, i)),
                 bool(raw.FPDFText_IsHyphen(tp.raw, i)),
                 bool(raw.FPDFText_HasUnicodeMapError(tp.raw, i)),

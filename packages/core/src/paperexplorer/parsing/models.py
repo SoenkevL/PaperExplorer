@@ -51,11 +51,15 @@ class LinkTarget(BaseModel):
 
 
 class CitationMarker(BaseModel):
-    """A Citation marker as printed, with the evidence for the Reference it points at."""
+    """A Citation marker as printed, with the evidence for the Reference it points at.
+
+    `cue` is what the matching rules read: GROBID's text for the marker, or for a scan the
+    author-year or number a pattern found (a bare year carries its author: `Smith, 2021`).
+    """
 
     span: Span
     text: str
-    grobid_text: str | None = None
+    cue: str | None = None
     grobid_reference_id: str | None = None
     link_target: LinkTarget | None = None
 

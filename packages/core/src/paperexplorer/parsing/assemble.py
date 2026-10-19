@@ -2,10 +2,13 @@
 
 import itertools
 import re
+import statistics
+from collections.abc import Callable
 
 from paperexplorer.parsing.grobid import TeiBlock, TeiDocument, TeiReference
 from paperexplorer.parsing.models import (
     Block,
+    BlockKind,
     Box,
     CitationMarker,
     LinkTarget,
@@ -22,15 +25,60 @@ _NUMBERED = re.compile(r"^\W*(?:refs?\.?\s*)?\d{1,3}(?:\s*[,\u2013\-]\s*\d{1,3})
 _NUMBER = re.compile(r"\b\d{1,3}\b")
 _YEAR = re.compile(r"\b(?:1[5-9]|20)\d\d[a-z]?\b")
 _DOI = re.compile(r"10\.\d{4,9}/\S+")
+# A label, or what is left of one, at the start of an entry's box (`[12] `, `12. `, `. `).
+_LEADING_LABEL = re.compile(r"^(?:\[?(\d{1,4})[\].]|[.\]])\s+")
 _SURNAME = re.compile(r"^(?:\[?\d{1,4}[\].]?\s+)?([^,(]+?)\s*[,(]")
 _LABEL_WIDTH = 45.0  # points left of an entry's text where its printed label can sit
+_SAME_SIZE = 0.3  # points: printed heading sizes this close are one heading level
 
 
 def assemble(tei: TeiDocument, layer: TextLayer) -> ParsedWork:
     """Read every GROBID block, marker and Reference from the text layer; add the PDF's links."""
     references = [r for tr in tei.references for r in _references(tr, layer) if r.text]
-    blocks = [b for tb in tei.blocks if (b := _block(tb, layer, references)) is not None]
+    blocks: list[Block] = []
+    headings: list[tuple[str | None, float] | None] = []
+    for tb in tei.blocks:
+        block = _block(tb, layer, references)
+        if block is None:
+            continue
+        blocks.append(block)
+        is_heading = block.kind is BlockKind.HEADING
+        headings.append((tb.number, _printed_size(layer.read(tb.boxes))) if is_heading else None)
+    _nest(blocks, headings)
     return ParsedWork(text_origin=TextOrigin.PRINTED, blocks=blocks, references=references)
+
+
+def _nest(blocks: list[Block], headings: list[tuple[str | None, float] | None]) -> None:
+    """Give every block its Heading Path: numbered headings nest by number, others by size."""
+    level_of = _size_levels([h[1] for h in headings if h is not None and not h[0]])
+    stack: list[tuple[int, str]] = []
+    for block, heading in zip(blocks, headings, strict=True):
+        if heading is None:
+            block.heading_path = [text for _, text in stack]
+            continue
+        number, size = heading
+        digits = re.findall(r"\d+", number or "")
+        level = len(digits) if digits else level_of(size)
+        while stack and stack[-1][0] >= level:
+            stack.pop()
+        block.heading_path = [text for _, text in stack]
+        stack.append((level, block.text))
+
+
+def _size_levels(sizes: list[float]) -> Callable[[float], int]:
+    """Map a printed heading size to its level: the largest size is level 1."""
+    tops: list[float] = []
+    for size in sorted(set(sizes), reverse=True):
+        if not tops or size < tops[-1] - _SAME_SIZE:
+            tops.append(size)
+    return lambda size: next(
+        (i + 1 for i, top in enumerate(tops) if size >= top - _SAME_SIZE), len(tops) or 1
+    )
+
+
+def _printed_size(reading: Reading) -> float:
+    heights = [g.height for g in reading.sources if g is not None]
+    return statistics.median(heights) if heights else 0.0
 
 
 def _block(tb: TeiBlock, layer: TextLayer, references: list[Reference]) -> Block | None:
@@ -80,7 +128,7 @@ def _block(tb: TeiBlock, layer: TextLayer, references: list[Reference]) -> Block
                 hits = sorted(overlapping, key=lambda m, s=span: -_overlap(m.span, s))[:1]
             if hits and (not numbers or len(hits) >= len(numbers)):
                 for m in hits:  # the PDF link already marks this Citation; add GROBID's view
-                    m.grobid_text = ref.text
+                    m.cue = ref.text
                     m.grobid_reference_id = ref.target
                     # Author-year links cover only the year: show GROBID's wider span when it
                     # holds the link's and starts at a word boundary.
@@ -98,18 +146,22 @@ def _block(tb: TeiBlock, layer: TextLayer, references: list[Reference]) -> Block
                 CitationMarker(
                     span=span,
                     text=reading.text[span.start : span.end],
-                    grobid_text=ref.text,
+                    cue=ref.text,
                     grobid_reference_id=ref.target,
                     link_target=target,
                 )
             )
     markers.sort(key=lambda m: m.span.start)
+    sentences = [
+        s for ts in tb.sentences if (s := _span(layer.read(ts.boxes), positions)) is not None
+    ]
     return Block(
         kind=tb.kind,
         heading_path=[],
         page=tb.boxes[0].page,
         boxes=tb.boxes,
         text=reading.text,
+        sentences=sentences,
         citation_markers=markers,
     )
 
@@ -132,6 +184,10 @@ def _references(tr: TeiReference, layer: TextLayer) -> list[Reference]:
     out: list[Reference] = []
     for i, boxes in enumerate(parts):
         text = layer.read(boxes).text
+        label = _label(boxes, layer)
+        if lead := _LEADING_LABEL.match(text):
+            label = label or lead.group(1)
+            text = text[lead.end() :]
         first = i == 0
         surname = _SURNAME.match(text)
         year = _YEAR.search(text)
@@ -139,7 +195,7 @@ def _references(tr: TeiReference, layer: TextLayer) -> list[Reference]:
         out.append(
             Reference(
                 id=tr.id if first else f"{tr.id}-{i + 1}",
-                label=_label(boxes, layer),
+                label=label,
                 text=text,
                 page=boxes[0].page,
                 boxes=boxes,

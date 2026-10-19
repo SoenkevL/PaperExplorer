@@ -35,6 +35,14 @@ services:
     depends_on: [api]
     restart: unless-stopped
 
+  grobid:
+    # Finds where blocks, References and Citations are in a PDF (ADR 0006). CRF models only:
+    # the deep-learning image linked fewer Citations correctly on our corpus.
+    image: grobid/grobid:0.9.1-crf
+    init: true
+    ports: ["127.0.0.1:8070:8070"]
+    restart: unless-stopped
+
   pipeline:
     # One-off runs: docker compose run --rm pipeline explore <zoteroItemKey>
     build: { context: ., dockerfile: docker/pipeline.Dockerfile }
@@ -43,13 +51,16 @@ services:
     environment:
       PE_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       PE_EMBEDDING_BASE_URL: http://host.docker.internal:11434/v1
+      PE_GROBID_URL: http://grobid:8070
       PE_DATA_DIR: /data
     extra_hosts: ["host.docker.internal:host-gateway"]
     volumes:
       - ./data:/data
       # Zotero desktop on the tower syncs PDFs here; mounted read-only.
       - ${ZOTERO_STORAGE_HOST_DIR:-./data/no-zotero}:/zotero/storage:ro
-    depends_on: { db: { condition: service_healthy } }
+    depends_on:
+      db: { condition: service_healthy }
+      grobid: { condition: service_started }
 
 volumes:
   pgdata:

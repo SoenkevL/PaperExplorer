@@ -142,6 +142,7 @@ def _block(tb: TeiBlock, layer: TextLayer, references: list[Reference]) -> Block
                         m.text = reading.text[span.start : span.end]
                 continue
             target = next((t for s, t in page_only if _spans_overlap(s, span)), None)
+            span = _from_word_start(reading.text, span)
             markers.append(
                 CitationMarker(
                     span=span,
@@ -275,6 +276,14 @@ def _overlaps(a: Box, b: Box) -> bool:
         and a.y < b.y + b.height
         and b.y < a.y + a.height
     )
+
+
+def _from_word_start(text: str, span: Span) -> Span:
+    """A multi-word GROBID span that starts inside a word starts at the next word instead."""
+    marker = text[span.start : span.end]
+    if span.start == 0 or not text[span.start - 1].isalnum() or " " not in marker:
+        return span
+    return Span(start=span.start + marker.index(" ") + 1, end=span.end)
 
 
 def _spans_overlap(a: Span, b: Span) -> bool:

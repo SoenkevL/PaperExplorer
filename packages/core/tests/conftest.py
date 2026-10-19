@@ -3,19 +3,23 @@
 import hashlib
 import os
 import shutil
+import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import docker
+import httpx
 import psycopg
 import pytest
 from psycopg.rows import TupleRow
 from testcontainers.community.postgres import PostgresContainer
+from testcontainers.core.container import DockerContainer
 
 from paperexplorer.config import Settings
 from paperexplorer.parsing import ParsedWork, parse
 
 PGVECTOR_IMAGE = "pgvector/pgvector:pg17"
+GROBID_IMAGE = "grobid/grobid:0.9.1-crf"  # the image the recordings came from (compose.yaml)
 FIXTURES = Path(__file__).resolve().parents[3] / "tests" / "fixtures"
 # Recorded output only: a GROBID cache miss fails instead of calling out.
 UNREACHABLE = "http://127.0.0.1:9"
@@ -77,3 +81,23 @@ def db(postgres_url: str) -> Iterator[psycopg.Connection[TupleRow]]:
     """A connection whose changes are rolled back after each test."""
     with psycopg.connect(postgres_url) as conn, conn.transaction(force_rollback=True):
         yield conn
+
+
+@pytest.fixture(scope="session")
+def grobid_url() -> Iterator[str]:
+    """URL of a live GROBID, started once per session (the one live check of the recordings)."""
+    if not _docker_available():
+        pytest.skip("Docker is not running; the live GROBID check needs it")
+    with DockerContainer(GROBID_IMAGE).with_exposed_ports(8070) as container:
+        url = f"http://{container.get_container_host_ip()}:{container.get_exposed_port(8070)}"
+        deadline = time.monotonic() + 180
+        while time.monotonic() < deadline:
+            try:
+                if httpx.get(f"{url}/api/isalive", timeout=2).text.strip() == "true":
+                    break
+            except httpx.HTTPError:
+                pass
+            time.sleep(1)
+        else:
+            pytest.fail("GROBID did not become ready within 180 s")
+        yield url

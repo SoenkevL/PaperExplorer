@@ -1,6 +1,13 @@
 from collections.abc import Callable
 
+import pytest
+from typer.testing import CliRunner
+
+from paperexplorer.cli import app
+from paperexplorer.config import Settings
 from paperexplorer.parsing import Block, CitationMarker, ParsedWork, TextOrigin
+
+from .conftest import fixture_pdf
 
 ParseFixture = Callable[[str], ParsedWork]
 RANGE_1_TO_3 = "[1\u20133]"  # as printed, with an en dash
@@ -166,3 +173,31 @@ def test_scan_citation_markers_are_found_by_pattern(parse_fixture: ParseFixture)
     ]
     spans = [paragraph.text[m.span.start : m.span.end] for m in paragraph.citation_markers[1:3]]
     assert spans[1] == "2021"
+
+
+def test_cli_parse_prints_what_was_found(
+    recorded_settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PE_DATA_DIR", str(recorded_settings.data_dir))
+    monkeypatch.setenv("PE_GROBID_URL", recorded_settings.grobid_url)
+
+    result = CliRunner().invoke(app, ["parse", str(fixture_pdf("villiger2024-tandf"))])
+
+    assert result.exit_code == 0, result.output
+    assert "printed text" in result.stdout
+    assert "References: 80" in result.stdout  # GROBID's 79, one of them two merged entries
+    assert "Citations: 90" in result.stdout
+
+
+def test_marker_starting_inside_a_word_is_trimmed_to_the_next_word(
+    parse_fixture: ParseFixture,
+) -> None:
+    work = parse_fixture("villiger2024-tandf")
+
+    marker = next(
+        m
+        for b in work.blocks
+        for m in b.citation_markers
+        if "de Vos et al., 2016, p. 207" in m.text
+    )
+    assert marker.text == "(de Vos et al., 2016, p. 207)"

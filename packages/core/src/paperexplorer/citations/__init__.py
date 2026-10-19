@@ -38,12 +38,30 @@ class Evidence(StrEnum):
     AUTHOR_YEAR = "author_year"
 
 
+class ConfidenceLevel(StrEnum):
+    """How firmly a Citation is tied to a Reference, as reported to the reader."""
+
+    CERTAIN = "certain"  # the PDF's own exact link target
+    HIGH = "high"
+    LOW = "low"  # one source alone, or sources that disagree
+    UNLINKED = "unlinked"  # no evidence: an Unlinked Citation
+
+
 class CitationLink(BaseModel):
     """A Citation's tie to the Reference it points at."""
 
     reference_id: str
     confidence: float
     evidence: list[Evidence]
+
+
+def confidence_level(link: CitationLink | None) -> ConfidenceLevel:
+    """The level a Citation Link's confidence falls in; no link means an Unlinked Citation."""
+    if link is None:
+        return ConfidenceLevel.UNLINKED
+    if link.confidence >= 1.0:
+        return ConfidenceLevel.CERTAIN
+    return ConfidenceLevel.HIGH if link.confidence >= LOW_CONFIDENCE else ConfidenceLevel.LOW
 
 
 class Citation(BaseModel):

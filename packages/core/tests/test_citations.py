@@ -1,6 +1,15 @@
 from collections.abc import Callable
 
-from paperexplorer.citations import Citation, CitationGraph, Evidence, extract
+import pytest
+
+from paperexplorer.citations import (
+    Citation,
+    CitationGraph,
+    CitationLink,
+    Evidence,
+    confidence_level,
+    extract,
+)
 from paperexplorer.parsing import (
     Block,
     BlockKind,
@@ -179,3 +188,23 @@ def test_author_count_in_the_cue_tells_same_year_entries_apart() -> None:
     graph = extract(doc)
 
     assert [c.link.reference_id if c.link else None for c in graph.citations] == ["b0", "b1"]
+
+
+@pytest.mark.parametrize(
+    ("link", "level"),
+    [
+        (CitationLink(reference_id="b1", confidence=1.0, evidence=[Evidence.PDF_LINK]), "certain"),
+        (
+            CitationLink(
+                reference_id="b1", confidence=0.9, evidence=[Evidence.GROBID, Evidence.LABEL]
+            ),
+            "high",
+        ),
+        (CitationLink(reference_id="b1", confidence=0.6, evidence=[Evidence.LABEL]), "low"),
+        (None, "unlinked"),
+    ],
+)
+def test_a_citation_link_is_certain_high_low_or_missing(
+    link: CitationLink | None, level: str
+) -> None:
+    assert confidence_level(link) == level

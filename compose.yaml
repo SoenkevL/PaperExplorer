@@ -44,7 +44,7 @@ services:
     restart: unless-stopped
 
   pipeline:
-    # One-off runs: docker compose run --rm pipeline explore <zoteroItemKey>
+    # One-off runs: docker compose run --rm pipeline run <stage> <zoteroItemKey>
     build: { context: ., dockerfile: docker/pipeline.Dockerfile }
     profiles: [tools]
     env_file: .env
@@ -53,6 +53,7 @@ services:
       PE_EMBEDDING_BASE_URL: http://host.docker.internal:11434/v1
       PE_GROBID_URL: http://grobid:8070
       PE_DATA_DIR: /data
+      PE_ZOTERO_STORAGE_DIR: /zotero/storage
     extra_hosts: ["host.docker.internal:host-gateway"]
     volumes:
       - ./data:/data

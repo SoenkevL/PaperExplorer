@@ -4,6 +4,7 @@ import hashlib
 import os
 import shutil
 import time
+import uuid
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
@@ -11,6 +12,8 @@ import docker
 import httpx
 import psycopg
 import pytest
+from psycopg import sql
+from psycopg.conninfo import make_conninfo
 from psycopg.rows import TupleRow
 from testcontainers.community.postgres import PostgresContainer
 from testcontainers.core.container import DockerContainer
@@ -87,6 +90,17 @@ def db(postgres_url: str) -> Iterator[psycopg.Connection[TupleRow]]:
     """A connection whose changes are rolled back after each test."""
     with psycopg.connect(postgres_url) as conn, conn.transaction(force_rollback=True):
         yield conn
+
+
+@pytest.fixture
+def scratch_database_url(postgres_url: str) -> Iterator[str]:
+    """URL of a fresh, empty database, for code that commits (the CLI); dropped afterwards."""
+    name = f"scratch_{uuid.uuid4().hex[:12]}"
+    with psycopg.connect(postgres_url, autocommit=True) as admin:
+        admin.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
+    yield make_conninfo(postgres_url, dbname=name)
+    with psycopg.connect(postgres_url, autocommit=True) as admin:
+        admin.execute(sql.SQL("DROP DATABASE {} WITH (FORCE)").format(sql.Identifier(name)))
 
 
 @pytest.fixture

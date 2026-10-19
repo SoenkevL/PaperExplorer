@@ -202,3 +202,35 @@ def test_marker_starting_inside_a_word_is_trimmed_to_the_next_word(
         if "de Vos et al., 2016, p. 207" in m.text
     )
     assert marker.text == "(de Vos et al., 2016, p. 207)"
+
+
+def test_author_and_year_links_of_one_citation_make_one_marker(parse_fixture: ParseFixture) -> None:
+    # Regression: LaTeX links the author part and the year of `(Amigó et al, 2004)` separately;
+    # the year's link stayed a second marker for the same Reference.
+    work = parse_fixture("wegner2023-rsquare")
+
+    paragraph = _block_with(work, "(Amigó et al, 2004). Sur")
+    start = paragraph.text.index("(Amigó et al, 2004)")
+    inside = [m for m in paragraph.citation_markers if start <= m.span.start < start + 19]
+    assert [m.text for m in inside] == ["(Amigó et al, 2004)"]
+    assert _linked_reference_text(work, inside[0]).startswith("Amigó JM, Szczepański J")
+    for block in work.blocks:
+        markers = block.citation_markers
+        for i, a in enumerate(markers):
+            for b in markers[i + 1 :]:
+                same = a.link_target is not None and a.link_target == b.link_target
+                assert not (same and a.span.start < b.span.end and b.span.start < a.span.end)
+
+
+def test_a_bare_year_after_an_author_year_keeps_its_own_reference(
+    parse_fixture: ParseFixture,
+) -> None:
+    work = parse_fixture("wegner2023-rsquare")
+
+    paragraph = _block_with(work, "LZ-78 algorithms (Lempel")
+    start = paragraph.text.index("(Lempel and Ziv, 1976, 1977;")
+    inside = [m for m in paragraph.citation_markers if start <= m.span.start < start + 28]
+    assert [(m.text, _linked_reference_text(work, m)[:21]) for m in inside] == [
+        ("(Lempel and Ziv, 1976,", "Lempel A, Ziv J (1976"),
+        ("1977;", "Lempel A, Ziv J (1977"),
+    ]

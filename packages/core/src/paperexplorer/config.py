@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
@@ -40,6 +40,12 @@ class Settings(BaseSettings):
 
     log_level: LogLevel = "INFO"
     log_format: LogFormat = "text"
+
+    @field_validator("zotero_storage_dir", "tessdata_dir", mode="before")
+    @classmethod
+    def _empty_is_unset(cls, value: object) -> object:
+        """`.env.example` leaves optional folders empty; empty means unset, not the cwd."""
+        return None if value == "" else value
 
     @property
     def cache_dir(self) -> Path:

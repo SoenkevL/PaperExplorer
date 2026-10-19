@@ -35,3 +35,4 @@ docker compose run --rm pipeline version
 ```
 
 Tower-only tests (real Zotero storage, GROBID, the Seed) run there with `uv run pytest -m tower`.
+`scripts/tower-check.sh` runs those, the gate, the Seed and the pipeline image in one go and writes `tower-check.log` to commit back to the branch.

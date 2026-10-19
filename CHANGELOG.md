@@ -17,3 +17,4 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - Citations: `extract(doc)` links each Citation to its Reference with a confidence and evidence, builds Citing Sentences, and reports Unlinked and low-confidence Citations.
 - `paperexplorer parse <pdf>` prints what a PDF parses into; compose `grobid` service; the pipeline image ships Tesseract's English model.
 - CC BY test fixtures with recorded GROBID output, a synthetic scan, and a live GROBID check.
+- `scripts/tower-check.sh`: checks a branch on the tower (gate, GROBID, tower tests, the Seed, pipeline image with OCR) and logs it for review from the Mac.

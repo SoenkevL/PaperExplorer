@@ -1,11 +1,10 @@
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
 from paperexplorer.config import Settings
 from paperexplorer.parsing import ParsedWork, parse
-
-from .conftest import fixture_pdf
 
 RECORDED = ["felippe2021-arxiv", "villiger2024-tandf", "wegner2023-rsquare", "albantakis2023-plos"]
 
@@ -25,7 +24,11 @@ def _structure(work: ParsedWork) -> tuple[object, ...]:
 
 @pytest.mark.parametrize("name", RECORDED)
 def test_fresh_grobid_output_has_the_recorded_structure(
-    name: str, grobid_url: str, recorded_settings: Settings, tmp_path: Path
+    name: str,
+    grobid_url: str,
+    recorded_settings: Settings,
+    fixture_pdf: Callable[[str], Path],
+    tmp_path: Path,
 ) -> None:
     live = Settings(_env_file=None, data_dir=tmp_path / "live", grobid_url=grobid_url)  # pyright: ignore[reportCallIssue]
 

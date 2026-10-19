@@ -1,0 +1,1575 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TEI xml:space="preserve" xmlns="http://www.tei-c.org/ns/1.0" 
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+xsi:schemaLocation="http://www.tei-c.org/ns/1.0 https://raw.githubusercontent.com/kermitt2/grobid/master/grobid-home/schemas/xsd/Grobid.xsd"
+ xmlns:xlink="http://www.w3.org/1999/xlink">
+	<teiHeader xml:lang="en">
+		<fileDesc>
+			<titleStmt>
+				<title level="a" type="main">Threshold-free estimation of entropy from a Pearson matrix</title>
+			</titleStmt>
+			<publicationStmt>
+				<publisher/>
+				<availability  status="unknown">
+					<licence/>
+				</availability>
+				<date type="published" when="2023-02-07">February 7, 2023</date>
+			</publicationStmt>
+			<sourceDesc>
+				<biblStruct status="extracted">
+					<analytic>
+						<author role="corresp">
+							<persName><forename type="first">H</forename><surname>Felippe</surname></persName>
+							<email>h.felippe@fisica.ufrn.br</email>
+							<affiliation key="aff0">
+								<orgName type="department">Department of Physics</orgName>
+								<orgName type="institution">Federal University of Rio Grande do Norte -Natal-RN</orgName>
+								<address>
+									<postCode>59078-970</postCode>
+									<country key="BR">Brazil</country>
+								</address>
+							</affiliation>
+							<affiliation key="aff1">
+								<orgName type="department">Department of Network and Data Science</orgName>
+								<orgName type="institution">Central European University -Vienna</orgName>
+								<address>
+									<postCode>1100</postCode>
+									<country key="AT">Austria</country>
+								</address>
+							</affiliation>
+						</author>
+						<author>
+							<persName><forename type="first">A</forename><surname>Viol</surname></persName>
+							<affiliation key="aff2">
+								<orgName type="department">Cognitive Neuroscience</orgName>
+								<orgName type="institution">Scuola Internazionale Superiore di Studi Avanzati -Trieste</orgName>
+								<address>
+									<postCode>34136</postCode>
+									<country key="IT">Italy</country>
+								</address>
+							</affiliation>
+						</author>
+						<author>
+							<persName><forename type="first">D</forename><forename type="middle">B</forename><surname>De Araujo</surname></persName>
+							<affiliation key="aff3">
+								<orgName type="institution" key="instit1">Brain Institute</orgName>
+								<orgName type="institution" key="instit2">Federal University of Rio Grande do Norte -Natal-RN</orgName>
+								<address>
+									<postCode>59076-550</postCode>
+									<country key="BR">Brazil</country>
+								</address>
+							</affiliation>
+						</author>
+						<author>
+							<persName><forename type="first">M</forename><forename type="middle">G E</forename><surname>Da Luz</surname></persName>
+							<affiliation key="aff4">
+								<orgName type="department">Departamento de Física</orgName>
+								<orgName type="institution">Universidade Federal do Paraná -Curitiba-PR</orgName>
+								<address>
+									<postCode>81531-980</postCode>
+									<country key="BR">Brazil</country>
+								</address>
+							</affiliation>
+						</author>
+						<author>
+							<persName><forename type="first">F</forename><surname>Palhano-Fontes</surname></persName>
+							<affiliation key="aff3">
+								<orgName type="institution" key="instit1">Brain Institute</orgName>
+								<orgName type="institution" key="instit2">Federal University of Rio Grande do Norte -Natal-RN</orgName>
+								<address>
+									<postCode>59076-550</postCode>
+									<country key="BR">Brazil</country>
+								</address>
+							</affiliation>
+						</author>
+						<author>
+							<persName><forename type="first">H</forename><surname>Onias</surname></persName>
+							<affiliation key="aff3">
+								<orgName type="institution" key="instit1">Brain Institute</orgName>
+								<orgName type="institution" key="instit2">Federal University of Rio Grande do Norte -Natal-RN</orgName>
+								<address>
+									<postCode>59076-550</postCode>
+									<country key="BR">Brazil</country>
+								</address>
+							</affiliation>
+						</author>
+						<author>
+							<persName><forename type="first">E</forename><forename type="middle">P</forename><surname>Raposo</surname></persName>
+							<affiliation key="aff5">
+								<orgName type="department" key="dep1">Laboratório de Física Teórica e Computacional</orgName>
+								<orgName type="department" key="dep2">Departamento de Física</orgName>
+								<orgName type="institution">Universidade Federal de Pernambuco -Recife-PE</orgName>
+								<address>
+									<postCode>50670-901</postCode>
+									<country key="BR">Brazil</country>
+								</address>
+							</affiliation>
+						</author>
+						<author>
+							<persName><forename type="first">G</forename><forename type="middle">M</forename><surname>Viswanathan</surname></persName>
+							<affiliation key="aff0">
+								<orgName type="department">Department of Physics</orgName>
+								<orgName type="institution">Federal University of Rio Grande do Norte -Natal-RN</orgName>
+								<address>
+									<postCode>59078-970</postCode>
+									<country key="BR">Brazil</country>
+								</address>
+							</affiliation>
+							<affiliation key="aff6">
+								<orgName type="department">National Institute of Science and Technology of Complex Systems</orgName>
+								<orgName type="institution">Federal University of Rio Grande do Norte -Natal-RN</orgName>
+								<address>
+									<postCode>59078-970</postCode>
+									<country key="BR">Brazil</country>
+								</address>
+							</affiliation>
+						</author>
+						<title level="a" type="main">Threshold-free estimation of entropy from a Pearson matrix</title>
+					</analytic>
+					<monogr>
+						<imprint>
+							<date type="published" when="2023-02-07">February 7, 2023</date>
+						</imprint>
+					</monogr>
+					<idno type="MD5">E2962257F7A98EDE0CE9820C055CC26C</idno>
+					<idno type="arXiv">arXiv:2106.05379v2[physics.data-an]</idno>
+				</biblStruct>
+			</sourceDesc>
+		</fileDesc>
+		<encodingDesc>
+			<appInfo>
+				<application version="0.9.1" ident="GROBID" when="2026-10-19T17:18+0000">
+					<desc>GROBID - A machine learning software for extracting information from scholarly documents</desc>
+					<label type="revision">0.9.1</label>
+					<label type="parameters">startPage=-1, endPage=-1, consolidateCitations=0, consolidateHeader=0, consolidateFunders=0, includeRawAffiliations=false, includeRawCitations=true, includeRawCopyrights=false, generateTeiIds=false, generateTeiCoordinates=[head, p, s, ref, biblStruct, figure, formula, note], flavor=null, debugLabelingCollector=disabled</label>
+					<ref target="https://github.com/kermitt2/grobid"/>
+				</application>
+			</appInfo>
+		</encodingDesc>
+		<profileDesc>
+			<abstract/>
+		</profileDesc>
+	</teiHeader>
+	<facsimile>
+		<surface n="1" ulx="0.0" uly="0.0" lrx="612.0" lry="792.0"/>
+		<surface n="2" ulx="0.0" uly="0.0" lrx="612.0" lry="792.0"/>
+		<surface n="3" ulx="0.0" uly="0.0" lrx="612.0" lry="792.0"/>
+		<surface n="4" ulx="0.0" uly="0.0" lrx="612.0" lry="792.0"/>
+		<surface n="5" ulx="0.0" uly="0.0" lrx="612.0" lry="792.0"/>
+		<surface n="6" ulx="0.0" uly="0.0" lrx="612.0" lry="792.0"/>
+		<surface n="7" ulx="0.0" uly="0.0" lrx="612.0" lry="792.0"/>
+		<surface n="8" ulx="0.0" uly="0.0" lrx="612.0" lry="792.0"/>
+		<surface n="9" ulx="0.0" uly="0.0" lrx="612.0" lry="792.0"/>
+		<surface n="10" ulx="0.0" uly="0.0" lrx="612.0" lry="792.0"/>
+		<surface n="11" ulx="0.0" uly="0.0" lrx="612.0" lry="792.0"/>
+		<surface n="12" ulx="0.0" uly="0.0" lrx="612.0" lry="792.0"/>
+	</facsimile>
+	<text xml:lang="en">
+		<body>
+<div xmlns="http://www.tei-c.org/ns/1.0"><p coords="1,118.01,215.32,389.29,7.86;1,108.80,225.78,398.50,7.86;1,108.80,236.24,398.51,7.86;1,108.80,246.70,398.50,7.86"><s coords="1,118.01,215.32,389.29,7.86;1,108.80,225.78,49.25,7.86">There is demand in diverse fields for a reliable method of estimating the entropy associated with correlations.</s><s coords="1,162.94,225.78,344.36,7.86;1,108.80,236.24,234.16,7.86">The estimation of a unique entropy directly from the Pearson correlation matrix has remained an open problem for more than half a century.</s><s coords="1,349.29,236.24,158.02,7.86;1,108.80,246.70,398.50,7.86">All existing approaches lack generality insofar as they require thresholding choices that arbitrarily remove possibly important information.</s></p><p coords="1,108.80,257.16,398.51,7.86;1,108.80,267.62,398.51,7.86;1,108.80,278.08,398.50,7.86;1,108.80,288.54,398.50,7.86;1,108.80,299.00,104.25,7.86"><s coords="1,108.80,257.16,398.51,7.86;1,108.80,267.62,29.46,7.86">Here we propose an objective procedure for directly estimating a unique entropy of a general Pearson matrix.</s><s coords="1,144.02,267.62,363.29,7.86;1,108.80,278.08,215.68,7.86">We show that upon rescaling the Pearson matrix satisfies all necessary conditions for an analog of the von Neumann entropy to be well defined.</s><s coords="1,328.34,278.08,110.19,7.86">No thresholding is required.</s><s coords="1,442.39,278.08,64.91,7.86;1,108.80,288.54,398.50,7.86;1,108.80,299.00,104.25,7.86">We demonstrate the method by estimating the entropy from neuroimaging time series of the human brain under the influence of a psychedelic.</s></p><p coords="1,63.96,329.29,235.12,9.96;1,54.00,341.24,245.08,9.96;1,54.00,353.20,136.39,9.96;1,213.37,353.20,85.71,9.96;1,54.00,365.15,245.08,9.96;1,54.00,377.11,117.42,9.96;1,195.64,377.11,86.82,9.96;1,295.76,377.11,3.32,9.96;1,54.00,389.06,85.61,9.96;1,163.11,389.06,135.97,9.96;1,54.00,401.02,245.08,9.96;1,54.00,412.97,136.66,9.96;1,208.73,412.97,90.35,9.96;1,54.00,424.93,245.08,9.96;1,54.00,436.88,245.08,9.96;1,54.00,448.84,245.08,9.96;1,54.00,460.79,245.08,9.96;1,54.00,472.75,223.44,9.96;1,65.62,484.70,233.46,9.96;1,54.00,496.66,245.08,9.96;1,54.00,508.61,34.40,9.96"><s coords="1,63.96,329.29,235.12,9.96;1,54.00,341.24,245.08,9.96;1,54.00,353.20,163.24,9.96">An important open problem in many fields concerns how to estimate the entropy from the Pearson correlation matrix of an arbitrary data set <ref type="bibr" coords="1,194.00,353.20,7.75,9.96">[1]</ref><ref type="bibr" coords="1,201.74,353.20,3.87,9.96">[2]</ref><ref type="bibr" coords="1,205.62,353.20,7.75,9.96">[3]</ref>.</s><s coords="1,222.53,353.20,76.55,9.96;1,54.00,365.15,245.08,9.96;1,54.00,377.11,245.08,9.96;1,54.00,389.06,112.99,9.96">This problem has wide and immediate applicability to diverse phenomena, e.g., correlated asset prices <ref type="bibr" coords="1,174.77,377.11,10.52,9.96">[4,</ref><ref type="bibr" coords="1,188.63,377.11,7.01,9.96">5]</ref>, diffusion processes <ref type="bibr" coords="1,285.79,377.11,9.96,9.96">[6]</ref>, and brain networks <ref type="bibr" coords="1,143.74,389.06,7.75,9.96">[7]</ref><ref type="bibr" coords="1,151.49,389.06,3.87,9.96">[8]</ref><ref type="bibr" coords="1,155.37,389.06,7.75,9.96">[9]</ref>.</s><s coords="1,173.88,389.06,125.20,9.96;1,54.00,401.02,245.08,9.96;1,54.00,412.97,158.38,9.96">The Shannon entropy solves the simpler problem of how to calculate the entropy given a probability distribution <ref type="bibr" coords="1,194.11,412.97,14.61,9.96">[10]</ref>.</s><s coords="1,217.20,412.97,81.88,9.96;1,54.00,424.93,245.08,9.96;1,54.00,436.88,245.08,9.96;1,54.00,448.84,245.08,9.96;1,54.00,460.79,245.08,9.96;1,54.00,472.75,245.08,9.96;1,54.00,484.70,15.50,9.96">However, attempts to extend this formalism to estimate the entropy of a correlation matrix have required admittedly ad hoc methods, such as the thresholding of the correlation matrix to generate a new symmetric and unweighted adjacency matrix consisting only of 0's and 1's <ref type="bibr" coords="1,283.58,472.75,15.50,9.96">[11,</ref><ref type="bibr" coords="1,54.00,484.70,11.62,9.96">12]</ref>.</s><s coords="1,74.70,484.70,224.38,9.96;1,54.00,496.66,245.08,9.96;1,54.00,508.61,34.40,9.96">The resulting adjacency matrix represents a simple graph, which can then be studied using topological metrics.</s></p><p coords="1,108.57,508.61,190.51,9.96;1,54.00,520.57,245.08,9.96;1,54.00,532.52,222.52,9.96;1,295.43,532.52,3.65,9.96;1,54.00,544.48,222.33,9.96;1,65.62,556.43,233.46,9.96;1,54.00,568.39,140.26,9.96;1,212.19,568.39,3.65,9.96"><s coords="1,108.57,508.61,190.51,9.96;1,54.00,520.57,245.08,9.96;1,54.00,532.52,245.09,9.96;1,54.00,544.48,245.08,9.96;1,54.00,556.43,15.50,9.96">These methods have led to significant advances in diverse fields, examples of which include applications to market volatility in financial crisis <ref type="bibr" coords="1,280.82,532.52,14.61,9.96">[13]</ref>, and to scale-free and small-world brain networks <ref type="bibr" coords="1,281.37,544.48,13.28,9.96">[14]</ref><ref type="bibr" coords="1,294.65,544.48,4.43,9.96">[15]</ref><ref type="bibr" coords="1,54.00,556.43,11.62,9.96">[16]</ref>.</s><s coords="1,78.14,556.43,220.95,9.96;1,54.00,568.39,161.84,9.96">Nevertheless, they have drawbacks that motivate the search for better approaches <ref type="bibr" coords="1,197.57,568.39,14.61,9.96">[17]</ref>.</s></p><p coords="1,63.96,580.34,235.12,9.96;1,54.00,592.30,245.08,9.96;1,54.00,604.25,50.67,9.96;1,123.79,604.25,175.30,9.96;1,54.00,615.96,245.08,10.21;1,54.00,628.17,245.08,9.96;1,54.00,640.12,245.08,9.96;1,54.00,651.83,245.08,10.21;1,54.00,664.03,245.08,9.96;1,54.00,675.74,245.08,10.21;1,317.01,329.29,245.08,9.96;1,317.01,341.24,245.08,9.96;1,317.01,353.20,245.08,9.96;1,317.01,365.15,245.08,9.96;1,317.01,377.11,53.77,9.96;1,403.97,377.11,158.12,9.96;1,317.01,389.06,245.08,9.96;1,317.01,401.02,245.08,9.96;1,317.01,412.97,98.61,9.96;1,433.25,412.97,88.44,9.96;1,539.31,412.97,22.78,9.96;1,317.01,424.93,78.28,9.96;1,415.25,424.93,146.84,9.96;1,317.01,436.88,245.08,9.96"><s coords="1,63.96,580.34,235.12,9.96;1,54.00,592.30,245.08,9.96;1,54.00,604.25,73.44,9.96">The main limitation of the existing methods is that the thresholding operation inevitably leads to loss of information <ref type="bibr" coords="1,109.18,604.25,14.61,9.96">[18]</ref>.</s><s coords="1,135.42,604.25,163.66,9.96;1,54.00,615.96,201.13,10.21">Consider, for example, the set of all possible 2 × 2 Pearson correlation matrices.</s><s coords="1,265.96,616.21,33.12,9.96;1,54.00,628.17,245.08,9.96;1,54.00,640.12,245.08,9.96;1,54.00,651.83,151.12,10.21">Since a correlation coefficient can assume any real value in the closed interval [-1, 1], there are an infinite number of possible 2 × 2 Pearson matrices.</s><s coords="1,217.31,652.08,81.77,9.96;1,54.00,664.03,245.08,9.96;1,54.00,675.74,245.08,10.21;1,317.01,329.29,118.54,9.96">In contrast, there are only two corresponding adjacency matrices of size 2 × 2 because a simple graph with two nodes is either connected or disconnected.</s><s coords="1,442.50,329.29,119.60,9.96;1,317.01,341.24,155.11,9.96">Significant information can thus be lost due to thresholding.</s><s coords="1,484.49,341.24,77.61,9.96;1,317.01,353.20,245.08,9.96;1,317.01,365.15,245.08,9.96;1,317.01,377.11,90.84,9.96">As an important example, we mention that in neuroimaging data the results are not always robust with respect to the choice of thresholding <ref type="bibr" coords="1,373.81,377.11,15.50,9.96">[19,</ref><ref type="bibr" coords="1,392.35,377.11,11.62,9.96" target="#b19">20]</ref>.</s><s coords="1,412.17,377.11,149.93,9.96;1,317.01,389.06,245.08,9.96;1,317.01,401.02,245.08,9.96;1,317.01,412.97,245.08,9.96;1,317.01,424.93,101.89,9.96">Insofar as unweighted matrices are used, these methods are only indirectly measuring the entropy of correlations, generally via topological metrics such as network motifs <ref type="bibr" coords="1,418.64,412.97,14.61,9.96" target="#b20">[21]</ref>, degree distribution <ref type="bibr" coords="1,524.71,412.97,14.60,9.96" target="#b21">[22]</ref>, and geodesic diversity <ref type="bibr" coords="1,400.64,424.93,14.61,9.96" target="#b22">[23]</ref>.</s><s coords="1,429.44,424.93,132.66,9.96;1,317.01,436.88,245.08,9.96">There is thus a growing and vexing demand for a better method of estimating entropy.</s></p><p coords="1,326.98,448.84,235.12,9.96;1,317.01,460.79,245.08,9.96;1,317.01,472.75,245.08,9.96;1,317.01,484.45,245.08,10.21;1,317.01,496.66,245.08,9.96;1,317.01,508.61,245.08,10.71;1,317.01,520.57,245.08,9.96;1,317.01,532.52,245.08,9.96;1,317.01,544.48,245.08,9.96;1,317.01,556.43,53.71,9.96"><s coords="1,326.98,448.84,235.12,9.96;1,317.01,460.79,245.08,9.96;1,317.01,472.75,245.08,9.96;1,317.01,484.70,37.47,9.96">Here, we demonstrate that the problem of how to calculate the entropy of a correlation matrix can be solved without the need of an adjacency matrix or ad hoc schemes.</s><s coords="1,358.89,484.45,203.20,10.21;1,317.01,496.66,117.00,9.96">Let R be a general N × N Pearson correlation matrix and let ρ = R/N .</s><s coords="1,441.49,496.66,120.61,9.96;1,317.01,508.61,245.08,10.71;1,317.01,520.57,170.92,9.96">We show below that ρ has N non-negative eigenvalues λ j that add up to 1, so that ρ has unit trace (i.e., trρ = 1).</s><s coords="1,496.64,520.57,65.46,9.96;1,317.01,532.52,245.08,9.96;1,317.01,544.48,245.08,9.96;1,317.01,556.43,53.71,9.96">If we interpret these eigenvalues as a probability distribution, then we can define the Shannon entropy for this distribution according to</s></p><formula xml:id="formula_0" coords="1,388.77,575.57,173.32,31.18">S(ρ) = - N j=1 λ j log λ j .<label>(1)</label></formula><p coords="1,317.01,616.00,245.08,9.96;1,317.01,627.96,79.78,9.96"><s coords="1,317.01,616.00,245.08,9.96;1,317.01,627.96,79.78,9.96">In terms of the trace of a matrix, we can equivalently write the above as</s></p><formula xml:id="formula_1" coords="1,393.78,647.86,168.32,10.21">S(ρ) = -tr(ρ log ρ) .<label>(2)</label></formula><p coords="1,326.98,668.26,235.12,9.96;1,317.01,680.22,204.23,9.96;1,525.49,680.22,36.61,9.96;1,317.01,692.17,245.08,9.96;1,317.01,704.13,245.08,9.96;1,317.01,716.09,9.11,10.71;1,345.56,716.09,216.54,9.96;2,116.23,53.64,11.81,9.26;2,301.87,53.85,12.32,9.26"><s coords="1,326.98,668.26,235.12,9.96;1,317.01,680.22,245.08,9.96;1,317.01,692.17,245.08,9.96;1,317.01,704.13,245.08,9.96;1,317.01,716.09,32.20,10.71">The reader familiar with quantum statistical mechanics will immediately recognize Eq. ( <ref type="formula" coords="1,521.24,680.22,4.24,9.96" target="#formula_1">2</ref>) as an analogue of the von Neumann entropy for a density operator ρ for an ensemble of states with probabilities λ j <ref type="bibr" coords="1,330.94,716.09,14.61,9.96" target="#b23">[24]</ref>.</s><s coords="1,355.44,716.09,206.66,9.96;2,116.23,53.64,11.81,9.26;2,301.87,53.85,12.32,9.26">Indeed, the problem of calculating the entropy (a) (b)</s></p><formula xml:id="formula_2" coords="2,54.00,53.74,496.28,167.69">x (k) i 1 n Data points x i x j x (k) j (c) i j -1/N + 1/N x 1 x 2 x 3 x N -1 x N . . . O Figure 1.</formula><p coords="2,100.13,213.57,461.96,7.86;2,54.00,224.03,508.10,7.86;2,54.00,236.34,76.16,7.86;2,130.16,233.80,9.83,5.24;2,130.16,240.77,2.66,5.24;2,143.12,236.34,316.57,7.86;2,463.27,236.34,98.82,7.86;2,54.00,246.77,508.09,7.89;2,54.00,257.26,508.10,7.86;2,54.00,267.72,238.37,7.86;2,295.95,267.72,7.17,7.86"><s coords="2,100.13,213.57,293.90,7.86">The construction of a density matrix from a Pearson correlation matrix.</s><s coords="2,398.86,213.57,163.24,7.86;2,54.00,224.03,164.48,7.86">(a) The system of interest is partitioned into N interacting components or nodes.</s><s coords="2,222.95,224.03,247.92,7.86">(b) The correlation between nodes i and j is then calculated.</s><s coords="2,475.33,224.03,86.77,7.86;2,54.00,236.34,76.16,7.86;2,130.16,233.80,9.83,5.24;2,130.16,240.77,2.66,5.24;2,143.12,236.34,63.01,7.86">For each i node there are n data points x (k) i where k = 1, . . .</s><s coords="2,207.66,236.34,12.22,7.86">, n.</s><s coords="2,223.83,236.34,338.27,7.86;2,54.00,246.77,447.73,7.89">The correlation Rij between nodes i and j is given by Eq. ( <ref type="formula" coords="2,459.69,236.34,3.58,7.86" target="#formula_3">3</ref>), and lies in the interval -1 ≤ Rij ≤ 1. (c) For each correlation coefficient Rij, we calculate ρij = Rij/N , yielding the matrix ρ = R/N .</s><s coords="2,505.78,246.77,56.32,7.89;2,54.00,257.26,474.07,7.86">This matrix ρ fully satisfies the properties of a density operator, i.e., (i) hermiticity, (ii) unit trace, and (iii) positive semidefiniteness.</s><s coords="2,532.01,257.26,30.08,7.86;2,54.00,267.72,231.72,7.86">Finally, we calculate the entropy from this density matrix via Eq.</s><s coords="2,288.79,267.72,14.34,7.86">( <ref type="formula" coords="2,292.37,267.72,3.58,7.86" target="#formula_1">2</ref>).</s></p><p coords="2,54.00,300.49,245.08,9.96;2,54.00,312.45,245.08,9.96;2,54.00,324.40,59.80,9.96;2,134.33,324.40,69.80,9.96;2,221.26,324.40,77.82,9.96;2,54.00,336.36,245.08,9.96;2,54.00,348.32,245.08,9.96;2,54.00,360.27,245.08,9.96;2,54.00,372.23,212.48,9.96;2,273.68,372.23,7.75,9.96"><s coords="2,54.00,300.49,245.08,9.96;2,54.00,312.45,245.08,9.96;2,54.00,324.40,170.91,9.96">of a Hermitian matrix with non-negative eigenvalues and with unit trace was solved almost a century ago by John von Neumann <ref type="bibr" coords="2,116.33,324.40,15.50,9.96" target="#b24">[25]</ref> and Lev Landau <ref type="bibr" coords="2,206.64,324.40,14.61,9.96" target="#b25">[26]</ref>.</s><s coords="2,229.07,324.40,70.01,9.96;2,54.00,336.36,245.08,9.96;2,54.00,348.32,245.08,9.96;2,54.00,360.27,20.20,9.96">However, a form of entropy defined in terms of a density operator had not been applied to Pearson correlation matrices until now.</s><s coords="2,80.86,360.27,218.22,9.96;2,54.00,372.23,227.43,9.96">This procedure will thereby allow the calculation of the entropy from the Pearson matrix (see Fig. <ref type="figure" coords="2,269.81,372.23,3.87,9.96">1</ref>).</s></p><p coords="2,63.96,391.06,235.12,8.77;2,54.00,402.38,245.08,9.96;2,54.00,414.33,245.08,9.96;2,54.00,427.67,191.03,10.71;2,245.03,424.74,10.20,6.97;2,245.03,432.69,2.82,6.97;2,255.72,427.67,27.83,9.96;2,283.56,424.74,11.15,6.97;2,283.56,432.69,2.82,6.97;2,295.21,427.67,3.87,9.96;2,54.00,439.63,245.09,9.96;2,54.00,451.33,245.08,10.21;2,54.00,463.29,245.08,10.96;2,54.00,475.49,118.84,10.71;2,173.20,474.12,3.97,6.97;2,172.84,480.33,2.82,6.97;2,182.28,475.49,25.68,9.96;2,208.73,474.12,3.97,6.97;2,207.96,480.33,2.82,6.97;2,221.50,475.49,77.57,9.96;2,54.00,487.45,245.08,10.71;2,54.00,499.40,220.34,9.96"><s coords="2,63.96,391.06,235.12,8.77;2,54.00,403.01,46.53,8.77">Direct estimation of entropy from the Pearson matrix.</s><s coords="2,104.11,402.38,194.97,9.96;2,54.00,414.33,82.69,9.96">-We first review the definition of the Pearson correlation matrix.</s><s coords="2,144.01,414.33,155.07,9.96;2,54.00,427.67,135.32,9.96">Consider N data sets, each with a population of n measurements.</s><s coords="2,194.27,427.67,50.76,10.71;2,245.03,424.74,10.20,6.97;2,245.03,432.69,2.82,6.97;2,255.72,427.67,16.05,9.96">Let x i = (x (1) i , . . .</s><s coords="2,273.44,427.67,10.12,9.96;2,283.56,424.74,11.15,6.97;2,283.56,432.69,2.82,6.97;2,295.21,427.67,3.87,9.96;2,54.00,439.63,245.09,9.96;2,54.00,451.58,15.00,9.96">, x (n) i ) denote the sequence of n measurements of the i-th data set.</s><s coords="2,73.10,451.33,225.98,10.21;2,54.00,463.29,245.08,10.96;2,54.00,475.49,118.84,10.71;2,173.20,474.12,3.97,6.97;2,172.84,480.33,2.82,6.97;2,182.28,475.49,25.68,9.96;2,208.73,474.12,3.97,6.97;2,207.96,480.33,2.82,6.97;2,221.50,475.49,77.57,9.96;2,54.00,487.45,12.65,10.71">Let • denote the average taken over the population of n points, so that X i = x ix i represents deviations from the mean x i and σ 2 i = X 2 i is the variance of x i .</s><s coords="2,72.06,487.45,227.02,9.96;2,54.00,499.40,220.34,9.96">The correlation between the i-th and j-th data sets is then given by the Pearson correlation coefficient</s></p><formula xml:id="formula_3" coords="2,58.82,519.95,240.26,42.36">R ij = 1 n n k=1 x (k) i -x i σ i x (k) j -x j σ j = X i X j σ i σ j .<label>(3)</label></formula><p coords="2,54.00,570.29,245.04,10.21;2,54.00,582.50,118.36,10.71;2,176.23,582.50,7.75,9.96;2,63.96,594.54,235.12,9.96;2,54.00,606.50,245.08,9.96;2,54.00,618.45,245.08,9.96;2,54.00,630.41,245.08,9.96;2,54.00,642.11,245.08,10.96;2,54.00,654.32,124.37,10.71;2,196.37,654.32,102.71,9.96;2,54.00,666.27,245.08,9.96;2,54.00,678.23,245.08,9.96;2,54.00,690.18,245.08,9.96;2,54.00,702.14,245.08,9.96;2,54.00,714.09,245.08,9.96;2,317.01,300.49,93.99,9.96;2,415.25,300.49,146.84,9.96;2,317.01,312.45,82.41,9.96;2,437.18,312.45,103.47,9.96;2,558.44,312.45,3.65,9.96;2,317.01,324.40,245.08,9.96;2,317.01,336.36,161.79,9.96;2,525.75,336.36,36.34,9.96;2,317.01,348.32,245.08,9.96;2,317.01,360.27,104.43,9.96;2,438.83,360.27,123.26,9.96;2,317.01,372.23,210.16,9.96"><s coords="2,54.00,570.29,245.04,10.21;2,54.00,582.50,129.98,10.71">The Pearson correlation matrix is the N × N matrix R with entries R ij as in Eq. ( <ref type="formula" coords="2,172.36,582.50,3.87,9.96" target="#formula_3">3</ref>).</s><s coords="2,63.96,594.54,235.12,9.96;2,54.00,606.50,245.08,9.96;2,54.00,618.45,245.08,9.96;2,54.00,630.41,245.08,9.96;2,54.00,642.11,245.08,10.96;2,54.00,654.32,146.02,10.71">Given a Pearson correlation matrix R, the entropy is often estimated by using a different (but related) object as a proxy, viz., a binary adjacency matrix A. The latter is defined by imposing a threshold value ξ over the entries of R. Specifically, one sets A ij = 1 whenever |R ij | ≥ ξ for i = j, and A ij = 0 otherwise <ref type="bibr" coords="2,181.76,654.32,14.61,9.96" target="#b26">[27]</ref>.</s><s coords="2,204.63,654.32,94.45,9.96;2,54.00,666.27,245.08,9.96;2,54.00,678.23,26.07,9.96">The matrix A defines a graph with N nodes and undirected and unweighted edges.</s><s coords="2,85.62,678.23,213.46,9.96;2,54.00,690.18,245.08,9.96;2,54.00,702.14,245.08,9.96;2,54.00,714.09,76.23,9.96">The entropy estimation, then, becomes a matter of computing the Shannon entropy of certain probability distributions embedded in the graph structure of A, as explained earlier.</s><s coords="2,139.85,714.09,159.23,9.96;2,317.01,300.49,245.08,9.96;2,317.01,312.45,245.08,9.96;2,317.01,324.40,245.08,9.96;2,317.01,336.36,212.61,9.96">We note that, in network analysis, the entropy in Eq. ( <ref type="formula" coords="2,411.01,300.49,4.24,9.96" target="#formula_1">2</ref>) has previously been used with adjacency matrices <ref type="bibr" coords="2,402.60,312.45,15.50,9.96" target="#b27">[28,</ref><ref type="bibr" coords="2,421.28,312.45,12.73,9.96" target="#b28">29]</ref> and networks in general <ref type="bibr" coords="2,543.83,312.45,14.61,9.96" target="#b29">[30]</ref>, rendering a properly sub-additive spectral entropy for model selection of complex networks <ref type="bibr" coords="2,482.83,336.36,10.52,9.96">[3,</ref><ref type="bibr" coords="2,497.37,336.36,12.73,9.96" target="#b30">31,</ref><ref type="bibr" coords="2,514.13,336.36,11.62,9.96" target="#b31">32]</ref>.</s><s coords="2,536.16,336.36,25.93,9.96;2,317.01,348.32,245.08,9.96;2,317.01,360.27,125.47,9.96">It has also been analyzed in the context of measures of fit of multiple latent variables <ref type="bibr" coords="2,424.21,360.27,14.61,9.96" target="#b32">[33]</ref>.</s><s coords="2,446.72,360.27,115.37,9.96;2,317.01,372.23,210.16,9.96">However, it has never been applied directly to Pearson correlation matrices.</s></p><p coords="2,326.98,384.18,235.12,9.96;2,317.01,396.14,245.08,9.96;2,317.01,408.09,245.08,9.96;2,317.01,420.05,77.76,9.96;2,415.96,420.05,146.13,9.96;2,317.01,432.00,245.08,9.96;2,317.01,443.96,33.65,9.96;2,383.61,443.96,178.49,9.96;2,317.01,455.91,245.08,9.96;2,317.01,467.87,245.08,9.96;2,317.01,479.82,245.08,9.96;2,317.01,491.78,188.62,9.96;2,546.29,491.78,15.80,9.96;2,317.01,503.73,245.08,9.96;2,317.01,515.69,54.32,9.96;2,403.76,515.69,158.34,9.96;2,317.01,527.64,245.08,9.96;2,317.01,539.60,45.11,9.96;2,393.59,539.60,168.50,9.96;2,317.01,551.55,245.08,9.96;2,317.01,563.51,140.13,9.96;2,475.26,563.51,86.84,9.96;2,317.01,575.46,245.08,9.96;2,317.01,587.42,38.55,9.96;2,368.85,587.42,3.32,9.96"><s coords="2,326.98,384.18,235.12,9.96;2,317.01,396.14,245.08,9.96;2,317.01,408.09,245.08,9.96;2,317.01,420.05,102.60,9.96">Numerous properties of correlation matrices can be extracted from their thresholded counterparts, partly due to the information that remains stored in the topology of simple graphs <ref type="bibr" coords="2,401.35,420.05,14.61,9.96" target="#b33">[34]</ref>.</s><s coords="2,433.80,420.05,128.29,9.96;2,317.01,432.00,245.08,9.96;2,317.01,443.96,70.74,9.96">Hence, these methods have become pivotal and ubiquitous in the study of complex systems <ref type="bibr" coords="2,354.55,443.96,12.45,9.96">[13]</ref><ref type="bibr" coords="2,367.00,443.96,4.15,9.96">[14]</ref><ref type="bibr" coords="2,371.15,443.96,12.45,9.96">[15]</ref>.</s><s coords="2,393.88,443.96,168.22,9.96;2,317.01,455.91,245.08,9.96;2,317.01,467.87,245.08,9.96;2,317.01,479.82,245.08,9.96;2,317.01,491.78,245.08,9.96;2,317.01,503.73,245.08,9.96;2,317.01,515.69,94.49,9.96">In neuroscience, for instance, different thresholding schemes are extensively used to deduce the structural and functional connectivity of the brain, despite the selected method possibly influencing over and misleading the neuroimaging data analysis <ref type="bibr" coords="2,509.78,491.78,15.50,9.96" target="#b34">[35,</ref><ref type="bibr" coords="2,529.42,491.78,12.73,9.96" target="#b35">36]</ref> (for context, see a thorough review of thresholding in network neuroscience <ref type="bibr" coords="2,373.99,515.69,15.50,9.96" target="#b36">[37,</ref><ref type="bibr" coords="2,392.14,515.69,11.62,9.96" target="#b37">38]</ref>).</s><s coords="2,415.71,515.69,146.38,9.96;2,317.01,527.64,245.08,9.96;2,317.01,539.60,80.73,9.96">But there are yet other drawbacks to this approach, in addition to the limitations previously mentioned <ref type="bibr" coords="2,364.53,539.60,12.45,9.96">[17]</ref><ref type="bibr" coords="2,376.99,539.60,4.15,9.96">[18]</ref><ref type="bibr" coords="2,376.99,539.60,4.15,9.96">[19]</ref><ref type="bibr" coords="2,381.14,539.60,12.45,9.96" target="#b19">[20]</ref>.</s><s coords="2,401.87,539.60,160.23,9.96;2,317.01,551.55,245.08,9.96;2,317.01,563.51,161.90,9.96">Not only can thresholding lead to loss of information, it can even inject spurious complexity into genuinely random networks <ref type="bibr" coords="2,460.65,563.51,14.61,9.96" target="#b38">[39]</ref>.</s><s coords="2,483.89,563.51,78.21,9.96;2,317.01,575.46,245.08,9.96;2,317.01,587.42,55.16,9.96">For these reasons, such methods require caution when applied to real-world networks <ref type="bibr" coords="2,358.89,587.42,9.96,9.96">[9]</ref>.</s></p><p coords="2,326.98,599.37,235.11,9.96;2,317.01,611.33,245.09,9.96;2,317.01,623.28,245.08,9.96;2,317.01,635.24,245.08,9.96;2,317.01,646.95,245.08,10.21;2,317.01,659.15,104.42,9.96"><s coords="2,326.98,599.37,235.11,9.96;2,317.01,611.33,245.09,9.96;2,317.01,623.28,245.08,9.96;2,317.01,635.24,31.85,9.96">In order to overcome these difficulties, we develop a way to estimate the entropy directly from the Pearson correlation matrix, without relying on an adjacency matrix.</s><s coords="2,353.10,635.24,208.99,9.96;2,317.01,646.95,245.08,10.21;2,317.01,659.15,104.42,9.96">Our method rests on the following mathematical foundation: if R is an arbitrary N × N Pearson correlation matrix, then</s></p><formula xml:id="formula_4" coords="2,424.12,674.78,133.73,23.54">ρ = R N (<label>4</label></formula><formula xml:id="formula_5" coords="2,557.85,681.52,4.24,9.96">)</formula><p coords="2,317.01,702.14,245.08,9.96;2,317.01,714.09,245.08,9.96;3,54.00,54.57,245.08,9.96;3,54.00,66.52,245.09,9.96;3,54.00,78.48,142.08,9.96"><s coords="2,317.01,702.14,245.08,9.96;2,317.01,714.09,245.08,9.96;3,54.00,54.57,72.12,9.96">satisfies all the conditions for a density operator, namely, (i) hermiticity, (ii) unit trace, and (iii) positive semidefiniteness.</s><s coords="3,130.27,54.57,168.81,9.96;3,54.00,66.52,213.91,9.96">To see this, observe that R has real and symmetric entries, from which follows claim (i).</s><s coords="3,275.28,66.52,23.81,9.96;3,54.00,78.48,142.08,9.96">Next, the diagonal entries are given by</s></p><formula xml:id="formula_6" coords="3,138.46,100.53,160.62,26.94">R ii = X 2 i σ 2 i = 1 ,<label>(5)</label></formula><p coords="3,54.00,139.10,245.08,9.96;3,54.00,151.06,245.08,9.96;3,54.00,162.77,183.19,10.21;3,237.20,161.64,6.31,6.97;3,244.75,163.01,54.33,9.96;3,54.00,174.97,245.08,9.96;3,54.00,186.93,122.18,9.96"><s coords="3,54.00,139.10,162.85,9.96">so that trR = N , leading to claim (ii).</s><s coords="3,220.98,139.10,78.09,9.96;3,54.00,151.06,173.01,9.96">For (iii), it suffices to show that R is positive semidefinite.</s><s coords="3,232.11,151.06,66.97,9.96;3,54.00,162.77,183.19,10.21;3,237.20,161.64,6.31,6.97;3,244.75,163.01,2.77,9.96">In other words, we must show that v •R v ≥ 0 for all v ∈ R N .</s><s coords="3,251.70,163.01,47.38,9.96;3,54.00,174.97,245.08,9.96;3,54.00,186.93,61.21,9.96">In fact, the positive semidefiniteness of Pearson correlation matrices is well known.</s><s coords="3,119.65,186.93,56.53,9.96">Observe that</s></p><formula xml:id="formula_7" coords="3,65.74,207.04,229.09,34.71">N ij v i n k X (k) i X (k) j v j = n k N i v i X (k) i 2 ≥ 0 . (<label>6</label></formula><formula xml:id="formula_8" coords="3,294.84,220.55,4.24,9.96">)</formula><p coords="3,63.96,256.17,235.12,9.96;3,54.00,268.12,245.08,9.96;3,54.00,280.08,49.90,9.96;3,107.77,280.08,118.62,9.96;3,230.27,280.08,68.81,9.96;3,54.00,292.03,245.08,9.96;3,54.00,303.99,245.08,9.96;3,54.00,315.94,221.89,9.96;3,295.43,315.94,3.65,9.96;3,54.00,327.90,245.09,9.96;3,54.00,339.85,245.08,9.96;3,54.00,351.81,245.08,9.96;3,54.00,363.76,245.08,9.96;3,54.00,375.72,123.00,9.96"><s coords="3,63.96,256.17,149.33,9.96">We can now state our main result.</s><s coords="3,217.66,256.17,81.43,9.96;3,54.00,268.12,245.08,9.96;3,54.00,280.08,184.02,9.96">Given an arbitrary Pearson correlation matrix, the entropy can be calculated from Eq. ( <ref type="formula" coords="3,103.90,280.08,3.87,9.96" target="#formula_1">2</ref>), with ρ given by Eq. ( <ref type="formula" coords="3,226.40,280.08,3.87,9.96" target="#formula_4">4</ref>).</s><s coords="3,248.98,280.08,50.10,9.96;3,54.00,292.03,245.08,9.96;3,54.00,303.99,245.08,9.96;3,54.00,315.94,245.08,9.96">We remark in passing that many other correlation matrices (e.g., Spearman, Kendall) will satisfy analogous conditions, so long as they consist of real symmetric entries <ref type="bibr" coords="3,280.82,315.94,14.61,9.96" target="#b39">[40]</ref>.</s><s coords="3,54.00,327.90,245.09,9.96;3,54.00,339.85,245.08,9.96;3,54.00,351.81,54.55,9.96">For normalized time series this definition of the density operator is the same as the covariance matrix divided by its trace.</s><s coords="3,116.65,351.81,182.43,9.96;3,54.00,363.76,245.08,9.96;3,54.00,375.72,123.00,9.96">Furthermore, one can readily verify that S(ρ) = log N is the maximal entropy value for a system of N uncorrelated data sets.</s></p><p coords="3,63.96,388.88,235.12,9.96;3,54.00,400.84,245.08,9.96;3,54.00,412.79,245.08,9.96;3,54.00,424.75,245.08,9.96;3,54.00,436.70,245.08,9.96;3,54.00,448.66,245.09,9.96;3,54.00,460.61,245.08,9.96;3,54.00,472.57,245.08,9.96;3,54.00,484.52,243.99,9.96;3,54.00,496.48,245.08,9.96;3,54.00,508.43,245.08,9.96;3,54.00,520.39,245.08,9.96;3,54.00,532.34,81.72,9.96"><s coords="3,63.96,388.88,235.12,9.96;3,54.00,400.84,245.08,9.96;3,54.00,412.79,245.08,9.96;3,54.00,424.75,245.08,9.96;3,54.00,436.70,31.85,9.96">In conceptual terms, the method here proposed is a mathematical device that yields a set of scaled eigenvalues, in such a way that makes it possible to assign a well defined entropy to any given Pearson correlation matrix.</s><s coords="3,90.80,436.70,208.28,9.96;3,54.00,448.66,245.09,9.96;3,54.00,460.61,201.17,9.96">This entropy is the analog of the von Neumann entropy for a density operator ρ and is a continuous nonnegative real functional of the Pearson matrix.</s><s coords="3,259.47,460.61,39.60,9.96;3,54.00,472.57,245.08,9.96;3,54.00,484.52,243.99,9.96;3,54.00,496.48,245.08,9.96;3,54.00,508.43,245.08,9.96;3,54.00,520.39,245.08,9.96;3,54.00,532.34,81.72,9.96">However, apart from the special case where ρ would correspond to a pure state in quantum mechanics, the matrix ρ = R/N corresponds to a mixed state in quantum statistical mechanics, such that it encodes classical probabilities that are precisely the eigenvalues of the scaled Pearson correlation matrix.</s></p><p coords="3,63.96,545.51,235.11,9.96;3,54.00,557.47,245.08,9.96;3,54.00,569.42,245.08,9.96;3,54.00,581.38,245.08,9.96;3,54.00,593.33,245.08,9.96;3,54.00,605.29,245.08,9.96;3,54.00,617.24,245.08,9.96;3,54.00,629.20,245.08,9.96;3,54.00,641.15,198.51,9.96"><s coords="3,63.96,545.51,235.11,9.96;3,54.00,557.47,245.08,9.96;3,54.00,569.42,245.08,9.96;3,54.00,581.38,245.08,9.96;3,54.00,593.33,44.86,9.96">Since probability distributions (and density operators) become coarse-grained (hence effectively renormalized) in the presence of noise, the entropy of two different data sets with similar levels of added noise can still be usefully compared.</s><s coords="3,103.07,593.33,196.01,9.96;3,54.00,605.29,197.63,9.96">Therefore, this is an advantage of our method given that it is robust to the addition of noise.</s><s coords="3,255.85,605.29,43.23,9.96;3,54.00,617.24,245.08,9.96;3,54.00,629.20,245.08,9.96;3,54.00,641.15,198.51,9.96">Moreover, although the Pearson coefficient is a pair correlation coefficient, it is still sensitive to nonlinear effects because it is the expected value of a bilinear quantity.</s></p><p coords="3,63.96,654.32,235.12,9.96;3,54.00,666.27,245.09,9.96;3,54.00,678.23,245.08,9.96;3,54.00,690.18,245.08,9.96;3,54.00,702.14,245.08,9.96;3,54.00,714.09,245.08,9.96;3,317.01,54.57,113.35,9.96"><s coords="3,63.96,654.32,235.12,9.96;3,54.00,666.27,245.09,9.96;3,54.00,678.23,139.36,9.96">It is worth pointing out a crucial difference between the method proposed here and the other thresholding-based methods of calculating entropy.</s><s coords="3,200.35,678.23,98.73,9.96;3,54.00,690.18,245.08,9.96;3,54.00,702.14,245.08,9.96;3,54.00,714.09,78.46,9.96">Whereas the proposed entropy is a continuous function (functional) of the Pearson matrix, the usual thresholding-based entropies are discontinuous.</s><s coords="3,137.73,714.09,161.35,9.96;3,317.01,54.57,113.35,9.96">To see this, recall that the Heaviside step function is defined as</s></p><formula xml:id="formula_9" coords="3,386.96,76.31,175.13,22.17">Θ(x) = 0, x ≤ 0 1, x &gt; 0 .<label>(7)</label></formula><p coords="3,317.01,110.70,245.08,9.96;3,317.01,122.66,245.08,9.96;3,317.01,134.62,245.08,9.96;3,317.01,146.57,245.08,9.96;3,317.01,158.53,245.08,9.96;3,317.01,170.48,212.90,9.96;3,326.98,182.80,235.12,9.96;3,317.01,194.75,245.08,9.96;3,317.01,206.71,245.08,9.96;3,317.01,218.67,245.08,9.96;3,317.01,230.62,245.08,9.96;3,317.01,242.58,245.08,9.96;3,317.01,254.53,245.08,9.96;3,317.01,266.49,245.08,9.96;3,317.01,278.44,245.08,9.96;3,317.01,290.40,245.08,9.96;3,317.01,302.35,245.08,9.96;3,317.01,314.31,119.56,9.96"><s coords="3,317.01,110.70,245.08,9.96;3,317.01,122.66,245.08,9.96;3,317.01,134.62,245.08,9.96;3,317.01,146.57,245.08,9.96;3,317.01,158.53,94.24,9.96">This function has a discontinuity at x = 0, so that any entropy calculated via thresholding is necessarily a discontinuous function of the Pearson matrix, due to the explicit or implicit use of the Heaviside step function to perform thresholding.</s><s coords="3,415.73,158.53,146.37,9.96;3,317.01,170.48,212.90,9.96">In contrast, the proposed entropy is a continuous functional of the Pearson matrix.</s><s coords="3,326.98,182.80,235.12,9.96;3,317.01,194.75,162.28,9.96">We thus have a robust and direct approach to obtain the entropy of correlation matrices.</s><s coords="3,489.90,194.75,72.19,9.96;3,317.01,206.71,245.08,9.96;3,317.01,218.67,245.08,9.96;3,317.01,230.62,178.19,9.96">Crucially, at no point have we introduced a priori estimates, hence the resulting entropy is free from arbitrary or extraneous assumptions (e.g., choice of threshold ξ).</s><s coords="3,499.70,230.62,62.39,9.96;3,317.01,242.58,245.08,9.96;3,317.01,254.53,223.24,9.96">Of course, one can additionally use thresholding to obtain a suitable A, but even then our protocol can still be useful.</s><s coords="3,547.54,254.53,14.56,9.96;3,317.01,266.49,245.08,9.96;3,317.01,278.44,245.08,9.96;3,317.01,290.40,22.14,9.96">For example, it can be used to obtain an exact expression for the entropy of an idealized ranked set of correlated data.</s><s coords="3,347.71,290.40,214.39,9.96;3,317.01,302.35,245.08,9.96;3,317.01,314.31,119.56,9.96">Such results might then yield a null hypothesis for subsequent statistical inference or undertake more rigorous hypothesis testing.</s></p><p coords="3,326.98,326.63,235.12,9.96;3,317.01,338.58,245.08,9.96;3,317.01,350.54,245.08,9.96;3,317.01,362.49,245.08,9.96;3,317.01,374.45,245.09,9.96;3,317.01,386.40,245.08,9.96;3,317.01,398.36,245.08,9.96;3,317.01,410.31,245.08,9.96;3,317.01,422.27,112.13,9.96"><s coords="3,326.98,326.63,235.12,9.96;3,317.01,338.58,245.08,9.96;3,317.01,350.54,127.15,9.96">In what follows, we apply our main result to illustrative examples that are easy to understand, in order to further build intuition on the subject.</s><s coords="3,448.26,350.54,113.84,9.96;3,317.01,362.49,245.08,9.96;3,317.01,374.45,146.03,9.96">We then apply our method to functional magnetic resonance imaging (fMRI) time series of the human brain activity.</s><s coords="3,467.27,374.45,94.83,9.96;3,317.01,386.40,245.08,9.96;3,317.01,398.36,245.08,9.96;3,317.01,410.31,245.08,9.96;3,317.01,422.27,112.13,9.96">We also have included an extra material where we discuss in some detail the related topic of Guttman-scalable Pearson matrices for those readers interested in further applications (see the Supplementary Material).</s></p><p coords="3,326.98,441.29,235.12,9.96;3,317.01,453.25,245.08,10.71;3,317.01,465.20,245.08,10.71"><s coords="3,326.98,441.93,193.35,8.77">Examples of some Pearson matrices.</s><s coords="3,523.82,441.29,38.27,9.96;3,317.01,453.25,245.08,10.71;3,317.01,465.20,245.08,10.71">-Consider first the scenario of N series where all x i and x j are statistically independent, i.e., uncorrelated:</s></p><formula xml:id="formula_10" coords="3,324.21,475.78,81.85,13.18">X i X j = X 2 i δ ij .</formula><p coords="3,415.30,477.16,135.17,9.96;3,554.35,477.16,7.75,9.96;3,317.01,489.11,245.08,10.71;3,317.01,501.07,245.08,9.96;3,317.01,512.77,218.49,10.21;3,539.75,513.02,22.35,9.96;3,317.01,524.98,245.08,9.96;3,317.01,536.93,245.08,9.96;3,317.01,548.64,113.74,10.21"><s coords="3,415.30,477.16,146.79,9.96;3,317.01,489.11,245.08,10.71;3,317.01,501.07,245.08,9.96;3,317.01,512.77,165.89,10.21">Thus from equation Eq. ( <ref type="formula" coords="3,550.47,477.16,3.87,9.96" target="#formula_3">3</ref>), R ij = δ ij , and, as expected, the density operator admits the (completely mixed state) representation ρ = I/N , where I is the N × N identity matrix.</s><s coords="3,487.28,513.02,74.82,9.96;3,317.01,524.98,147.87,9.96">From Eq. ( <ref type="formula" coords="3,535.50,513.02,4.24,9.96" target="#formula_1">2</ref>) one immediately finds that S = log N .</s><s coords="3,469.24,524.98,92.86,9.96;3,317.01,536.93,245.08,9.96;3,317.01,548.64,113.74,10.21">It is a simple exercise to show that this is the maximum possible entropy for an N × N density matrix.</s></p><p coords="3,326.98,561.21,235.12,9.96;3,317.01,573.16,245.08,9.96;3,317.01,585.12,245.08,10.71;3,317.01,597.07,32.36,9.96;3,349.42,595.70,3.97,6.97;3,360.13,597.07,201.97,9.96"><s coords="3,326.98,561.21,235.12,9.96;3,317.01,573.16,245.08,9.96;3,317.01,585.12,123.53,10.71">Compare the above with the other extreme, i.e., when all pairs are perfectly autocorrelated, so that X i /σ i = X j /σ j for all i, j.</s><s coords="3,447.95,585.12,114.15,10.71;3,317.01,597.07,32.36,9.96;3,349.42,595.70,3.97,6.97;3,360.13,597.07,34.58,9.96">Then, clearly, R ij = 1, so that R 2 = N R.</s><s coords="3,405.41,597.07,156.69,9.96">The matrix ρ is thus idempotent:</s></p><formula xml:id="formula_11" coords="3,317.01,607.65,245.08,33.98">ρ 2 = ρ. It follows immediately that tr(ρ log ρ) = tr(ρ log ρ 2 ) = 2tr(ρ log ρ) ,<label>(8)</label></formula><p coords="3,317.01,654.32,245.08,9.96;3,317.01,666.27,245.08,9.96;3,317.01,678.23,245.08,9.96;3,317.01,690.18,245.08,9.96;3,317.01,702.14,245.08,9.96;3,317.01,713.84,170.25,10.96;4,149.55,226.44,149.53,7.86;4,54.00,236.90,245.08,7.86;4,54.00,247.36,245.08,7.86;4,54.00,257.82,37.89,7.86"><s coords="3,317.01,654.32,245.08,9.96;3,317.01,666.27,245.08,9.96;3,317.01,678.23,136.78,9.96">hence tr(ρ log ρ) = 0. Then we have that S = 0, which is the absolute minimum possible value (corresponding to a pure state configuration).</s><s coords="3,462.35,678.23,99.75,9.96;3,317.01,690.18,245.08,9.96;3,317.01,702.14,245.08,9.96;3,317.01,713.84,170.25,10.96;4,142.39,226.44,14.34,7.86">Note that, in contrast to statistical moments, the entropy is not strongly dependent on the tails of the distribution of eigenvalues, since λ j log λ j → 0 in the limit λ j → 0.  <ref type="formula" coords="4,142.39,226.44,7.17,7.86" target="#formula_12">(9</ref>).</s><s coords="4,160.70,226.44,138.38,7.86;4,54.00,236.90,245.08,7.86;4,54.00,247.36,119.16,7.86">The case t = 1 represents maximal correlation (S = 0) while t = 0 represents uncorrelated series, leading to maximum entropy.</s><s coords="4,178.13,247.36,120.95,7.86;4,54.00,257.82,37.89,7.86">S = log N = log 100 ≈ 4.6, as expected.</s></p><p coords="4,63.96,290.08,235.12,9.96;4,54.00,302.03,245.08,9.96;4,54.00,313.99,245.08,9.96;4,54.00,325.94,245.08,9.96;4,54.00,337.90,188.65,9.96"><s coords="4,63.96,290.08,235.12,9.96;4,54.00,302.03,245.08,9.96;4,54.00,313.99,155.15,9.96">Let us now focus on analytically solvable examples, in order to illustrate better how the entropy depends on the entries of the Pearson matrix.</s><s coords="4,218.47,313.99,80.61,9.96;4,54.00,325.94,245.08,9.96;4,54.00,337.90,188.65,9.96">Consider thus the following situation which is an interpolation between the cases of maximum and minimum entropies.</s></p><p coords="4,63.96,349.85,219.04,9.96"><s coords="4,63.96,349.85,219.04,9.96">Let the Pearson matrix now be given according to</s></p><formula xml:id="formula_12" coords="4,126.03,371.50,173.05,10.96">R ij (t) = t + δ ij (1 -t) .<label>(9)</label></formula><p coords="4,54.00,393.64,245.08,9.96;4,54.00,405.35,245.09,10.21;4,54.00,417.55,245.08,9.96;4,54.00,429.26,245.08,10.21;4,54.00,441.21,245.08,10.21;4,54.00,453.17,245.08,10.21;4,54.00,465.37,85.38,9.96"><s coords="4,54.00,393.64,245.08,9.96;4,54.00,405.35,164.11,10.21">This corresponds to a situation where any pair of distinct series have autocorrelation t ∈ [-1, 1].</s><s coords="4,222.39,405.59,76.70,9.96;4,54.00,417.55,245.08,9.96;4,54.00,429.51,102.73,9.96">It is easy to check that the density operator ρ(t) = R(t)/N for this Pearson matrix is well behaved.</s><s coords="4,163.07,429.26,136.01,10.21;4,54.00,441.21,245.08,10.21">N -1 of the N eigenvaluesall but one of them -are identically equal to (1t)/N .</s><s coords="4,54.00,453.17,245.08,10.21">The last remaining eigenvalue equals (1 + (N -1)t)/N .</s><s coords="4,54.00,465.37,85.38,9.96">The entropy is thus</s></p><formula xml:id="formula_13" coords="4,71.26,484.80,227.82,47.76">S(t) = log N - N -1 N (1 -t) log(1 -t) - 1 N [1 + (N -1)t] log[1 + (N -1)t] .<label>(10)</label></formula><p coords="4,54.00,540.46,245.08,9.96;4,54.00,552.41,245.08,9.96;4,54.00,564.37,62.10,9.96;4,128.30,564.37,170.78,9.96;4,54.00,576.32,191.88,9.96"><s coords="4,54.00,540.46,245.08,9.96;4,54.00,552.41,245.08,9.96;4,54.00,564.37,245.08,9.96;4,54.00,576.32,191.88,9.96">The special case t = 0 recovers the maximum entropy S = log N while t = 1 recovers the minimum entropy S = 0. Figure <ref type="figure" coords="4,119.70,564.37,4.98,9.96" target="#fig_0">2</ref> shows how the entropy varies with t in between the two limiting cases for N = 100.</s></p><p coords="4,63.96,588.28,235.12,9.96;4,54.00,600.23,41.92,9.96;4,95.92,604.42,8.82,6.14;4,110.16,600.23,187.83,9.96;4,54.00,612.19,245.08,9.96;4,54.00,624.14,245.08,9.96;4,54.00,635.85,219.29,10.21"><s coords="4,63.96,588.28,235.12,9.96;4,54.00,600.23,41.92,9.96;4,95.92,604.42,8.82,6.14;4,110.16,600.23,187.83,9.96;4,54.00,612.19,110.39,9.96">Our final example is the case of a modular Pearson matrix R M representing 2 weakly correlated sets of N strongly correlated series.</s><s coords="4,168.67,612.19,130.41,9.96;4,54.00,624.14,143.20,9.96">Let the strong correlation be t and let the weak correlation be .</s><s coords="4,201.46,624.14,97.62,9.96;4,54.00,635.85,219.29,10.21">Such a Pearson matrix is a 2N × 2N matrix with a 2 × 2 block structure:</s></p><formula xml:id="formula_14" coords="4,116.73,656.23,177.92,21.92">R M (t, ) = R(t) R(t) . (<label>11</label></formula><formula xml:id="formula_15" coords="4,294.65,662.31,4.43,9.96">)</formula><p coords="4,54.00,690.18,155.42,9.96;4,213.66,690.18,76.26,9.96;4,54.00,702.14,245.08,9.96;4,54.00,714.09,245.08,9.96;4,317.01,260.97,245.08,10.21;4,317.01,272.92,245.08,10.21;4,317.01,285.13,143.43,9.96"><s coords="4,54.00,690.18,235.92,9.96;4,54.00,702.14,116.69,9.96">where the R(t) are given by Eq. ( <ref type="formula" coords="4,209.42,690.18,4.24,9.96" target="#formula_12">9</ref>) and the matrix has every entry equal to .</s><s coords="4,175.89,702.14,123.18,9.96;4,54.00,714.09,245.08,9.96;4,317.01,260.97,165.12,10.21">In this case, all but 2 of the eigenvalues of the corresponding density matrix ρ(t, ) are identically equal to (1t)/(2N ).</s><s coords="4,488.70,261.22,73.40,9.96;4,317.01,272.92,190.75,10.21">The remaining 2 eigenvalues are (1 + (N -1)t ± N )/(2N ).</s><s coords="4,514.80,273.17,47.30,9.96;4,317.01,285.13,143.43,9.96">Hence, the entropy is immediately obtained:</s></p><formula xml:id="formula_16" coords="4,318.65,308.20,243.44,94.61">S(t, ) = 1 2N -( N + (N -1)t + 1) log N + (N -1)t + 1 2N + ( N -N t + t -1) log -N + (N -1)t + 1 2N + 2(N -1)(t -1) log 1 -t 2N .<label>(12)</label></formula><p coords="4,317.01,414.51,245.08,9.96;4,317.01,426.21,245.08,10.21;4,317.01,438.42,105.25,9.96"><s coords="4,317.01,414.51,245.08,9.96;4,317.01,426.21,245.08,10.21;4,317.01,438.42,105.25,9.96">Note that for the condition of positive semidefiniteness to be satisfied, we require 1 + (N -1)t ± N ≥ 0 , so that for fixed t we must have</s></p><formula xml:id="formula_17" coords="4,396.51,457.75,165.59,23.79">| | ≤ 1 + (N -1)t N .<label>(13)</label></formula><p coords="4,326.98,491.19,28.12,9.96;4,366.19,491.19,195.90,9.96;4,317.01,503.14,245.08,9.96;4,317.01,515.10,245.08,9.96;4,317.01,527.05,95.83,9.96"><s coords="4,326.98,491.19,235.12,9.96;4,317.01,503.14,40.09,9.96">Figure <ref type="figure" coords="4,358.15,491.19,4.98,9.96" target="#fig_1">3</ref> shows the entropy as a function of t and for N = 100.</s><s coords="4,361.40,503.14,200.70,9.96">For fixed t, a smaller leads to higher entropy.</s><s coords="4,317.01,515.10,245.08,9.96;4,317.01,527.05,95.83,9.96">For = 0 the 2 modules become independent and the entropy is maximized.</s></p><p coords="4,326.98,546.72,235.12,9.96;4,317.01,558.68,245.08,9.96;4,317.01,570.63,245.08,9.96;4,317.01,582.59,245.08,9.96;4,317.01,594.54,245.08,9.96;4,317.01,606.50,245.08,9.96;4,317.01,618.45,245.08,9.96;4,317.01,630.41,245.08,9.96;4,317.01,642.36,245.08,9.96;4,317.01,654.32,245.08,9.96;4,317.01,666.27,75.33,9.96;4,413.74,666.27,148.36,9.96;4,317.01,678.23,160.69,9.96;4,498.70,678.23,63.40,9.96;4,317.01,690.18,245.08,9.96;4,317.01,702.14,245.08,9.96;4,317.01,714.09,31.69,9.96;4,366.63,714.09,3.65,9.96;5,265.24,269.67,296.85,7.86;5,54.00,280.13,507.60,8.35;5,54.00,290.59,508.09,8.35;5,54.00,301.05,508.09,7.86;5,54.00,311.52,508.10,7.86;5,54.00,321.98,508.09,7.86;5,54.00,332.44,375.65,7.86"><s coords="4,326.98,547.36,205.30,8.77">Application to a real-world data set.</s><s coords="4,537.47,546.72,24.63,9.96;4,317.01,558.68,245.08,9.96;4,317.01,570.63,160.21,9.96">-What about Pearson matrices with entropy in between the maximum and minimum entropies?</s><s coords="4,487.62,570.63,74.47,9.96;4,317.01,582.59,245.08,9.96;4,317.01,594.54,67.58,9.96">This scenario is, of course, the case of crucial interest for analyzing empirical data.</s><s coords="4,395.75,594.54,166.34,9.96;4,317.01,606.50,245.08,9.96;4,317.01,618.45,245.08,9.96;4,317.01,630.41,245.08,9.96">As a practical demonstration of the method's power and its potential applicability, we calculate the entropy of Pearson correlation matrices obtained from fMRI time courses of the human brain.</s><s coords="4,317.01,642.36,245.08,9.96;4,317.01,654.32,245.08,9.96;4,317.01,666.27,100.38,9.96">Specifically, we assess the hypothesis that brain signals display an increase of entropy while under the influence of a psychedelic <ref type="bibr" coords="4,399.12,666.27,14.61,9.96" target="#b40">[41]</ref>.</s><s coords="4,432.19,666.27,129.90,9.96;4,317.01,678.23,245.08,9.96;4,317.01,690.18,245.08,9.96;4,317.01,702.14,245.08,9.96;4,317.01,714.09,53.27,9.96">For this purpose, we chose the indigenous beverage ayahuasca <ref type="bibr" coords="4,484.08,678.23,14.61,9.96" target="#b41">[42]</ref>, a decoction with rapid antidepressant effects partially mediated by the serotonergic agonist N,N -dimethyltryptamine (DMT) <ref type="bibr" coords="4,352.02,714.09,14.61,9.96" target="#b42">[43]</ref>.</s><s coords="5,265.24,269.67,296.85,7.86;5,54.00,280.13,346.73,8.35">The plot shows the entropy S of the nine subjects (horizontal axis), both before (S before ) and after (S after ) ayahuasca ingestion, normalized by Smax = log (104).</s><s coords="5,404.76,280.13,156.84,8.35;5,54.00,290.59,208.82,7.86">Entropy variation ∆S = S after -S before was found positive for seven subjects (dotted lines).</s><s coords="5,266.90,290.59,295.19,8.35;5,54.00,301.05,261.27,7.86">(b) Box plots of the distribution S before and S after , with the single outlier being Subject 6 in the condition prior to ayahuasca consumption.</s><s coords="5,319.25,301.05,242.85,7.86;5,54.00,311.52,82.58,7.86">On the right, the inset shows the box plot of the distribution of entropy variation.</s><s coords="5,141.24,311.52,420.86,7.86;5,54.00,321.98,155.47,7.86">The error bar of the average ∆S taken over all nine subjects is represented by the shaded region, and only slightly touches the ∆S &lt; 0 zone.</s><s coords="5,213.55,321.98,348.55,7.86;5,54.00,332.44,375.65,7.86">These findings are broadly consistent with the hypothesis of psychedelic-induced brain entropy increase, although one must be careful due to the small number of subjects involved.</s></p><p coords="5,63.96,364.71,235.12,9.96;5,54.00,376.67,245.08,9.96;5,54.00,388.62,245.08,9.96;5,54.00,400.58,245.08,9.96;5,54.00,412.53,245.09,9.96;5,54.00,424.49,245.08,9.96;5,54.00,436.45,245.09,9.96;5,54.00,448.40,245.08,9.96;5,54.00,460.36,245.08,9.96;5,54.00,472.31,245.08,9.96;5,54.00,484.27,39.60,9.96"><s coords="5,63.96,364.71,235.12,9.96;5,54.00,376.67,245.08,9.96;5,54.00,388.62,78.90,9.96">A total of nine healthy human volunteers were assigned to a neuroimaging session both before and after ayahuasca intake.</s><s coords="5,145.57,388.62,153.51,9.96;5,54.00,400.58,245.08,9.96;5,54.00,412.53,245.09,9.96;5,54.00,424.49,87.92,9.96">We obtained a set of N = 104 fMRI time series of the blood-oxygen-level-dependent (BOLD) signal of the human brain from each subject at both conditions.</s><s coords="5,154.02,424.49,145.06,9.96;5,54.00,436.45,43.56,9.96">We next calculated the density operators.</s><s coords="5,101.93,436.45,197.16,9.96;5,54.00,448.40,206.15,9.96">The 18 correlation matrices were individually scaled according to Eq. 4 using N = 104.</s><s coords="5,273.32,448.40,25.77,9.96;5,54.00,460.36,245.08,9.96;5,54.00,472.31,245.08,9.96;5,54.00,484.27,39.60,9.96">For a detailed description of the acquisition, preprocessing, and availability of the data, please refer to the Supplementary Material.</s></p><p coords="5,63.96,498.39,30.98,9.96;5,109.60,498.39,189.47,9.96;5,54.00,510.34,245.08,9.96;5,54.00,522.30,245.08,9.96;5,54.00,534.25,45.44,9.96"><s coords="5,63.96,498.39,235.11,9.96;5,54.00,510.34,245.08,9.96;5,54.00,522.30,245.08,9.96;5,54.00,534.25,45.44,9.96">In Fig. <ref type="figure" coords="5,99.78,498.39,4.98,9.96" target="#fig_2">4</ref> we show the normalized entropy of all 18 matrices ρ, grouped in terms of subjects (from 1 to 9) for both experimental conditions (before and after ayahuasca ingestion).</s></p><p coords="5,115.20,534.25,183.87,9.96;5,54.00,546.21,245.08,9.96;5,54.00,557.91,245.08,10.96;5,54.00,570.12,245.08,9.96;5,54.00,582.07,245.08,9.96;5,54.00,594.03,245.08,9.96;5,54.00,605.98,208.63,9.96;5,85.20,617.94,3.87,9.96"><s coords="5,115.20,534.25,183.87,9.96;5,54.00,546.21,245.08,9.96;5,54.00,557.91,245.08,10.96">With the exception of two individuals (Subjects 1 and 9), we find positive entropy variation ∆S ≡ S after -S before among subjects (dotted lines).</s><s coords="5,54.00,570.12,245.08,9.96;5,54.00,582.07,245.08,9.96;5,54.00,594.03,245.08,9.96;5,54.00,605.98,245.08,9.96;5,54.00,617.94,35.07,9.96">Although the low number of individuals demands careful analysis in regards to statistical significance, our findings are in agreement with previous measures of increased brain entropy due to a psychedelic ingestion <ref type="bibr" coords="5,268.64,605.98,30.44,9.96;5,54.00,617.94,31.20,9.96">[21-23, 44, 45]</ref>.</s></p><p coords="5,104.07,617.94,195.02,9.96;5,54.00,629.89,245.09,9.96;5,54.00,641.85,245.08,9.96;5,54.00,653.80,245.08,9.96;5,54.00,665.76,20.26,9.96;5,109.22,665.76,189.86,9.96;5,54.00,677.71,245.08,9.96;5,54.00,689.67,51.53,9.96"><s coords="5,104.07,617.94,195.02,9.96;5,54.00,629.89,111.26,9.96">Ours, however, crucially avoids the need of thresholding schemes.</s><s coords="5,177.72,629.89,121.36,9.96;5,54.00,641.85,245.08,9.96;5,54.00,653.80,245.08,9.96;5,54.00,665.76,59.09,9.96">Finally, measures of brain entropy might differ in the literature, for instance, by probing either static or dynamical properties of network links <ref type="bibr" coords="5,78.18,665.76,15.50,9.96" target="#b45">[46,</ref><ref type="bibr" coords="5,97.60,665.76,11.62,9.96" target="#b46">47]</ref>.</s><s coords="5,119.32,665.76,179.76,9.96;5,54.00,677.71,245.08,9.96;5,54.00,689.67,51.53,9.96">Here, the entropy proposed is a measure of the network connectivity repertoire, thus an entropy of the links.</s></p><p coords="5,63.96,714.09,235.12,9.96;5,317.01,364.71,245.08,9.96;5,317.01,376.67,245.08,9.96;5,317.01,388.62,245.08,9.96;5,317.01,400.58,245.08,9.96;5,317.01,412.53,245.08,9.96;5,317.01,424.49,245.09,9.96;5,317.01,436.45,75.93,9.96;8,163.03,353.80,290.03,7.89;8,63.96,391.68,498.13,9.96;8,54.00,403.64,474.78,9.96"><s coords="5,63.96,714.09,235.12,9.96;5,317.01,364.71,245.08,9.96;5,317.01,376.67,245.08,9.96;5,317.01,388.62,56.54,9.96">In summary, we have proposed an entirely objective procedure for directly estimating a unique entropy of a general Pearson matrix without needing to use thresholding.</s><s coords="5,380.81,388.62,181.29,9.96;5,317.01,400.58,245.08,9.96;5,317.01,412.53,245.08,9.96;5,317.01,424.49,245.09,9.96;5,317.01,436.45,75.93,9.96">We hope that our results will contribute positively to satisfy, at least partially, the growing and urgent demand in diverse fields of science for a reliable method of estimating the information entropy associated with correlations.</s><s coords="8,163.03,353.80,290.03,7.89;8,63.96,391.68,498.13,9.96;8,54.00,403.64,232.13,9.96">Possible ways to frame a general data set in terms of "events" An important question is certainly how a given data set, given as in Eq. (S1), can be described in terms of events and thus to allow an indicator matrix representation.</s><s coords="8,290.56,403.64,238.22,9.96">Below we summarize two possible procedures to do so.</s></p><p coords="8,63.96,428.66,498.13,9.96;8,54.00,440.62,508.09,9.96;8,54.00,454.51,216.50,9.96;8,270.50,451.58,9.93,6.97;8,270.50,459.53,2.82,6.97;8,280.93,454.51,153.86,9.96;8,434.78,451.58,9.93,6.97;8,434.78,459.53,2.82,6.97;8,448.54,454.51,113.56,9.96;8,54.00,466.47,508.10,9.96;8,54.00,478.42,508.10,9.96;8,54.00,492.31,106.93,9.96;8,160.93,489.38,9.93,6.97;8,160.93,497.33,2.82,6.97;8,175.32,492.31,386.77,9.96;8,54.00,506.49,243.95,9.96;8,297.95,503.56,9.93,6.97;8,297.95,511.51,2.82,6.97;8,308.38,506.49,253.72,10.71;8,54.00,518.45,508.10,9.96;8,54.00,530.40,77.74,9.96;8,148.62,530.40,413.47,9.96;8,54.00,542.36,508.10,9.96;8,54.00,554.31,287.79,9.96"><s coords="8,63.96,428.66,339.67,9.96">The first is when we can associate phenomenological behavior to the data.</s><s coords="8,412.25,428.66,149.85,9.96;8,54.00,440.62,508.09,9.96;8,54.00,454.51,216.50,9.96;8,270.50,451.58,9.93,6.97;8,270.50,459.53,2.82,6.97;8,280.93,454.51,2.77,9.96">Then, we can define an event by classifying appropriate (i.e., easier to characterize in terms of ranking of predominance) information which can be inferred once we know the explicit values of the x (j) i .</s><s coords="8,288.16,454.51,146.62,9.96;8,434.78,451.58,9.93,6.97;8,434.78,459.53,2.82,6.97;8,448.54,454.51,113.56,9.96;8,54.00,466.47,438.17,9.96">For example, suppose whenever x (j) i is above a threshold γ, we can conclude it has been a high electrical pulse crossing the population i at the measurement step j.</s><s coords="8,496.58,466.47,65.52,9.96;8,54.00,478.42,251.25,9.96">Then, an event could be the existence (1) or not (0) of an intense pulse.</s><s coords="8,311.28,478.42,250.82,9.96;8,54.00,492.31,106.93,9.96;8,160.93,489.38,9.93,6.97;8,160.93,497.33,2.82,6.97;8,175.32,492.31,20.64,9.96">Further, suppose that a determined biochemical reaction takes place when α &lt; x (j) i &lt; β.</s><s coords="8,202.55,492.31,359.55,9.96;8,54.00,506.49,243.95,9.96;8,297.95,503.56,9.93,6.97;8,297.95,511.51,2.82,6.97;8,308.38,506.49,2.77,9.96">Such reaction could also constitute another event, with the values 0 and 1 being ascribed conforming to the numerical intervals for the x (j) i .</s><s coords="8,315.58,506.49,246.52,10.71;8,54.00,518.45,321.86,9.96">Importantly, if x i &lt; γ &lt; α, in principle we may expect an order of priority between the high pulse and the biochemical reaction.</s><s coords="8,381.06,518.45,181.04,9.96;8,54.00,530.40,309.55,9.96">In this way, we might try to organize the events as in Table <ref type="table" coords="8,134.92,530.40,10.52,9.96">S1</ref> according to the numerical sequences in Eq. (S1).</s><s coords="8,367.93,530.40,194.17,9.96;8,54.00,542.36,494.10,9.96">Of course, such an approach is heavily based on the concrete understanding of the physical, chemical, biological, etc., aspects underlying the problem studied.</s><s coords="8,552.97,542.36,9.13,9.96;8,54.00,554.31,287.79,9.96">In the absence of this type of knowledge, the protocol is not feasible.</s></p><p coords="8,63.96,579.34,498.13,9.96;8,54.00,591.30,508.09,9.96;8,54.00,603.25,72.95,9.96;8,156.35,603.25,405.74,9.96;8,54.00,617.15,121.04,9.96;8,175.04,614.21,9.93,6.97;8,175.04,622.16,2.82,6.97;8,185.47,617.15,376.63,10.71;8,54.00,629.10,508.10,10.71;8,54.00,641.06,507.60,10.71;8,54.00,653.01,508.09,10.71;8,54.00,666.27,192.20,10.71;8,260.07,663.50,6.31,6.97;8,260.07,671.50,12.91,6.97;8,275.13,666.02,286.97,10.96;8,54.00,678.23,309.36,10.71;8,375.88,678.23,186.21,9.96;8,54.00,690.18,404.42,9.96;8,471.00,690.18,91.09,9.96;8,54.00,702.14,508.10,10.71;8,54.00,714.09,174.04,9.96;8,240.22,714.09,4.43,9.96"><s coords="8,63.96,579.34,498.13,9.96;8,54.00,591.30,132.64,9.96">A second possibility is to consider an algorithmically oriented method, not relying on any a priori qualitative information about the process.</s><s coords="8,190.94,591.30,371.16,9.96;8,54.00,603.25,106.22,9.96">But then, admittedly it has a higher chance of not satisfying the perfect homogeneous Guttman scaling <ref type="bibr" coords="8,130.57,603.25,10.52,9.96">[9,</ref><ref type="bibr" coords="8,144.73,603.25,11.62,9.96">14]</ref>.</s><s coords="8,165.59,603.25,396.50,9.96;8,54.00,617.15,121.04,9.96;8,175.04,614.21,9.93,6.97;8,175.04,622.16,2.82,6.97;8,185.47,617.15,2.77,9.96">For the full data set, let us define a and b as the minimum and maximum values assumed by the entire collection of x (j) i .</s><s coords="8,193.12,617.15,232.12,10.71">Thus, we divide [a, b] into N + 1 intervals ∆ 0 , ∆ 1 , . . .</s><s coords="8,426.90,617.15,23.05,10.71">, ∆ N .</s><s coords="8,454.83,617.15,107.26,10.71;8,54.00,629.10,508.10,10.71;8,54.00,641.06,29.22,9.96">Here, ∆ 0 must represent the most frequent numerical interval for the data set, with the other ∆ i presenting a decreasing order of occurrence with i.</s><s coords="8,88.62,641.06,431.24,10.71">The events to be considered in the indicator matrix are the occurrence of the intervals ∆ 1 , ∆ 2 , . . .</s><s coords="8,521.52,641.06,40.08,10.71;8,54.00,653.01,365.13,9.96">, ∆ N (∆ 0 is not explicitly included in the events table, but it contributes with the "0"'s in it).</s><s coords="8,423.51,653.01,138.59,10.71;8,54.00,666.27,192.20,10.71;8,260.07,663.50,6.31,6.97;8,260.07,671.50,12.91,6.97;8,275.13,666.02,56.42,10.96">For M i the number of times the interval ∆ i appears in the data set, we have N i=0 M i = n × N .</s><s coords="8,336.08,666.27,148.15,10.71">All the incidences M i (i = 0, 1, . . .</s><s coords="8,485.89,666.27,76.21,9.96;8,54.00,678.23,326.31,10.71">, N ) of the events ∆ i should thus be combined to generate a structure like that in Table <ref type="table" coords="8,367.02,678.23,8.86,9.96">S1</ref>.</s><s coords="8,385.77,678.23,176.32,9.96;8,54.00,690.18,421.43,9.96">An illustration of how to proceed in the particular case the data allows an exact homogeneous Guttman scaling is depicted in Table <ref type="table" coords="8,462.15,690.18,8.86,9.96">S2</ref>.</s><s coords="8,481.07,690.18,81.02,9.96;8,54.00,702.14,508.10,10.71;8,54.00,714.09,190.65,9.96">Finally, given that there is a certain freedom in choosing the intervals ∆ i , this must be done in such way to get an indicator matrix as close as possible to the pattern in Table <ref type="table" coords="8,231.36,714.09,8.86,9.96">S1</ref>.</s></p></div><figure xmlns="http://www.tei-c.org/ns/1.0" xml:id="fig_0" coords="4,54.00,215.97,245.08,7.86;4,54.00,226.44,245.08,7.86;4,54.00,236.90,245.08,7.86;4,54.00,247.36,245.08,7.86;4,54.00,257.82,37.89,7.86"><head>Figure 2 .</head><label>2</label><figDesc><div><p><s coords="4,54.00,215.97,35.98,7.86">Figure2.</s><s coords="4,97.99,215.97,201.10,7.86;4,54.00,226.44,102.72,7.86">Entropy S as a function of the parameter t for the example given by Eq. (9).</s><s coords="4,160.70,226.44,138.38,7.86;4,54.00,236.90,245.08,7.86;4,54.00,247.36,119.16,7.86">The case t = 1 represents maximal correlation (S = 0) while t = 0 represents uncorrelated series, leading to maximum entropy.</s><s coords="4,178.13,247.36,120.95,7.86;4,54.00,257.82,37.89,7.86">S = log N = log 100 ≈ 4.6, as expected.</s></p></div></figDesc></figure>
+<figure xmlns="http://www.tei-c.org/ns/1.0" xml:id="fig_1" coords="4,317.01,216.82,238.15,7.86;4,317.01,227.29,236.10,7.86"><head>Figure 3 .</head><label>3</label><figDesc><div><p><s coords="4,317.01,216.82,36.37,7.86">Figure3.</s><s coords="4,362.32,216.82,192.85,7.86;4,317.01,227.29,236.10,7.86">Entropy S as a function of the parameter t and for the "modular" example given by Eq. (11) for N = 100.</s></p></div></figDesc></figure>
+<figure xmlns="http://www.tei-c.org/ns/1.0" xml:id="fig_2" coords="5,54.00,269.67,508.09,7.86;5,54.00,280.13,507.60,8.35;5,54.00,290.59,508.09,8.35;5,54.00,301.05,508.09,7.86;5,54.00,311.52,508.10,7.86;5,54.00,321.98,508.09,7.86;5,54.00,332.44,375.65,7.86"><head>Figure 4 .</head><label>4</label><figDesc><div><p><s coords="5,54.00,269.67,36.36,7.86">Figure4.</s><s coords="5,99.23,269.67,146.61,7.86">Entropy before and after ayahuasca.</s><s coords="5,250.28,269.67,311.81,7.86;5,54.00,280.13,346.73,8.35">(a) The plot shows the entropy S of the nine subjects (horizontal axis), both before (S before ) and after (S after ) ayahuasca ingestion, normalized by Smax = log (104).</s><s coords="5,404.76,280.13,156.84,8.35;5,54.00,290.59,208.82,7.86">Entropy variation ∆S = S after -S before was found positive for seven subjects (dotted lines).</s><s coords="5,266.90,290.59,295.19,8.35;5,54.00,301.05,261.27,7.86">(b) Box plots of the distribution S before and S after , with the single outlier being Subject 6 in the condition prior to ayahuasca consumption.</s><s coords="5,319.25,301.05,242.85,7.86;5,54.00,311.52,82.58,7.86">On the right, the inset shows the box plot of the distribution of entropy variation.</s><s coords="5,141.24,311.52,420.86,7.86;5,54.00,321.98,155.47,7.86">The error bar of the average ∆S taken over all nine subjects is represented by the shaded region, and only slightly touches the ∆S &lt; 0 zone.</s><s coords="5,213.55,321.98,348.55,7.86;5,54.00,332.44,375.65,7.86">These findings are broadly consistent with the hypothesis of psychedelic-induced brain entropy increase, although one must be careful due to the small number of subjects involved.</s></p></div></figDesc></figure>
+<figure xmlns="http://www.tei-c.org/ns/1.0" xml:id="fig_3" coords="5,326.98,457.06,235.12,9.96;5,317.01,469.01,245.08,9.96;5,317.01,480.97,245.08,9.96;5,317.01,492.92,245.08,9.96;5,317.01,504.88,245.08,9.96;5,317.01,516.83,245.08,9.96;5,317.01,528.79,245.08,9.96;5,317.01,540.74,245.08,9.96;5,317.01,552.70,245.08,9.96;5,317.01,564.65,107.82,9.96;8,122.76,229.70,5.95,11.90;8,207.73,229.82,17.85,11.90;8,298.64,229.70,17.85,11.90;8,389.54,229.70,17.85,11.90;8,480.44,229.70,17.85,11.90;8,118.49,195.02,5.95,11.90;8,117.51,166.62,5.95,11.90;8,117.88,138.23,5.95,11.90;8,117.51,109.95,5.95,11.90;8,117.88,81.67,5.95,11.90;8,117.51,53.33,5.95,11.90;8,377.07,158.31,17.85,11.90;8,423.05,158.05,17.85,11.90;8,469.03,158.05,17.85,11.90;8,340.83,151.66,21.15,11.90;8,333.99,115.37,27.10,11.90;8,333.99,79.07,27.10,11.90;8,156.64,68.27,9.38,15.30;8,166.03,74.00,16.68,10.71;8,300.26,243.24,12.12,15.10;8,157.44,85.57,34.73,15.09"><figDesc><div><p><s coords="5,326.98,457.06,235.12,9.96;5,317.01,469.01,245.08,9.96;5,317.01,480.97,109.40,9.96">A.V. thanks the support of Progetti di Ricerca di Interesse Nazionale (PRIN) grant 20174TPEFJ "TRIPS".</s><s coords="5,435.37,480.97,126.72,9.96;5,317.01,492.92,245.08,9.96;5,317.01,504.88,245.08,9.96;5,317.01,516.83,245.08,9.96;5,317.01,528.79,245.08,9.96;5,317.01,540.74,245.08,9.96;5,317.01,552.70,245.08,9.96;5,317.01,564.65,62.80,9.96">This work was supported by the Brazilian agencies Conselho Nacional de Desenvolvimento Científico e Tecnológico (CNPq) (Grants No. 304532/2019-3, No. 305062/2017-4, and No. 302051/2018-0) Coordenação de Aperfeiçoamento de Pessoal de Nível Superior (CAPES), and Fundação de Amparo à Ciência e Tecnologia do Estado de Pernambuco (</s></p></div></figDesc></figure>
+<figure xmlns="http://www.tei-c.org/ns/1.0" xml:id="fig_4" coords="8,54.00,272.63,508.09,7.86;8,54.00,283.09,508.10,8.35;8,54.00,293.56,345.54,7.86"><head>Fig. S1 .</head><label>S1</label><figDesc><div><p><s coords="8,54.00,272.63,31.25,7.86">Fig.S1.</s><s coords="8,94.32,272.63,447.36,7.86">The entropy for a Pearson correlation matrix resulting from an ideal homogeneous Guttman-scalable data set.</s><s coords="8,546.22,272.63,15.88,7.86;8,54.00,283.09,439.84,8.35">The entropy S hG tends to a constant value for the population (number of items) N going to infinity (see the inset).</s><s coords="8,497.80,283.09,64.30,7.86;8,54.00,293.56,345.54,7.86">For comparison, it also shows the entropy for a completely uncorrelated data set, for which S = ln[N ].</s></p></div></figDesc></figure>
+		</body>
+		<back>
+
+			
+			<div type="acknowledgement">
+<div xmlns="http://www.tei-c.org/ns/1.0"><p coords="10,54.00,54.57,508.09,9.96;10,54.00,66.52,106.11,9.96;10,54.00,54.57,508.09,9.96;10,54.00,66.52,4.42,9.96;10,151.27,66.52,8.84,9.96"><s coords="10,54.00,54.57,208.67,9.96">are also available in the referred repository.</s><s coords="10,276.93,54.57,285.16,9.96;10,54.00,66.52,4.42,9.96;10,151.27,66.52,8.84,9.96">The original fMRI data can be sent upon request to DBA (<ref type="url" coords="10,58.42,66.52,92.84,9.96" target="mailto:draulio@neuro.ufrn.br">draulio@neuro.ufrn.br</ref>).</s></p></div>
+			</div>
+
+
+			<div type="availability">
+<div xmlns="http://www.tei-c.org/ns/1.0"><head coords="9,252.88,676.89,110.34,7.89">DATA AVAILABILITY</head><p coords="9,63.96,702.14,498.13,9.96;9,54.00,714.09,508.09,9.96;9,254.86,714.09,307.23,9.96"><s coords="9,63.96,702.14,498.13,9.96;9,254.86,714.09,4.57,9.96">The datasets generated and/or analysed during the current study are available in the GitHub repository, <ref type="url" coords="9,54.00,714.09,200.86,9.96" target="https://github.com/hfelippe/arXiv.2106.05379">https://github.com/hfelippe/arXiv.2106.05379</ref>.</s><s coords="9,269.22,714.09,292.88,9.96">In-house scripts to generate the correlation matrices and figures</s></p></div>
+			</div>
+
+			<div type="annex">
+<div xmlns="http://www.tei-c.org/ns/1.0"><head coords="6,238.35,417.14,143.22,10.52">Supplementary Material</head></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head coords="6,268.66,452.26,78.77,7.89">Guttman Scaling</head><p coords="6,174.10,476.92,271.20,7.86;6,63.96,501.70,498.13,9.96;6,54.00,513.66,508.09,9.96;6,54.00,525.61,172.51,9.96;6,251.12,525.61,310.97,9.96;6,54.00,537.57,374.76,9.96;6,451.35,537.57,110.75,9.96;6,54.00,549.52,230.76,9.96"><s coords="6,174.10,476.92,271.20,7.86;6,63.96,501.70,498.13,9.96;6,54.00,513.66,319.35,9.96">The entropy for the homogeneous Guttman-scalable Pearson matrix Whenever a new method of data analysis is developed, it is always useful to obtain exact analytical results from it, thus aiming to gain proper insights on the characteristics of the approach.</s><s coords="6,377.65,513.66,184.44,9.96;6,54.00,525.61,200.63,9.96">An idealized, but useful, type of correlated data is that of a perfect Guttman scale <ref type="bibr" coords="6,230.06,525.61,10.52,9.96">[1,</ref><ref type="bibr" coords="6,244.11,525.61,7.01,9.96">2]</ref>.</s><s coords="6,259.72,525.61,302.38,9.96">It has been used to study data in many different areas of knowledge.</s><s coords="6,54.00,537.57,401.22,9.96">But in particular, it finds important usages in health and biomedical related problems <ref type="bibr" coords="6,431.97,537.57,7.75,9.96">[3]</ref><ref type="bibr" coords="6,439.72,537.57,3.87,9.96">[4]</ref><ref type="bibr" coords="6,439.72,537.57,3.87,9.96">[5]</ref><ref type="bibr" coords="6,439.72,537.57,3.87,9.96">[6]</ref><ref type="bibr" coords="6,443.60,537.57,7.75,9.96">[7]</ref>.</s><s coords="6,459.60,537.57,102.49,9.96;6,54.00,549.52,230.76,9.96">We thus shall address a set of correlated data following the Guttman scaling.</s></p><p coords="6,63.96,561.48,109.04,9.96;6,190.65,561.48,371.44,9.96;6,54.00,573.44,51.19,10.71;6,128.29,573.44,433.80,10.71;6,54.00,585.39,508.10,10.71;6,63.96,597.35,498.13,9.96;6,54.00,609.30,63.11,9.96;6,150.87,609.30,302.44,9.96"><s coords="6,63.96,561.48,498.13,9.96;6,54.00,573.44,77.80,10.71">In the homogeneous case <ref type="bibr" coords="6,176.57,561.48,10.52,9.96">[8]</ref> (see below), many exact results are known for the corresponding Pearson correlation matrix R hG <ref type="bibr" coords="6,108.23,573.44,10.52,9.96">[8,</ref><ref type="bibr" coords="6,121.28,573.44,7.01,9.96">9]</ref>.</s><s coords="6,135.96,573.44,381.28,10.71">As we will show, this allows to write an analytical expression for the entropy S hG of R hG .</s><s coords="6,521.41,573.44,40.68,9.96;6,54.00,585.39,508.10,10.71;6,54.00,597.35,13.28,9.96">Although real data rarely fits in with a perfect Guttman scale, the present S hG could play the role of a null hypothesis model <ref type="bibr" coords="6,54.00,597.35,9.96,9.96">[8]</ref>.</s><s coords="6,72.70,597.35,489.39,9.96;6,54.00,609.30,380.26,9.96">Indeed, it may be useful for testing hierarchies as well as features of correlations in distinct processes involving N populations <ref type="bibr" coords="6,120.43,609.30,15.50,9.96">[10,</ref><ref type="bibr" coords="6,139.25,609.30,11.62,9.96">11]</ref>; in our case all with the same size n and described by (i = 1, . . .</s><s coords="6,435.92,609.30,17.39,9.96">, N )</s></p><formula xml:id="formula_18" coords="6,261.61,629.84,92.88,14.93">x i = (x (1) i , . . . , x (n) i ) .</formula><p coords="6,543.83,632.78,18.27,9.96;6,54.00,654.32,508.10,9.96;6,54.00,666.27,92.59,9.96"><s coords="6,543.83,632.78,18.27,9.96;6,54.00,654.32,508.10,9.96;6,54.00,666.27,92.59,9.96">(S1) Moreover, Guttman scaling is a very instructive example of how the entropy portrays data with strong but not absolute correlations.</s></p><p coords="6,63.96,678.23,498.13,9.96;6,54.00,690.18,164.42,9.96;6,261.23,690.18,300.87,9.96;6,54.00,702.14,508.09,9.96;6,54.00,714.09,311.94,9.96"><s coords="6,63.96,678.23,498.13,9.96;6,54.00,690.18,214.98,9.96">For our purposes, we concentrate on dichotomous or binary events (or "items", a more common terminology in the area of statistical measurement theory <ref type="bibr" coords="6,221.07,690.18,10.52,9.96">[8,</ref><ref type="bibr" coords="6,234.22,690.18,12.73,9.96">12,</ref><ref type="bibr" coords="6,249.60,690.18,11.62,9.96">13]</ref>).</s><s coords="6,273.17,690.18,288.93,9.96;6,54.00,702.14,112.80,9.96">Thus, to each properly defined event i we can associate two distinct numerical values, 0 and 1.</s><s coords="6,171.15,702.14,390.94,9.96;6,54.00,714.09,311.94,9.96">For a given instance or realization pattern for the collection of events, the numerical value 1 (0) for the event i means it has (has not) taken place in that pattern.</s></p><p coords="7,63.96,54.57,498.13,9.96;7,54.00,66.52,508.10,9.96;7,54.00,78.48,508.09,9.96;7,54.00,90.43,419.08,9.96;7,485.14,90.43,76.95,9.96;7,54.00,102.14,508.09,10.21;7,54.00,114.34,44.55,9.96;7,115.72,114.34,199.08,9.96"><s coords="7,63.96,54.57,498.13,9.96;7,54.00,66.52,508.10,9.96;7,54.00,78.48,166.71,9.96">The idea underlying the Guttman scaling, also known as cumulative scaling or scalogram analysis, is to be able to create a table or indicator matrix -which should not be confused with the correlation matrix R itself -assembling the data in a very particular manner.</s><s coords="7,226.93,78.48,335.16,9.96;7,54.00,90.43,435.57,9.96">If such construction is possible for the data set, the indicator matrix would display a triangular structure, with all entries in the lower (upper) part equal to 1 (0), see Table <ref type="table" coords="7,476.29,90.43,8.86,9.96">S1</ref>.</s><s coords="7,493.96,90.43,68.14,9.96;7,54.00,102.39,236.98,9.96">Hence, within a given pattern of outcomes, there is a priority of events.</s><s coords="7,295.28,102.14,266.82,10.21">If the event i has occurred, then event i -1 has also occurred.</s><s coords="7,54.00,114.34,260.80,9.96">The Table <ref type="table" coords="7,101.87,114.34,10.52,9.96">S1</ref> explains in more detail the data organization.</s></p><p coords="7,63.96,128.61,498.13,9.96;7,63.96,140.56,498.13,10.71;7,54.00,152.52,508.10,9.96;7,54.00,164.47,508.09,10.71;7,54.00,176.43,432.17,9.96;7,503.61,176.43,58.49,9.96;7,54.00,188.13,85.40,10.96;7,155.45,188.38,333.00,9.96;7,501.17,188.38,60.92,9.96;7,54.00,200.34,508.09,9.96;7,54.00,212.04,508.09,10.96;7,54.00,224.25,308.79,9.96;7,387.14,224.25,7.20,9.96"><s coords="7,63.96,128.61,498.13,9.96;7,54.00,140.56,13.28,9.96">Two extra assumptions for data already observing the Guttman arrangement are known as homogeneity conditions <ref type="bibr" coords="7,54.00,140.56,9.96,9.96">[8]</ref>.</s><s coords="7,72.78,140.56,160.56,9.96">They can be stated as the following.</s><s coords="7,238.84,140.56,323.25,10.71">(a) There is no full correlation between any two populations x i and x i .</s><s coords="7,54.00,152.52,508.10,9.96;7,54.00,164.47,508.09,10.71;7,54.00,176.43,52.08,9.96">Actually, in many contexts this is not a really restrictive hypothesis, either because such coincidence is rare or, if it is not, for N large enough we can just eliminate the akin x i from the data set without loosing relevant statistical significance.</s><s coords="7,110.93,176.43,451.16,9.96;7,54.00,188.13,203.70,10.96">(b) The probability of obtaining the different patterns of outcomes indicated in Table <ref type="table" coords="7,489.64,176.43,10.51,9.96">S1</ref> are the same, i.e., the N i in Table <ref type="table" coords="7,142.17,188.38,10.52,9.96">S1</ref> are essentially all equal.</s><s coords="7,261.95,188.38,242.55,9.96">Arguably, this may seem a too restricting imposition <ref type="bibr" coords="7,491.22,188.38,9.96,9.96">[9]</ref>.</s><s coords="7,508.74,188.38,53.36,9.96;7,54.00,200.34,508.09,9.96;7,54.00,212.04,508.09,10.96;7,54.00,224.25,340.34,9.96">But perhaps a bit surprising, it has been verified numerically that certain results (like principal component analysis and certain properties of covariance matrices) for homogeneous data do not depart very much from the case where the N i display a normal distribution (provided the populations have ample variability <ref type="bibr" coords="7,366.10,224.25,10.52,9.96">[8,</ref><ref type="bibr" coords="7,379.95,224.25,7.20,9.96">9]</ref>).</s></p><p coords="7,63.96,238.51,498.13,9.96;7,54.00,250.47,508.09,10.71;7,54.00,262.42,50.37,9.96;7,117.77,259.79,269.53,12.59;7,400.71,262.42,161.39,10.71;7,54.00,271.75,103.54,12.59;7,174.69,274.38,27.95,9.96"><s coords="7,63.96,238.51,458.77,9.96">Therefore, it is correct to affirm that data obeying the homogeneous Guttman scaling is not ubiquitous.</s><s coords="7,528.14,238.51,33.95,9.96;7,54.00,250.47,508.09,10.71;7,54.00,262.42,67.09,9.96">But the relevant fact for our purposes is that, precisely because of that, the Pearson correlation matrix R hG can be derived analytically <ref type="bibr" coords="7,107.81,262.42,9.96,9.96">[8]</ref>.</s><s coords="7,125.87,259.79,278.16,12.59">Furthermore, its exact eigenvalues λi have been obtained in <ref type="bibr" coords="7,390.74,262.42,9.96,9.96">[8]</ref>.</s><s coords="7,408.80,262.42,153.29,10.71;7,54.00,271.75,148.65,12.59">Since the eigenvalues λ i of ρ hG are simply λi /N , then from <ref type="bibr" coords="7,160.86,274.38,10.52,9.96">[8]</ref> we get</s></p><formula xml:id="formula_19" coords="7,274.13,298.96,287.97,25.13">λ i = 1 + N -1 i (i + 1) .<label>(S2)</label></formula><p coords="7,63.96,341.42,437.06,10.71"><s coords="7,63.96,341.42,354.60,10.71">Notice that the λ i depend only on a single parameter, the population number N .</s><s coords="7,422.98,341.42,78.04,9.96">So, finally we find</s></p><formula xml:id="formula_20" coords="7,208.11,366.94,349.42,82.31">S hG = -(1 + N -1 ) N i=1 1 i (i + 1) ln 1 + N -1 i (i + 1) = ln[N ] -(1 -N -2 ) ln[N + 1] + 2 (1 + N -1 ) N -1 i=1 1 i (i + 2) ln[i + 1] . (<label>S3</label></formula><formula xml:id="formula_21" coords="7,557.53,428.28,4.57,9.96">)</formula><p coords="7,54.00,464.72,163.07,9.96;7,231.37,461.73,7.94,7.20;7,231.37,469.95,12.91,6.97;7,246.43,464.72,25.68,9.96;7,272.12,463.35,3.97,6.97;7,280.36,464.72,281.73,10.71;7,54.00,476.43,508.09,10.21;7,54.00,488.63,358.33,10.71;7,428.54,488.63,133.55,9.96;7,54.00,500.59,508.10,10.71;7,54.00,512.54,74.17,9.96"><s coords="7,54.00,464.72,163.07,9.96;7,231.37,461.73,7.94,7.20;7,231.37,469.95,12.91,6.97;7,246.43,464.72,25.68,9.96;7,272.12,463.35,3.97,6.97;7,280.36,464.72,281.73,10.71;7,54.00,476.43,37.32,10.21">Since it is well known that the series ∞ i=1 ln[i]/i 2 converges, it is not difficult to prove that S hG also converges as N → ∞.</s><s coords="7,95.61,476.68,466.48,9.96;7,54.00,488.63,325.93,10.71">Also, due to the peculiar way items are correlated in a homogeneous Guttman-scalable data collection, after a rapid increase with N , the entropy S hG tends to a plateau as N increases.</s><s coords="7,384.21,488.63,177.89,9.96;7,54.00,500.59,508.10,10.71;7,54.00,512.54,74.17,9.96">Figure <ref type="figure" coords="7,415.18,488.63,10.52,9.96">S1</ref> illustrates the general behavior of S hG (N ), also comparing it with the entropy for a Pearson correlation matrix of a totally uncorrelated data set, for which S = ln[N ].</s></p><p coords="7,54.00,557.61,22.27,7.86;7,88.05,557.61,474.05,7.86;7,54.00,568.07,508.09,7.86;7,54.00,578.53,508.09,7.86;7,54.00,588.99,508.09,7.86;7,54.00,599.45,352.58,7.86"><s coords="7,54.00,557.61,38.15,7.86">Table <ref type="table" coords="7,79.86,557.61,8.19,7.86">S1</ref>.</s><s coords="7,103.44,557.61,391.42,7.86">The data table (or indicator matrix) organized in a specific ordering of events i, with i = 1, . . .</s><s coords="7,496.40,557.61,14.99,7.86">, N .</s><s coords="7,517.04,557.61,45.06,7.86;7,54.00,568.07,508.09,7.86;7,54.00,578.53,133.45,7.86">Along each row -representing a particular configuration of events occurrence: a pattern -the entry 1 (0) means that the corresponding event has (has not) taken place.</s><s coords="7,194.28,578.53,367.81,7.86;7,54.00,588.99,133.18,7.86">The depicted structure illustrates a perfect Guttman scaling: for the pattern i, only the events up to i -1 do take place.</s><s coords="7,192.40,588.99,369.69,7.86;7,54.00,599.45,32.28,7.86">This ascribes a ranking or degree of prevalence among the distinct events within a specific pattern.</s><s coords="7,90.37,599.45,316.20,7.86">Ni is the number of times the pattern i is found in the full data set collection.</s></p></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head coords="7,130.75,620.22,249.74,7.86">Pattern Event 1 Event 2 Event 3 Event 4 Event 5 . . . Event</head><formula xml:id="formula_22" coords="7,132.42,620.22,356.00,99.54">N Number of occurrences 1 0 0 0 0 0 . . . 0 N1 2 1 0 0 0 0 . . . 0 N2 3 1 1 0 0 0 . . . 0 N3 4 1 1 1 0 0 . . . 0 N4 5 1 1 1 1 0 . . . 0 N5 6 1 1 1 1 1 . . . 0 N6 . . . . . . . . . . . . . . . . . . . . . 0 . . . N + 1 1 1 1 1 1 . . . 1 NN+1</formula><p coords="9,54.00,64.98,22.27,7.86;9,87.57,64.98,262.67,7.86;9,350.24,62.44,9.16,5.24;9,350.24,69.41,2.66,5.24;9,363.00,64.98,199.09,7.86;9,54.00,75.44,508.10,7.86;9,54.00,85.90,508.09,7.86;9,54.00,96.36,507.60,7.86;9,54.00,106.82,321.81,7.86"><s coords="9,54.00,64.98,37.66,7.86">Table <ref type="table" coords="9,79.37,64.98,8.19,7.86">S2</ref>.</s><s coords="9,100.03,64.98,250.21,7.86;9,350.24,62.44,9.16,5.24;9,350.24,69.41,2.66,5.24;9,363.00,64.98,199.09,7.86;9,54.00,75.44,246.05,7.86">Consider that for a data set of N = 3 and n = 4, the twelve x (j) i assume M0 = 6, M1 = 3, M2 = 2, M3 = 1 values, respectively, in the numerical intervals ∆0, ∆1, ∆2 and ∆3.</s><s coords="9,306.00,75.44,256.09,7.86;9,54.00,85.90,508.09,7.86;9,54.00,96.36,70.00,7.86">Then, taking as the events the instances (irrespective of i and j) in which the variables are within ∆1, ∆2 and ∆3, one can construct an indicator matrix exactly satisfying a homogeneous Guttman scaling.</s><s coords="9,128.85,96.36,432.75,7.86;9,54.00,106.82,321.81,7.86">Indeed, the three, two and one "1"'s in the columns Event 1, Event 2 and Event 3, correspond to M1, M2 and M3, whereas the total of six "0"'s spread in the whole table are due to M0.</s></p><formula xml:id="formula_23" coords="9,107.15,127.59,401.79,50.11">Pattern Event 1: Interval ∆1 Event 2: Interval ∆2 Event 3: Interval ∆3 Occurrence of the pattern 1 0 0 0 1 2 1 0 0 1 3 1 1 0 1 4 1 1 1 1</formula></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head coords="9,280.71,204.11,54.68,7.89">METHODS</head></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head coords="9,270.13,229.18,75.82,7.89">Data acquisition</head><p coords="9,63.96,254.42,498.13,9.96;9,54.00,266.38,508.10,9.96;9,54.00,278.34,508.09,9.96;9,54.00,290.29,238.16,9.96;9,310.87,290.29,251.23,9.96;9,54.00,302.25,508.10,9.96;9,54.00,314.20,508.09,9.96;9,54.00,326.16,508.09,9.96;9,54.00,338.11,508.10,9.96;9,54.00,350.07,503.89,9.96"><s coords="9,63.96,254.42,498.13,9.96;9,54.00,266.38,508.10,9.96;9,54.00,278.34,508.09,9.96;9,54.00,290.29,260.52,9.96">A total of nine healthy adults (five women) with no history of neurological or psychiatric disorders (assessed by DSM-IV structured interview), volunteered to ingest 120-200 mL (2.2 mL/kg of body weight) of ayahuasca known to contain 0.8 mg/mL of its main psychoactive compound DMT and 0.21 mg/mL of harmine, a β-carboline which allows for the entrance of DMT into the bloodstream <ref type="bibr" coords="9,296.26,290.29,14.61,9.96">[15]</ref>.</s><s coords="9,321.28,290.29,240.82,9.96;9,54.00,302.25,508.10,9.96;9,54.00,314.20,319.63,9.96">The volunteers were assigned with two task-free fMRI sessions: the first one prior to the ayahuasca ingestion, and the second one at 40 minutes after the brew intake (when ayahuasca's effects begin to occur, lasting for approximately four hours).</s><s coords="9,378.91,314.20,183.18,9.96;9,54.00,326.16,142.17,9.96">Both sessions required the participants to maintain an awake resting state.</s><s coords="9,201.05,326.16,361.04,9.96;9,54.00,338.11,294.12,9.96">The experimental procedure was approved by the Ethics and Research Committee of the University of São Paulo at Ribeirão Preto (No. 14672/2006).</s><s coords="9,352.78,338.11,209.32,9.96;9,54.00,350.07,46.85,9.96">Written informed consent was obtained from all volunteers.</s><s coords="9,105.28,350.07,452.61,9.96">All experimental procedures were performed in accordance with the relevant guidelines and regulations.</s></p><p coords="9,63.96,362.46,498.13,9.96;9,54.00,374.17,508.10,10.21;9,54.00,386.12,423.58,10.21;9,495.77,386.37,66.32,9.96;9,54.00,398.32,508.09,9.96;9,54.00,410.28,508.09,9.96;9,54.00,422.23,508.10,9.96;9,54.00,434.19,242.26,9.96;9,314.19,434.19,3.65,9.96"><s coords="9,63.96,362.46,498.13,9.96;9,54.00,374.17,508.10,10.21;9,54.00,386.12,195.73,10.21">The fMRI images were acquired in a 1.5 T scanner (Siemens, Magneton Vision), using an EPI-BOLD sequence to obtain 150 volumes with parameters TR = 1700 ms, TE = 66 ms, FOV = 220 mm, matrix 64 × 64, and voxel dimensions of 1.72 mm × 1.72 mm × 1.72 mm.</s><s coords="9,254.92,386.37,307.18,9.96;9,54.00,398.32,437.05,9.96">The images were preprocessed in the FSL software <ref type="bibr" coords="9,481.16,386.37,14.61,9.96">[16]</ref>, and consisted of slice-timing, head motion, and spatial smoothing corrections (Gaussian kernel, FWHM = 5 mm).</s><s coords="9,496.06,398.32,66.03,9.96;9,54.00,410.28,508.09,9.96;9,54.00,422.23,221.78,9.96">Nine regressors were used within a general linear model (GLM): six regressors to movement correction; one to white matter signal; one to cerebrospinal fluid; and one to global signal.</s><s coords="9,280.15,422.23,281.95,9.96;9,54.00,434.19,263.84,9.96">The images were normalized to the standard anatomical space of the Montreal Neurological Institute (MNI152 template) <ref type="bibr" coords="9,299.58,434.19,14.61,9.96">[17]</ref>.</s></p><p coords="9,63.96,446.58,498.13,9.96;9,54.00,458.54,351.92,9.96;9,417.53,458.54,144.57,9.96;9,54.00,470.49,508.10,9.96;9,54.00,482.45,508.09,9.96;9,54.00,494.40,508.09,9.96;9,54.00,506.36,360.38,9.96;9,432.50,506.36,129.59,9.96;9,54.00,518.31,508.10,10.71;9,54.00,530.02,508.10,10.21;9,54.00,542.22,358.96,9.96"><s coords="9,63.96,446.58,498.13,9.96;9,54.00,458.54,372.11,9.96">The preprocessed fMRI images were then parcellated into 110 anatomical regions of interest (ROIs) in accordance with the Harvard-Oxford cortical and subcortical atlas (see Supplementary Table <ref type="table" coords="9,408.95,458.54,8.58,9.96">S3</ref>).</s><s coords="9,430.44,458.54,131.66,9.96;9,54.00,470.49,203.65,9.96">Due to acquisition limitations, six regions were excluded from further analysis.</s><s coords="9,261.88,470.49,300.22,9.96;9,54.00,482.45,460.94,9.96">Thus, for each one of the remaining 104 ROIs, we averaged the BOLD signal of the regions' associated voxels, resulting in time courses listing a sequence of n = 150 data points.</s><s coords="9,519.32,482.45,42.77,9.96;9,54.00,494.40,508.09,9.96;9,54.00,506.36,382.15,9.96">To reduce confounders in the signal, a maximum overlap discrete wavelet transform (MODWT) was applied to the series in order to select the typical frequency range (0.01-0.1 Hz) of the resting state signal <ref type="bibr" coords="9,417.89,506.36,14.61,9.96">[18]</ref>.</s><s coords="9,441.13,506.36,120.96,9.96;9,54.00,518.31,508.10,10.71;9,54.00,530.02,508.10,10.21;9,54.00,542.22,358.96,9.96">Finally, in possession of the N = 104 time series x i , we pairwise-correlated them using the Pearson correlation coefficient of equation 3, resulting in the 104 × 104 Pearson correlation matrix R. We thus ended up with a total of 18 functional connectivity networks: two conditions (before and after ayahuasca) for each of the nine subjects involved.</s></p></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head coords="9,258.45,579.00,99.19,7.89">Subjective evaluation</head><p coords="9,63.96,604.25,498.13,9.96;9,54.00,616.20,205.79,9.96;9,276.75,616.20,285.34,9.96;9,54.00,628.16,508.09,9.96;9,54.00,640.11,28.12,9.96;9,94.01,640.11,8.58,9.96"><s coords="9,63.96,604.25,498.13,9.96;9,54.00,616.20,508.10,9.96;9,54.00,628.16,34.90,9.96">Individual responses of the Clinician-Administered Dissociative States Scale (CADSS), a psychometric scale that can discriminate subjects with dissociative disorders <ref type="bibr" coords="9,262.14,616.20,14.61,9.96">[19]</ref>, were collected and their scores were plotted against the respective entropy.</s><s coords="9,95.06,628.16,467.03,9.96;9,54.00,640.11,48.59,9.96">All subjects showed an increase in depersonalization as assessed by the CADSS scale (see Supplementary Figure <ref type="figure" coords="9,85.44,640.11,8.58,9.96">S2</ref>).</s></p><p coords="11,158.74,317.81,20.57,16.10;11,233.19,317.81,28.62,16.10;11,315.69,317.81,20.57,16.10;11,390.14,317.81,28.62,16.10;11,472.65,317.81,20.57,16.10;11,154.97,293.24,8.05,16.10;11,146.92,226.37,16.10,16.10;11,146.92,159.51,16.10,16.10;11,146.92,92.64,16.10,16.10;11,418.46,264.82,8.05,16.10;11,422.23,294.91,8.05,16.10;11,374.61,293.24,8.05,16.10;11,378.22,258.13,8.05,16.10;11,359.31,264.82,8.05,16.10;11,245.31,278.19,8.05,16.10;11,402.69,272.34,8.05,16.10;11,461.12,271.51,8.05,16.10;11,349.89,172.88,8.05,16.10;11,436.28,242.09,8.05,16.10;11,414.04,188.59,8.05,16.10;11,391.59,173.88,8.05,16.10;11,426.19,71.58,8.05,16.10;11,308.94,114.37,8.05,16.10;11,444.90,222.03,8.05,16.10;11,466.35,229.38,8.05,16.10;11,353.03,134.43,8.05,16.10;11,297.45,339.32,57.05,16.10;11,121.80,156.17,16.10,53.88;11,209.52,71.95,44.98,16.10;11,213.66,91.98,36.71,16.10"><s coords="11,158.74,317.81,20.57,16.10;11,233.19,317.81,28.62,16.10;11,315.69,317.81,20.57,16.10;11,390.14,317.81,28.62,16.10;11,472.65,317.81,20.57,16.10;11,154.97,293.24,8.05,16.10;11,146.92,226.37,16.10,16.10;11,146.92,159.51,16.10,16.10;11,146.92,92.64,16.10,16.10;11,418.46,264.82,8.05,16.10;11,422.23,294.91,8.05,16.10;11,374.61,293.24,8.05,16.10;11,378.22,258.13,8.05,16.10;11,359.31,264.82,8.05,16.10;11,245.31,278.19,8.05,16.10;11,402.69,272.34,8.05,16.10;11,461.12,271.51,8.05,16.10;11,349.89,172.88,8.05,16.10;11,436.28,242.09,8.05,16.10;11,414.04,188.59,8.05,16.10;11,391.59,173.88,8.05,16.10;11,426.19,71.58,8.05,16.10;11,308.94,114.37,8.05,16.10;11,444.90,222.03,8.05,16.10;11,466.35,229.38,8.05,16.10;11,353.03,134.43,8.05,16.10;11,297.45,339.32,57.05,16.10;11,121.80,156.17,16.10,53.88;11,209.52,71.95,44.98,16.10;11,213.66,91.98,36.71,16.10">0.4 0.45 0.5 0.55 0.6 0 10 20 30 1 2 3 4 5 6 8 9 1 2 3 4 5 6 7 8 9 Entropy CADSS Before After</s></p><p coords="11,54.00,374.19,26.01,7.86;11,91.33,374.19,470.77,7.86;11,54.00,384.65,508.09,7.86;11,54.00,395.11,508.10,7.86;11,54.00,405.57,488.15,7.86;12,54.00,62.64,22.27,7.86;12,87.65,62.64,334.62,7.86;12,422.26,60.87,3.82,5.24;12,426.58,62.64,135.52,7.86;12,54.00,73.10,416.06,7.86;12,186.70,89.19,22.53,7.86;12,316.57,89.19,27.78,7.86;12,308.56,100.05,49.43,7.86;12,304.05,110.51,58.45,7.86;12,286.40,120.98,93.76,7.86;12,289.49,131.44,87.58,7.86;12,252.65,141.90,161.25,7.86;12,253.80,152.36,158.94,7.86;12,298.82,162.82,68.92,7.86;12,303.89,173.28,58.78,7.86;12,246.09,183.74,174.37,7.86;12,244.02,194.20,178.52,7.86;12,249.19,204.66,168.18,7.86;12,247.11,215.12,172.33,7.86;12,238.08,225.58,190.40,7.86;12,215.20,236.04,5.80,7.86;12,248.27,236.04,170.01,7.86;12,246.20,246.50,174.16,7.86;12,237.16,256.97,192.23,7.86;12,296.89,267.43,72.78,7.86;12,186.70,277.89,34.30,7.86;12,283.71,277.89,99.14,7.86;12,254.43,288.35,157.70,7.86;12,252.35,298.81,161.85,7.86;12,303.25,309.27,60.05,7.86;12,247.75,319.73,171.06,7.86;12,249.56,330.19,167.43,7.86;12,186.70,340.65,29.69,7.86;12,290.37,340.65,85.82,7.86;12,186.70,351.11,29.69,7.86;12,288.27,351.11,90.03,7.86;12,186.70,361.57,29.69,7.86;12,274.68,361.57,117.19,7.86;12,186.70,372.03,29.69,7.86;12,295.61,372.03,75.33,7.86;12,186.70,382.49,29.69,7.86;12,291.92,382.49,82.72,7.86;12,186.70,392.96,29.69,7.86;12,264.43,392.96,137.70,7.86;12,186.70,403.42,29.69,7.86;12,262.36,403.42,141.84,7.86;12,186.70,413.88,29.69,7.86;12,295.15,413.88,76.25,7.86;12,186.70,424.34,29.69,7.86;12,303.95,424.34,58.64,7.86;12,186.70,434.80,29.69,7.86;12,287.36,434.80,91.84,7.86;12,186.70,445.26,29.69,7.86;12,248.61,445.26,169.33,7.86;12,186.70,455.72,29.69,7.86;12,246.54,455.72,173.47,7.86;12,186.70,466.18,29.69,7.86;12,304.35,466.18,57.85,7.86;12,186.70,476.64,34.30,7.86;12,244.02,476.64,178.51,7.86;12,186.70,487.10,29.69,7.86;12,241.95,487.10,182.66,7.86;12,186.70,497.56,29.69,7.86;12,259.94,497.56,146.67,7.86;12,186.70,508.02,29.69,7.86;12,282.17,508.02,102.21,7.86;12,186.70,518.48,29.69,7.86;12,279.55,518.48,107.45,7.86;12,186.70,528.94,29.69,7.86;12,281.39,528.94,103.77,7.86;12,186.70,539.41,29.69,7.86;12,278.27,539.41,110.02,7.86;12,186.70,549.87,29.69,7.86;12,303.44,549.87,59.66,7.86;12,186.70,560.33,29.69,7.86;12,258.51,560.33,149.53,7.86;12,186.70,570.79,29.69,7.86;12,294.93,570.79,76.70,7.86;12,186.70,581.25,29.69,7.86;12,288.57,581.25,89.40,7.86;12,186.70,591.71,29.69,7.86;12,304.93,591.71,56.70,7.86;12,186.70,602.17,34.30,7.86;12,313.41,602.17,39.73,7.86;12,186.70,612.63,34.30,7.86;12,316.38,612.63,33.79,7.86;12,186.70,623.09,34.30,7.86;12,315.04,623.09,36.48,7.86;12,186.70,633.55,38.91,7.86;12,315.17,633.55,36.22,7.86;12,186.70,644.01,38.91,7.86;12,305.73,644.01,55.09,7.86;12,186.70,654.47,38.91,7.86;12,312.93,654.47,40.70,7.86;12,186.70,664.93,38.91,7.86;12,310.34,664.93,45.88,7.86"><s coords="11,54.00,374.19,41.42,7.86">Figure <ref type="figure" coords="11,83.14,374.19,8.19,7.86">S2</ref>.</s><s coords="11,103.93,374.19,127.84,7.86">Entropy against CADSS scores.</s><s coords="11,236.03,374.19,326.06,7.86;11,54.00,384.65,211.84,7.86">Blue squares refer to the condition prior to the ayahuasca ingestion, whereas red circles is posterior to the consumption of ayahuasca.</s><s coords="11,270.39,384.65,233.58,7.86">The numbers 1 to 9 index the nine Subjects, respectively.</s><s coords="11,508.54,384.65,53.55,7.86;11,54.00,395.11,508.10,7.86;11,54.00,405.57,74.01,7.86">We note that Subjects 1 and 9 were the only individuals who showed a decrease in entropy after ingestion of ayahuasca (a translation to the left on the graph).</s><s coords="11,132.10,405.57,410.05,7.86">However, all subjects scored higher in the Clinician-Administered Dissociative States Scale (CADSS).</s><s coords="12,54.00,62.64,37.74,7.86">Table <ref type="table" coords="12,79.45,62.64,8.19,7.86">S3</ref>.</s><s coords="12,100.62,62.64,273.91,7.86">Brain regions in accordance with the Harvard-Oxford cortical atlas.</s><s coords="12,378.97,62.64,43.29,7.86;12,422.26,60.87,3.82,5.24;12,426.58,62.64,135.52,7.86;12,54.00,73.10,30.79,7.86">Asterisks ( * ) are assigned to the six excluded regions.</s><s coords="12,88.89,73.10,381.17,7.86">Ordered pairs (i, j) refers to the left (i) and right (j) hemispheres of the corresponding region.</s><s coords="12,186.70,89.19,22.53,7.86;12,316.57,89.19,27.78,7.86;12,186.70,100.05,20.48,7.86;12,308.56,100.05,49.43,7.86;12,186.70,110.51,20.48,7.86;12,304.05,110.51,58.45,7.86;12,186.70,120.98,20.48,7.86;12,286.40,120.98,93.76,7.86;12,186.70,131.44,20.48,7.86;12,289.49,131.44,87.58,7.86;12,186.70,141.90,25.09,7.86;12,252.65,141.90,161.25,7.86;12,186.70,152.36,29.69,7.86;12,253.80,152.36,158.94,7.86;12,186.70,162.82,29.69,7.86;12,298.82,162.82,68.92,7.86;12,186.70,173.28,29.69,7.86;12,303.89,173.28,58.78,7.86;12,186.70,183.74,29.69,7.86;12,246.09,183.74,174.37,7.86;12,186.70,194.20,29.69,7.86;12,244.02,194.20,178.52,7.86;12,186.70,204.66,29.69,7.86;12,249.19,204.66,168.18,7.86;12,186.70,215.12,29.69,7.86;12,247.11,215.12,172.33,7.86;12,186.70,225.58,29.69,7.86;12,238.08,225.58,190.40,7.86;12,186.70,236.04,34.30,7.86;12,248.27,236.04,170.01,7.86;12,186.70,246.50,29.69,7.86;12,246.20,246.50,174.16,7.86;12,186.70,256.97,29.69,7.86;12,237.16,256.97,192.23,7.86;12,186.70,267.43,29.69,7.86;12,296.89,267.43,72.78,7.86;12,186.70,277.89,34.30,7.86;12,283.71,277.89,99.14,7.86;12,186.70,288.35,29.69,7.86;12,254.43,288.35,157.70,7.86;12,186.70,298.81,29.69,7.86;12,252.35,298.81,161.85,7.86;12,186.70,309.27,29.69,7.86;12,303.25,309.27,60.05,7.86;12,186.70,319.73,29.69,7.86;12,247.75,319.73,171.06,7.86;12,186.70,330.19,29.69,7.86;12,249.56,330.19,167.43,7.86;12,186.70,340.65,29.69,7.86;12,290.37,340.65,85.82,7.86;12,186.70,351.11,29.69,7.86;12,288.27,351.11,90.03,7.86;12,186.70,361.57,29.69,7.86;12,274.68,361.57,117.19,7.86;12,186.70,372.03,29.69,7.86;12,295.61,372.03,75.33,7.86;12,186.70,382.49,29.69,7.86;12,291.92,382.49,82.72,7.86;12,186.70,392.96,29.69,7.86;12,264.43,392.96,137.70,7.86;12,186.70,403.42,29.69,7.86;12,262.36,403.42,141.84,7.86;12,186.70,413.88,29.69,7.86;12,295.15,413.88,76.25,7.86;12,186.70,424.34,29.69,7.86;12,303.95,424.34,58.64,7.86;12,186.70,434.80,29.69,7.86;12,287.36,434.80,91.84,7.86;12,186.70,445.26,29.69,7.86;12,248.61,445.26,169.33,7.86;12,186.70,455.72,29.69,7.86;12,246.54,455.72,173.47,7.86;12,186.70,466.18,29.69,7.86;12,304.35,466.18,57.85,7.86;12,186.70,476.64,34.30,7.86;12,244.02,476.64,178.51,7.86;12,186.70,487.10,29.69,7.86;12,241.95,487.10,182.66,7.86;12,186.70,497.56,29.69,7.86;12,259.94,497.56,146.67,7.86;12,186.70,508.02,29.69,7.86;12,282.17,508.02,102.21,7.86;12,186.70,518.48,29.69,7.86;12,279.55,518.48,107.45,7.86;12,186.70,528.94,29.69,7.86;12,281.39,528.94,103.77,7.86;12,186.70,539.41,29.69,7.86;12,278.27,539.41,110.02,7.86;12,186.70,549.87,29.69,7.86;12,303.44,549.87,59.66,7.86;12,186.70,560.33,29.69,7.86;12,258.51,560.33,149.53,7.86;12,186.70,570.79,29.69,7.86;12,294.93,570.79,76.70,7.86;12,186.70,581.25,29.69,7.86;12,288.57,581.25,89.40,7.86;12,186.70,591.71,29.69,7.86;12,304.93,591.71,56.70,7.86;12,186.70,602.17,34.30,7.86;12,313.41,602.17,39.73,7.86;12,186.70,612.63,34.30,7.86;12,316.38,612.63,33.79,7.86;12,186.70,623.09,34.30,7.86;12,315.04,623.09,36.48,7.86;12,186.70,633.55,38.91,7.86;12,315.17,633.55,36.22,7.86;12,186.70,644.01,38.91,7.86;12,305.73,644.01,55.09,7.86;12,186.70,654.47,38.91,7.86;12,312.93,654.47,40.70,7.86;12,186.70,664.93,38.91,7.86;12,310.34,664.93,45.88,7.86">Index Region <ref type="bibr" coords="12,186.70,100.05,10.75,7.86">(1,</ref><ref type="bibr" coords="12,198.99,100.05,8.19,7.86">2)</ref> Frontal Pole <ref type="bibr" coords="12,186.70,110.51,10.75,7.86">(3,</ref><ref type="bibr" coords="12,198.99,110.51,8.19,7.86">4)</ref> Insular Cortex <ref type="bibr" coords="12,186.70,120.98,10.75,7.86">(5,</ref><ref type="bibr" coords="12,198.99,120.98,8.19,7.86">6)</ref> Superior Frontal Gyrus <ref type="bibr" coords="12,186.70,131.44,10.75,7.86">(7,</ref><ref type="bibr" coords="12,198.99,131.44,8.19,7.86">8)</ref> Middle Frontal Gyrus <ref type="bibr" coords="12,186.70,141.90,10.75,7.86">(9,</ref><ref type="bibr" coords="12,198.99,141.90,12.80,7.86">10)</ref> Inferior Frontal Gyrus, pars triangularis <ref type="bibr" coords="12,186.70,152.36,15.36,7.86">(11,</ref><ref type="bibr" coords="12,203.59,152.36,12.80,7.86">12)</ref> Inferior Frontal Gyrus, pars opercularis <ref type="bibr" coords="12,186.70,162.82,15.36,7.86">(13,</ref><ref type="bibr" coords="12,203.59,162.82,12.80,7.86">14)</ref> Precentral Gyrus <ref type="bibr" coords="12,186.70,173.28,15.36,7.86">(15,</ref><ref type="bibr" coords="12,203.59,173.28,12.80,7.86">16)</ref> Temporal Pole <ref type="bibr" coords="12,186.70,183.74,15.36,7.86">(17,</ref><ref type="bibr" coords="12,203.59,183.74,12.80,7.86">18)</ref> Superior Temporal Gyrus, anterior division <ref type="bibr" coords="12,186.70,194.20,15.36,7.86">(19,</ref><ref type="bibr" coords="12,203.60,194.20,12.80,7.86" target="#b19">20)</ref> Superior Temporal Gyrus, posterior division <ref type="bibr" coords="12,186.70,204.66,15.36,7.86" target="#b20">(21,</ref><ref type="bibr" coords="12,203.59,204.66,12.80,7.86" target="#b21">22)</ref> Middle Temporal Gyrus, anterior division <ref type="bibr" coords="12,186.70,215.12,15.36,7.86" target="#b22">(23,</ref><ref type="bibr" coords="12,203.60,215.12,12.80,7.86" target="#b23">24)</ref> Middle Temporal Gyrus, posterior division <ref type="bibr" coords="12,186.70,225.58,15.36,7.86" target="#b24">(25,</ref><ref type="bibr" coords="12,203.59,225.58,12.80,7.86" target="#b25">26)</ref> Middle Temporal Gyrus, temporooccipital part <ref type="bibr" coords="12,186.70,236.04,15.36,7.86" target="#b26">(27,</ref><ref type="bibr" coords="12,203.59,236.04,11.61,7.86" target="#b27">28)</ref> * Inferior Temporal Gyrus, anterior division <ref type="bibr" coords="12,186.70,246.50,15.36,7.86" target="#b28">(29,</ref><ref type="bibr" coords="12,203.59,246.50,12.80,7.86" target="#b29">30)</ref> Inferior Temporal Gyrus, posterior division <ref type="bibr" coords="12,186.70,256.97,15.36,7.86" target="#b30">(31,</ref><ref type="bibr" coords="12,203.59,256.97,12.80,7.86" target="#b31">32)</ref> Inferior Temporal Gyrus, temporooccipital part <ref type="bibr" coords="12,186.70,267.43,15.36,7.86" target="#b32">(33,</ref><ref type="bibr" coords="12,203.59,267.43,12.80,7.86" target="#b33">34)</ref> Postcentral Gyrus (35, 36) * Superior Parietal Lobule <ref type="bibr" coords="12,186.70,288.35,15.36,7.86" target="#b36">(37,</ref><ref type="bibr" coords="12,203.59,288.35,12.80,7.86" target="#b37">38)</ref> Supramarginal Gyrus, anterior division <ref type="bibr" coords="12,186.70,298.81,15.36,7.86" target="#b38">(39,</ref><ref type="bibr" coords="12,203.59,298.81,12.80,7.86" target="#b39">40)</ref> Supramarginal Gyrus, posterior division <ref type="bibr" coords="12,186.70,309.27,15.36,7.86" target="#b40">(41,</ref><ref type="bibr" coords="12,203.59,309.27,12.80,7.86" target="#b41">42)</ref> Angular Gyrus <ref type="bibr" coords="12,186.70,319.73,15.36,7.86" target="#b42">(43,</ref><ref type="bibr" coords="12,203.60,319.73,12.80,7.86" target="#b43">44)</ref> Lateral Occipital Cortex, superior division <ref type="bibr" coords="12,186.70,330.19,15.36,7.86" target="#b44">(45,</ref><ref type="bibr" coords="12,203.60,330.19,12.80,7.86" target="#b45">46)</ref> Lateral Occipital Cortex, inferior division (47, 48) Intracalcarine Cortex (49, 50) Frontal Medial Cortex (51, 52) Juxtapositional lobule cortex (53, 54) Subcallosal Cortex (55, 56) Paracingulate Gyrus (57, 58) Cingulate Gyrus, anterior division (59, 60) Cingulate Gyrus, posterior division (61, 62) Precuneous Cortex (63, 64) Cuneal Cortex (65, 66) Frontal Orbital Cortex (67, 68) Parahippocampal Gyrus, anterior division (69, 70) Parahippocampal Gyrus, posterior division (71, 72) Lingual Gyrus (73, 74) * Temporal Fusiform Cortex, anterior division (75, 76) Temporal Fusiform Cortex, posterior division (77, 78) Temporal Occipital Fusiform Cortex (79, 80) Occipital Fusiform Gyrus (81, 82) Frontal Operculum Cortex (83, 84) Central Opercular Cortex (85, 86) Parietal Operculum Cortex (87, 88) Planum Polare (89, 90) Heschl's Gyrus (includes H1 and H2) (91, 92) Planum Temporale (93, 94) Supracalcarine Cortex (95, 96) Occipital Pole (97, 104) Thalamus (98, 105) Caudate (99, 106) Putamen (100, 107) Pallidum (101, 108) Hippocampus (102, 109) Amygdala (103, 110) Accumbens</s></p></div>			</div>
+			<div type="references">
+
+				<listBibl>
+
+<biblStruct coords="5,335.33,621.27,226.76,7.89;5,335.33,631.75,28.16,7.86" status="extracted" xml:id="b0">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">R</forename><surname>Albert</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">A</forename><surname>Barabási</surname></persName>
+		</author>
+		<idno type="DOI">10.1103/RevModPhys.74.47</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Rev. Mod. Phys</title>
+		<imprint>
+			<biblScope unit="volume">74</biblScope>
+			<biblScope unit="page">47</biblScope>
+			<date type="published" when="2002">2002</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Albert, R. and Barabási, A. Rev. Mod. Phys. 74, 47 (2002).</note>
+</biblStruct>
+
+<biblStruct coords="5,335.33,642.19,226.77,7.89;5,335.33,652.68,28.16,7.86" status="extracted" xml:id="b1">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">K</forename><surname>Anand</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">G</forename><surname>Bianconi</surname></persName>
+		</author>
+		<idno type="DOI">10.1103/PhysRevE.80.045102</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Phys. Rev. E</title>
+		<imprint>
+			<biblScope unit="volume">80</biblScope>
+			<biblScope unit="page">45102</biblScope>
+			<date type="published" when="2009">2009</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Anand, K. and Bianconi, G. Phys. Rev. E 80, 045102(R) (2009).</note>
+</biblStruct>
+
+<biblStruct coords="5,335.33,663.11,226.77,7.89;5,335.33,673.60,58.87,7.86" status="extracted" xml:id="b2">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">M</forename><surname>De Domenico</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Biamonte</surname></persName>
+		</author>
+		<idno type="DOI">10.1103/PhysRevX.6.041062</idno>
+	</analytic>
+	<monogr>
+		<title level="j">J. Phys. Rev. X</title>
+		<imprint>
+			<biblScope unit="volume">6</biblScope>
+			<biblScope unit="page">41062</biblScope>
+			<date type="published" when="2016">2016</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">De Domenico, M. and Biamonte, J. Phys. Rev. X 6, 041062 (2016).</note>
+</biblStruct>
+
+<biblStruct coords="5,335.33,684.03,214.06,7.89" status="extracted" xml:id="b3">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">A</forename><surname>Almog</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Shmueli</surname></persName>
+		</author>
+		<idno type="DOI">10.1038/s41598-019-47210-8</idno>
+	</analytic>
+	<monogr>
+		<title level="j">E. Sci. Rep</title>
+		<imprint>
+			<biblScope unit="volume">9</biblScope>
+			<biblScope unit="page">10832</biblScope>
+			<date type="published" when="2019">2019</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Almog, A. and Shmueli, E. Sci. Rep. 9 10832 (2019).</note>
+</biblStruct>
+
+<biblStruct coords="5,335.33,694.49,226.76,7.89;5,335.33,704.98,28.16,7.86" status="extracted" xml:id="b4">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">A</forename><surname>Chakraborti</surname></persName>
+		</author>
+		<idno type="DOI">10.1088/2632-072X/abbed1</idno>
+	</analytic>
+	<monogr>
+		<title level="j">J. Phys. Complex</title>
+		<imprint>
+			<biblScope unit="volume">2</biblScope>
+			<biblScope unit="page">15002</biblScope>
+			<date type="published" when="2021">2021</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Chakraborti, A. et al. J. Phys. Complex. 2, 015002 (2021).</note>
+</biblStruct>
+
+<biblStruct coords="5,335.33,715.41,226.77,7.89;6,72.32,55.91,72.82,7.86" status="extracted" xml:id="b5">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">J</forename><surname>Gómez-Gardeñes</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">V</forename><surname>Latora</surname></persName>
+		</author>
+		<idno type="DOI">10.1103/PhysRevE.78.065102</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Phys. Rev. E</title>
+		<imprint>
+			<biblScope unit="volume">78</biblScope>
+			<biblScope unit="page">65102</biblScope>
+			<date type="published" when="2008">2008</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Gómez-Gardeñes, J. and Latora, V. Phys. Rev. E 78, 065102(R) (2008).</note>
+</biblStruct>
+
+<biblStruct coords="6,72.32,66.35,226.76,7.89;6,72.32,76.83,63.48,7.86" status="extracted" xml:id="b6">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">E</forename><surname>Bullmore</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">O</forename><surname>Sporns</surname></persName>
+		</author>
+		<idno type="DOI">10.1038/nrn2575</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Nat. Rev. Neurosci</title>
+		<imprint>
+			<biblScope unit="volume">10</biblScope>
+			<biblScope unit="page" from="186" to="198" />
+			<date type="published" when="2009">2009</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Bullmore, E. and Sporns, O. Nat. Rev. Neurosci. 10, 186-198 (2009).</note>
+</biblStruct>
+
+<biblStruct coords="6,72.32,87.27,226.76,7.89" status="extracted" xml:id="b7">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">F</forename><forename type="middle">A N</forename><surname>Santos</surname></persName>
+		</author>
+		<idno type="DOI">10.1103/PhysRevE.100.032414</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Phys. Rev. E</title>
+		<imprint>
+			<biblScope unit="volume">100</biblScope>
+			<biblScope unit="page">32414</biblScope>
+			<date type="published" when="2019">2019</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Santos, F. A. N. et al. Phys. Rev. E 100, 032414 (2019).</note>
+</biblStruct>
+
+<biblStruct coords="6,72.32,97.73,204.26,7.89" status="extracted" xml:id="b8">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">C</forename><surname>Nicolini</surname></persName>
+		</author>
+		<idno type="DOI">10.1016/j.neuroimage.2020.116603</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Neuroimage</title>
+		<imprint>
+			<biblScope unit="volume">211</biblScope>
+			<biblScope unit="page">116603</biblScope>
+			<date type="published" when="2020">2020</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Nicolini, C. et al. Neuroimage 211, 116603 (2020).</note>
+</biblStruct>
+
+<biblStruct coords="6,72.32,108.19,217.05,7.89" status="extracted" xml:id="b9">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">C</forename><surname>Shannon</surname></persName>
+		</author>
+		<idno type="DOI">10.1002/j.1538-7305.1948.tb01338.x</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Bell System Tech. J</title>
+		<imprint>
+			<biblScope unit="volume">27</biblScope>
+			<biblScope unit="page" from="623" to="656" />
+			<date type="published" when="1948">1948</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Shannon, C. Bell System Tech. J. 27, 623-656 (1948).</note>
+</biblStruct>
+
+<biblStruct coords="6,72.32,118.65,226.76,7.89;6,72.32,129.14,28.16,7.86" status="extracted" xml:id="b10">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">V</forename><surname>Latora</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">M</forename><surname>Marchiori</surname></persName>
+		</author>
+		<idno type="DOI">10.1103/PhysRevLett.87.198701</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Phys. Rev. Lett</title>
+		<imprint>
+			<biblScope unit="volume">87</biblScope>
+			<biblScope unit="page">198701</biblScope>
+			<date type="published" when="2001">2001</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Latora, V. and Marchiori, M. Phys. Rev. Lett. 87, 198701 (2001).</note>
+</biblStruct>
+
+<biblStruct coords="6,72.32,139.57,189.20,7.89" status="extracted" xml:id="b11">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">X</forename><surname>Yan</surname></persName>
+		</author>
+		<idno type="DOI">10.1103/PhysRevE.98.042304</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Phys. Rev. E</title>
+		<imprint>
+			<biblScope unit="volume">98</biblScope>
+			<biblScope unit="page">42304</biblScope>
+			<date type="published" when="2018">2018</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Yan, X. et al. Phys. Rev. E 98, 042304 (2018).</note>
+</biblStruct>
+
+<biblStruct coords="6,72.32,150.03,226.77,7.89" status="extracted" xml:id="b12">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">S</forename><surname>Kumar</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">N</forename><surname>Deo</surname></persName>
+		</author>
+		<idno type="DOI">10.1103/PhysRevE.86.026101</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Phys. Rev. E</title>
+		<imprint>
+			<biblScope unit="volume">86</biblScope>
+			<biblScope unit="page">26101</biblScope>
+			<date type="published" when="2012">2012</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Kumar, S. and Deo, N. Phys. Rev. E 86, 026101 (2012).</note>
+</biblStruct>
+
+<biblStruct coords="6,72.32,160.49,226.77,7.89" status="extracted" xml:id="b13">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">V</forename><forename type="middle">M</forename><surname>Eguíluz</surname></persName>
+		</author>
+		<idno type="DOI">10.1103/PhysRevLett.94.018102</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Phys. Rev. Lett</title>
+		<imprint>
+			<biblScope unit="volume">94</biblScope>
+			<biblScope unit="page">18102</biblScope>
+			<date type="published" when="2005">2005</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Eguíluz, V. M. et al. Phys. Rev. Lett. 94, 018102 (2005).</note>
+</biblStruct>
+
+<biblStruct coords="6,72.32,170.96,226.76,7.89;6,72.32,181.44,61.94,7.86" status="extracted" xml:id="b14">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">D</forename><forename type="middle">S</forename><surname>Bassett</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">E</forename><surname>Bullmore</surname></persName>
+		</author>
+		<idno type="DOI">10.1177/1073858406293182</idno>
+	</analytic>
+	<monogr>
+		<title level="j">The Neuroscientist</title>
+		<imprint>
+			<biblScope unit="volume">12</biblScope>
+			<biblScope unit="page" from="512" to="523" />
+			<date type="published" when="2006">2006</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Bassett, D. S. and Bullmore, E. The Neuroscientist 12, 512-523 (2006).</note>
+</biblStruct>
+
+<biblStruct coords="6,72.32,191.88,226.76,7.89;6,72.32,202.36,71.16,7.86" status="extracted" xml:id="b15">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">L</forename><forename type="middle">K</forename><surname>Gallos</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">H</forename><forename type="middle">A</forename><surname>Makse</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">M</forename><surname>Sigman</surname></persName>
+		</author>
+		<idno type="DOI">10.1073/pnas.1106612109</idno>
+	</analytic>
+	<monogr>
+		<title level="j">PNAS</title>
+		<imprint>
+			<biblScope unit="volume">109</biblScope>
+			<biblScope unit="page" from="2825" to="2830" />
+			<date type="published" when="2012">2012</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Gallos, L. K., Makse, H. A. and Sigman, M. PNAS 109, 2825-2830 (2012).</note>
+</biblStruct>
+
+<biblStruct coords="6,72.32,212.80,226.77,7.89;6,72.32,223.29,28.16,7.86" status="extracted" xml:id="b16">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">M</forename><surname>Rubinov</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">O</forename><surname>Sporns</surname></persName>
+		</author>
+		<idno type="DOI">10.1016/j.neuroimage.2011.03.069</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Neuroimage</title>
+		<imprint>
+			<biblScope unit="volume">56</biblScope>
+			<biblScope unit="page" from="2068" to="2079" />
+			<date type="published" when="2011">2011</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Rubinov, M. and Sporns, O. Neuroimage 56, 2068-2079 (2011).</note>
+</biblStruct>
+
+<biblStruct coords="6,72.32,233.72,181.54,7.89" status="extracted" xml:id="b17">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">V</forename><surname>Kukreti</surname></persName>
+		</author>
+		<idno type="DOI">10.3389/fphy.2020.00323</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Front. Phys</title>
+		<imprint>
+			<biblScope unit="volume">8</biblScope>
+			<biblScope unit="page">323</biblScope>
+			<date type="published" when="2020">2020</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Kukreti, V. et al. Front. Phys. 8, 323 (2020).</note>
+</biblStruct>
+
+<biblStruct coords="6,72.32,244.18,226.76,7.89;6,72.32,254.67,28.16,7.86" status="extracted" xml:id="b18">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">N</forename><surname>Langer</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">A</forename><surname>Pedroni</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">L</forename><surname>Jäncke</surname></persName>
+		</author>
+		<idno type="DOI">10.1371/journal.pone.0053199</idno>
+	</analytic>
+	<monogr>
+		<title level="j">PLoS One</title>
+		<imprint>
+			<biblScope unit="volume">8</biblScope>
+			<biblScope unit="page" from="1" to="9" />
+			<date type="published" when="2013">2013</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Langer, N., Pedroni, A. and Jäncke, L. PLoS One 8, 1-9 (2013).</note>
+</biblStruct>
+
+<biblStruct coords="6,72.32,265.10,224.38,7.89" status="extracted" xml:id="b19">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">K</forename><forename type="middle">A</forename><surname>Garrison</surname></persName>
+		</author>
+		<idno type="DOI">10.1016/j.neuroimage.2015.05.046</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Neuroimage</title>
+		<imprint>
+			<biblScope unit="volume">118</biblScope>
+			<biblScope unit="page" from="651" to="661" />
+			<date type="published" when="2015">2015</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Garrison, K. A. et al. Neuroimage 118, 651-661 (2015).</note>
+</biblStruct>
+
+<biblStruct coords="6,72.32,275.56,226.76,7.89;6,72.32,286.05,28.16,7.86" status="extracted" xml:id="b20">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">E</forename><surname>Tagliazucchi</surname></persName>
+		</author>
+		<idno type="DOI">10.1002/hbm.22562</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Brain. Mapp</title>
+		<imprint>
+			<biblScope unit="volume">35</biblScope>
+			<biblScope unit="page" from="5442" to="5456" />
+			<date type="published" when="2014">2014</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Tagliazucchi, E. et al. Hum. Brain. Mapp. 35, 5442-5456 (2014).</note>
+</biblStruct>
+
+<biblStruct coords="6,72.32,296.48,158.37,7.89" status="extracted" xml:id="b21">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">A</forename><surname>Viol</surname></persName>
+		</author>
+		<idno type="DOI">10.1038/s41598-017-06854-0</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Sci. Rep</title>
+		<imprint>
+			<biblScope unit="volume">7</biblScope>
+			<biblScope unit="page">7388</biblScope>
+			<date type="published" when="2017">2017</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Viol, A. et al. Sci. Rep. 7, 7388 (2017).</note>
+</biblStruct>
+
+<biblStruct coords="6,72.32,306.95,155.28,7.89" status="extracted" xml:id="b22">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">A</forename><surname>Viol</surname></persName>
+		</author>
+		<idno type="DOI">10.3390/e21020128</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Entropy</title>
+		<imprint>
+			<biblScope unit="volume">21</biblScope>
+			<biblScope unit="page">128</biblScope>
+			<date type="published" when="2019">2019</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Viol, A. et al. Entropy 21, 128 (2019).</note>
+</biblStruct>
+
+<biblStruct coords="6,72.32,317.43,226.77,7.86;6,72.32,327.89,96.32,7.86" status="extracted" xml:id="b23">
+	<monogr>
+		<author>
+			<persName><forename type="first">M</forename><surname>Ohya</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">D</forename><surname>Petz</surname></persName>
+		</author>
+		<title level="m">Quantum Entropy and Its Use</title>
+		<imprint>
+			<publisher>Springer-Verlag</publisher>
+			<date type="published" when="1993">1993</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Ohya, M. and Petz, D. Quantum Entropy and Its Use (Springer-Verlag, 1993).</note>
+</biblStruct>
+
+<biblStruct coords="6,72.32,338.35,226.77,7.86;6,72.32,348.81,28.16,7.86" status="extracted" xml:id="b24">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">Von</forename><surname>Neumann</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">J. Nachr. Ges Wiss. Göttingen</title>
+		<imprint>
+			<biblScope unit="page">273</biblScope>
+			<date type="published" when="1927">1927</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Von Neumann, J. Nachr. Ges Wiss. Göttingen, 273 (1927).</note>
+</biblStruct>
+
+<biblStruct coords="6,72.32,359.25,142.93,7.89" status="extracted" xml:id="b25">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">L</forename><surname>Landau</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Z. Phys</title>
+		<imprint>
+			<biblScope unit="volume">45</biblScope>
+			<biblScope unit="page">430</biblScope>
+			<date type="published" when="1927">1927</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Landau L. Z. Phys. 45, 430 (1927).</note>
+</biblStruct>
+
+<biblStruct coords="6,72.32,369.71,166.56,7.89" status="extracted" xml:id="b26">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">Y</forename><surname>Liu</surname></persName>
+		</author>
+		<idno type="DOI">10.1093/brain/awn018</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Brain</title>
+		<imprint>
+			<biblScope unit="volume">131</biblScope>
+			<biblScope unit="page" from="945" to="961" />
+			<date type="published" when="2008">2008</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Liu, Y. et al. Brain 131, 945-961 (2008).</note>
+</biblStruct>
+
+<biblStruct coords="6,335.33,55.89,226.76,7.89;6,335.33,66.37,52.73,7.86" status="extracted" xml:id="b27">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">F</forename><surname>Passerini</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">S</forename><surname>Severini</surname></persName>
+		</author>
+		<idno type="DOI">10.4018/jats.2009071005</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Int. J. Agent Tech. Syst</title>
+		<imprint>
+			<biblScope unit="volume">1</biblScope>
+			<biblScope unit="page" from="58" to="67" />
+			<date type="published" when="2009">2009</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Passerini, F. and Severini, S. Int. J. Agent Tech. Syst. 1 58-67 (2009).</note>
+</biblStruct>
+
+<biblStruct coords="6,335.33,76.83,226.77,7.86;6,335.33,87.27,141.06,7.89" status="extracted" xml:id="b28">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">E</forename><surname>Estrada</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">J</forename><forename type="middle">A</forename><surname>De La Pẽna</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">N</forename><surname>Hatano</surname></persName>
+		</author>
+		<idno type="DOI">10.1016/j.laa.2013.11.009</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Linear Algebra Appl</title>
+		<imprint>
+			<biblScope unit="volume">443</biblScope>
+			<biblScope unit="page" from="235" to="244" />
+			<date type="published" when="2014">2014</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Estrada, E., De la Pẽna, J. A. and Hatano, N. Linear Algebra Appl. 443, 235-244 (2014).</note>
+</biblStruct>
+
+<biblStruct coords="6,335.33,97.73,224.53,7.89" status="extracted" xml:id="b29">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">M</forename><surname>De Domenico</surname></persName>
+		</author>
+		<idno type="DOI">10.1103/PhysRevX.3.041022</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Phys. Rev. X</title>
+		<imprint>
+			<biblScope unit="volume">3</biblScope>
+			<biblScope unit="page">41022</biblScope>
+			<date type="published" when="2013">2013</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">De Domenico, M. et al. Phys. Rev. X 3, 041022 (2013).</note>
+</biblStruct>
+
+<biblStruct coords="6,335.33,108.19,220.94,7.89" status="extracted" xml:id="b30">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">M</forename><surname>De Domenico</surname></persName>
+		</author>
+		<idno type="DOI">10.1038/ncomms7864</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Nat. Commun</title>
+		<imprint>
+			<biblScope unit="volume">6</biblScope>
+			<biblScope unit="page">6864</biblScope>
+			<date type="published" when="2015">2015</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">De Domenico, M. et al. Nat. Commun. 6, 6864 (2015).</note>
+</biblStruct>
+
+<biblStruct coords="6,335.33,118.65,226.76,7.89;6,335.33,129.14,58.87,7.86" status="extracted" xml:id="b31">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">A</forename><surname>Ghavasieh</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">De</forename><surname>Domenico</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">M</forename></persName>
+		</author>
+		<idno type="DOI">10.1103/PhysRevResearch.2.013155</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Phys. Rev. Res</title>
+		<imprint>
+			<biblScope unit="volume">2</biblScope>
+			<biblScope unit="page">13155</biblScope>
+			<date type="published" when="2020">2020</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Ghavasieh A. and De Domenico M. Phys. Rev. Res. 2, 013155 (2020).</note>
+</biblStruct>
+
+<biblStruct coords="6,335.33,139.57,226.77,7.89" status="extracted" xml:id="b32">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">H</forename><surname>Golino</surname></persName>
+		</author>
+		<idno type="DOI">10.1080/00273171.2020.1779642</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Multivariate Behav. Res</title>
+		<imprint>
+			<biblScope unit="volume">56</biblScope>
+			<biblScope unit="page">874</biblScope>
+			<date type="published" when="2021">2021</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Golino H. et al. Multivariate Behav. Res. 56, 874 (2021).</note>
+</biblStruct>
+
+<biblStruct coords="6,335.33,150.03,226.76,7.89;6,335.33,160.52,58.87,7.86" status="extracted" xml:id="b33">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">A</forename><surname>Viol</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">V</forename><surname>Vuksanović</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">P</forename><surname>Hövel</surname></persName>
+		</author>
+		<idno type="DOI">10.1016/j.physa.2020.125233</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Physica A</title>
+		<imprint>
+			<biblScope unit="volume">561</biblScope>
+			<biblScope unit="page">125233</biblScope>
+			<date type="published" when="2021">2021</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Viol, A., Vuksanović, V. and Hövel, P. Physica A 561, 125233 (2021).</note>
+</biblStruct>
+
+<biblStruct coords="6,335.33,170.96,218.02,7.89" status="extracted" xml:id="b34">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">B</forename><forename type="middle">C M</forename><surname>Van Wijk</surname></persName>
+		</author>
+		<idno type="DOI">10.1371/journal.pone.0013701</idno>
+	</analytic>
+	<monogr>
+		<title level="j">PLoS One</title>
+		<imprint>
+			<biblScope unit="volume">5</biblScope>
+			<biblScope unit="page">13701</biblScope>
+			<date type="published" when="2010">2010</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Van Wijk B. C. M. et al. PLoS One 5, e13701 (2010).</note>
+</biblStruct>
+
+<biblStruct coords="6,335.33,181.42,205.23,7.89" status="extracted" xml:id="b35">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">M</forename><surname>Drakesmith</surname></persName>
+		</author>
+		<idno type="DOI">10.1016/j.neuroimage.2015.05.011</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Neuroimage</title>
+		<imprint>
+			<biblScope unit="volume">118</biblScope>
+			<biblScope unit="page">313</biblScope>
+			<date type="published" when="2015">2015</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Drakesmith M. et al. Neuroimage 118, 313 (2015).</note>
+</biblStruct>
+
+<biblStruct coords="6,335.33,191.88,226.77,7.89;6,335.33,202.36,28.16,7.86" status="extracted" xml:id="b36">
+	<monogr>
+		<title/>
+		<author>
+			<persName><forename type="first">M</forename><forename type="middle">N</forename><surname>Hallquist</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">F</forename><forename type="middle">G</forename><surname>Hillary</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Netw</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Neurosci</surname></persName>
+		</author>
+		<idno type="DOI">10.1162/netn_a_00054</idno>
+		<imprint>
+			<date type="published" when="2018">2018</date>
+			<biblScope unit="volume">3</biblScope>
+			<biblScope unit="page">1</biblScope>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Hallquist M. N. and Hillary F. G. Netw. Neurosci. 3, 1 (2018).</note>
+</biblStruct>
+
+<biblStruct coords="6,335.33,212.82,226.77,7.86;6,335.33,223.29,97.27,7.86" status="extracted" xml:id="b37">
+	<monogr>
+		<title level="m" type="main">Fundamentals of brain network analysis</title>
+		<author>
+			<persName><forename type="first">A</forename><surname>Fornito</surname></persName>
+		</author>
+		<imprint>
+			<date type="published" when="2016">2016</date>
+			<publisher>Academic Press</publisher>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Fornito A. et al. Fundamentals of brain network analysis (Academic Press, 2016).</note>
+</biblStruct>
+
+<biblStruct coords="6,335.33,233.72,226.32,7.89" status="extracted" xml:id="b38">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">G</forename><forename type="middle">T</forename><surname>Cantwell</surname></persName>
+		</author>
+		<idno type="DOI">10.1103/PhysRevE.101.062302</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Phys. Rev. E</title>
+		<imprint>
+			<biblScope unit="volume">101</biblScope>
+			<biblScope unit="page">62302</biblScope>
+			<date type="published" when="2020">2020</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Cantwell, G. T. et al. Phys. Rev. E 101, 062302 (2020).</note>
+</biblStruct>
+
+<biblStruct coords="6,335.33,244.21,226.77,7.86;6,335.33,254.64,61.29,7.89" status="extracted" xml:id="b39">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">K</forename><surname>Boudt</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">J</forename><surname>Cornelissen</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Croux</surname></persName>
+		</author>
+		<idno type="DOI">10.1007/s11222-011-9237-0</idno>
+	</analytic>
+	<monogr>
+		<title level="j">C. Stat. Comput</title>
+		<imprint>
+			<biblScope unit="volume">22</biblScope>
+			<biblScope unit="page">471</biblScope>
+			<date type="published" when="2012">2012</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Boudt, K., Cornelissen, J. and Croux, C. Stat. Comput. 22, 471 (2012).</note>
+</biblStruct>
+
+<biblStruct coords="6,335.33,265.10,226.77,7.89;6,335.33,275.59,28.16,7.86" status="extracted" xml:id="b40">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">R</forename><forename type="middle">L</forename><surname>Carhart-Harris</surname></persName>
+		</author>
+		<idno type="DOI">10.3389/fnhum.2014.00020</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Front. Hum. Neurosci</title>
+		<imprint>
+			<biblScope unit="volume">8</biblScope>
+			<biblScope unit="page">20</biblScope>
+			<date type="published" when="2014">2014</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Carhart-Harris, R. L. et al. Front. Hum. Neurosci. 8, 20 (2014).</note>
+</biblStruct>
+
+<biblStruct coords="6,335.33,286.02,226.77,7.89;6,335.33,296.51,28.16,7.86" status="extracted" xml:id="b41">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">J</forename><surname>Riba</surname></persName>
+		</author>
+		<idno type="DOI">10.1124/jpet.103.049882</idno>
+	</analytic>
+	<monogr>
+		<title level="j">J. Pharmacol. Exp. Ther</title>
+		<imprint>
+			<biblScope unit="volume">306</biblScope>
+			<biblScope unit="page" from="73" to="83" />
+			<date type="published" when="2003">2003</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Riba, J. et al. J. Pharmacol. Exp. Ther. 306, 73-83 (2003).</note>
+</biblStruct>
+
+<biblStruct coords="6,335.33,306.95,226.76,7.89;6,335.33,317.43,28.16,7.86" status="extracted" xml:id="b42">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">F</forename><surname>Palhano-Fontes</surname></persName>
+		</author>
+		<idno type="DOI">10.1017/s0033291718001356</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Psychol. Med</title>
+		<imprint>
+			<biblScope unit="volume">49</biblScope>
+			<biblScope unit="page" from="655" to="663" />
+			<date type="published" when="2019">2019</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Palhano-Fontes, F. et al. Psychol. Med. 49, 655-663 (2019).</note>
+</biblStruct>
+
+<biblStruct coords="6,335.33,327.89,226.76,7.86;6,335.33,338.35,28.16,7.86" status="extracted" xml:id="b43">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">A</forename><forename type="middle">V</forename><surname>Lebedev</surname></persName>
+		</author>
+		<idno type="DOI">10.1002/hbm.23234</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Brain. Mapp</title>
+		<imprint>
+			<biblScope unit="volume">37</biblScope>
+			<biblScope unit="page" from="3203" to="3213" />
+			<date type="published" when="2016">2016</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Lebedev, A. V. et al. Hum. Brain. Mapp. 37, 3203-3213 (2016).</note>
+</biblStruct>
+
+<biblStruct coords="6,335.33,348.79,177.12,7.89" status="extracted" xml:id="b44">
+	<monogr>
+		<title/>
+		<author>
+			<persName><forename type="first">M</forename><forename type="middle">M</forename><surname>Schartner</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Sci</surname></persName>
+		</author>
+		<idno type="DOI">10.1038/srep46421</idno>
+		<imprint>
+			<date type="published" when="2017">2017</date>
+			<biblScope unit="volume">7</biblScope>
+			<biblScope unit="page">46421</biblScope>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Schartner, M. M. Sci. Rep. 7, 46421 (2017).</note>
+</biblStruct>
+
+<biblStruct coords="6,335.33,359.25,149.74,7.89" status="extracted" xml:id="b45">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">S</forename><surname>Keshmiri</surname></persName>
+		</author>
+		<idno type="DOI">10.3390/e22090917</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Entropy</title>
+		<imprint>
+			<biblScope unit="volume">22</biblScope>
+			<biblScope unit="page">917</biblScope>
+			<date type="published" when="2020">2020</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Keshmiri, S. Entropy 22, 917 (2020).</note>
+</biblStruct>
+
+<biblStruct coords="6,335.33,369.71,226.76,7.89;6,335.33,380.20,58.87,7.86" status="extracted" xml:id="b46">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">E</forename><forename type="middle">D</forename><surname>Mcculloch</surname></persName>
+		</author>
+		<idno type="DOI">10.1016/j.neubiorev.2022.104689</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Biobehav. Rev</title>
+		<imprint>
+			<biblScope unit="volume">128</biblScope>
+			<biblScope unit="page">104689</biblScope>
+			<date type="published" when="2022">2022</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">McCulloch E. D. et al. Neurosci. Biobehav. Rev. 128, 104689 (2022).</note>
+</biblStruct>
+
+<biblStruct coords="10,72.32,123.16,489.78,7.86;10,72.32,133.62,413.60,7.86" status="extracted" xml:id="b47">
+	<analytic>
+		<title level="a" type="main">The quantification of a class of attributes: a theory and method of scale construction</title>
+		<author>
+			<persName><forename type="first">L</forename><surname>Guttman</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="m">The prediction of personal adjustment</title>
+		<editor>
+			<persName><forename type="first">P</forename><surname>Horst</surname></persName>
+		</editor>
+		<meeting><address><addrLine>New York</addrLine></address></meeting>
+		<imprint>
+			<date type="published" when="1941">1941</date>
+			<biblScope unit="page" from="319" to="348" />
+		</imprint>
+		<respStmt>
+			<orgName>Social Science Research Council</orgName>
+		</respStmt>
+	</monogr>
+	<note type="raw_reference">Guttman, L. The quantification of a class of attributes: a theory and method of scale construction. in The prediction of personal adjustment, (eds. P. Horst et al.) 319-348 (Social Science Research Council, New York, 1941).</note>
+</biblStruct>
+
+<biblStruct coords="10,72.32,144.08,489.78,7.86;10,72.32,154.54,183.66,7.86" status="extracted" xml:id="b48">
+	<analytic>
+		<title level="a" type="main">The principal components of scale analysis</title>
+		<author>
+			<persName><forename type="first">L</forename><surname>Guttman</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="m">Measurement and prediction</title>
+		<editor>
+			<persName><forename type="first">S</forename><forename type="middle">A</forename><surname>Stouffer</surname></persName>
+		</editor>
+		<meeting><address><addrLine>Princeton</addrLine></address></meeting>
+		<imprint>
+			<publisher>Princeton University Press</publisher>
+			<date type="published" when="1950">1950</date>
+			<biblScope unit="page" from="312" to="361" />
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Guttman, L. The principal components of scale analysis. in Measurement and prediction, (eds. S. A. Stouffer et al.) 312-361 (Princeton University Press, Princeton, 1950)</note>
+</biblStruct>
+
+<biblStruct coords="10,72.32,165.00,387.27,7.86" status="extracted" xml:id="b49">
+	<monogr>
+		<author>
+			<persName><forename type="first">R</forename><forename type="middle">G</forename><surname>Davies</surname></persName>
+		</author>
+		<title level="m">Computer Programming in Quantitative Biology</title>
+		<meeting><address><addrLine>London</addrLine></address></meeting>
+		<imprint>
+			<publisher>Academic Press</publisher>
+			<date type="published" when="1971">1971</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Davies, R. G. Computer Programming in Quantitative Biology (Academic Press, London, 1971).</note>
+</biblStruct>
+
+<biblStruct coords="10,72.32,175.46,489.78,7.86;10,72.32,185.90,489.77,7.89;10,72.32,196.39,28.16,7.86" status="extracted" xml:id="b50">
+	<analytic>
+		<title level="a" type="main">Using the Guttman scale to define and estimate measurement error in items over time: the case of cognitive decline and the meaning of &quot;Points Lost</title>
+		<author>
+			<persName><forename type="first">R</forename><forename type="middle">E</forename><surname>Tractenberg</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">F</forename><surname>Yumoto</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">P</forename><forename type="middle">S</forename><surname>Aisen</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">J</forename><forename type="middle">A</forename><surname>Kaye</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">R</forename><forename type="middle">J</forename><surname>Mislevy</surname></persName>
+		</author>
+		<idno type="DOI">10.1371/journal.pone.0030019</idno>
+	</analytic>
+	<monogr>
+		<title level="j">PLoS One</title>
+		<imprint>
+			<biblScope unit="volume">7</biblScope>
+			<biblScope unit="page">30019</biblScope>
+			<date type="published" when="2012">2012</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Tractenberg, R. E., Yumoto, F., Aisen, P. S., Kaye, J. A. &amp; Mislevy, R. J. Using the Guttman scale to define and estimate measurement error in items over time: the case of cognitive decline and the meaning of &quot;Points Lost&quot;. PLoS One 7, e30019 (2012).</note>
+</biblStruct>
+
+<biblStruct coords="10,72.32,206.85,332.41,7.86" status="extracted" xml:id="b51">
+	<monogr>
+		<author>
+			<persName><forename type="first">M</forename><surname>Argyle</surname></persName>
+		</author>
+		<title level="m">The Scientific Study of Social Behaviour</title>
+		<meeting><address><addrLine>New York</addrLine></address></meeting>
+		<imprint>
+			<publisher>Routledge</publisher>
+			<date type="published" when="2013">2013</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Argyle, M. The Scientific Study of Social Behaviour (Routledge, New York, 2013).</note>
+</biblStruct>
+
+<biblStruct coords="10,72.32,217.31,489.78,7.86;10,72.32,227.77,118.23,7.86" status="extracted" xml:id="b52">
+	<monogr>
+		<author>
+			<persName><forename type="first">F</forename><forename type="middle">Guttman</forename><surname>Maggino</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Scale</surname></persName>
+		</author>
+		<title level="m">Encyclopedia of Quality of Life and Well-Being Research</title>
+		<editor>
+			<persName><forename type="first">A</forename><forename type="middle">C</forename><surname>Michalos</surname></persName>
+		</editor>
+		<meeting><address><addrLine>Dordrecht</addrLine></address></meeting>
+		<imprint>
+			<publisher>Sopringer</publisher>
+			<date type="published" when="2014">2014</date>
+			<biblScope unit="page" from="2626" to="2630" />
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Maggino, F. Guttman Scale. in Encyclopedia of Quality of Life and Well-Being Research, (ed. A. C. Michalos) 2626-2630 (Sopringer, Dordrecht, 2014).</note>
+</biblStruct>
+
+<biblStruct coords="10,72.32,238.23,489.78,7.86;10,72.32,248.69,489.77,7.86;10,72.32,259.15,189.18,7.86" status="extracted" xml:id="b53">
+	<analytic>
+		<title level="a" type="main">Health-related quality of life measures in the information age</title>
+		<author>
+			<persName><forename type="first">K</forename><surname>Warrian</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">G</forename><surname>Spaeth</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="m">Handbook of Research on Information Technology Management and Clinical Data Administration in</title>
+		<editor>
+			<persName><forename type="first">(</forename><surname>Healthcare</surname></persName>
+		</editor>
+		<editor>
+			<persName><forename type="middle">A</forename><surname>Ed</surname></persName>
+		</editor>
+		<editor>
+			<persName><surname>Dwivedi</surname></persName>
+		</editor>
+		<meeting><address><addrLine>Hershey</addrLine></address></meeting>
+		<imprint>
+			<date type="published" when="2009">2009</date>
+			<biblScope unit="page" from="725" to="745" />
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Warrian, K. &amp; Spaeth, G. Health-related quality of life measures in the information age. in Handbook of Research on Information Technology Management and Clinical Data Administration in Healthcare, (ed. A. Dwivedi) 725-745 (Medical Information Science Reference, Hershey, 2009).</note>
+</biblStruct>
+
+<biblStruct coords="10,72.32,269.61,489.78,7.86;10,72.32,280.05,72.93,7.89" status="extracted" xml:id="b54">
+	<analytic>
+		<title level="a" type="main">Some properties of the Pearson Correlation Matrix of Guttman-Scalable Items</title>
+		<author>
+			<persName><forename type="first">R</forename><surname>Zwick</surname></persName>
+		</author>
+		<idno type="DOI">10.1002/j.2330-8516.1986.tb00166.x</idno>
+	</analytic>
+	<monogr>
+		<title level="j">ETS Research Report Series</title>
+		<imprint>
+			<biblScope unit="page">23</biblScope>
+			<date type="published" when="1986">1986. 1986</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Zwick, R. Some properties of the Pearson Correlation Matrix of Guttman-Scalable Items. ETS Research Report Series 1986, i-23 (1986).</note>
+</biblStruct>
+
+<biblStruct coords="10,72.32,290.53,489.78,7.86;10,72.32,300.97,192.68,7.89" status="extracted" xml:id="b55">
+	<analytic>
+		<title level="a" type="main">A Note on the Eigensystem of the Covariance Matrix of Dichotomous Guttman Items</title>
+		<author>
+			<persName><forename type="first">C</forename><forename type="middle">P</forename><surname>Davis-Stober</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">J.-P</forename><surname>Doignon</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">R</forename><surname>Suck</surname></persName>
+		</author>
+		<idno type="DOI">10.3389/fpsyg.2015.01767</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Front. Psychol</title>
+		<imprint>
+			<biblScope unit="volume">6</biblScope>
+			<biblScope unit="page">1767</biblScope>
+			<date type="published" when="2015">2015</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Davis-Stober, C. P., Doignon, J.-P. &amp; Suck, R. A Note on the Eigensystem of the Covariance Matrix of Dichotomous Guttman Items. Front. Psychol. 6, 1767 (2015).</note>
+</biblStruct>
+
+<biblStruct coords="10,72.32,311.45,323.36,7.86" status="extracted" xml:id="b56">
+	<monogr>
+		<author>
+			<persName><forename type="first">M</forename><surname>Kendall</surname></persName>
+		</author>
+		<title level="m">Rank Correlation Methods, 5th ed</title>
+		<imprint>
+			<publisher>Oxford University Press</publisher>
+			<date type="published" when="1990">1990</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Kendall, M. Rank Correlation Methods, 5th ed. (Oxford University Press, 1990).</note>
+</biblStruct>
+
+<biblStruct coords="10,72.32,321.92,489.78,7.86;10,72.32,332.35,104.63,7.89" status="extracted" xml:id="b57">
+	<analytic>
+		<title level="a" type="main">Quantifying distinct associations on different temporal scales: comparison of DCCA and Pearson methods</title>
+		<author>
+			<persName><forename type="first">L</forename><surname>Piao</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Z</forename><surname>Fu</surname></persName>
+		</author>
+		<idno type="DOI">10.1038/srep36759</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Sci. Rep</title>
+		<imprint>
+			<biblScope unit="volume">6</biblScope>
+			<biblScope unit="page">36759</biblScope>
+			<date type="published" when="2016">2016</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Piao, L. &amp; Fu, Z. Quantifying distinct associations on different temporal scales: comparison of DCCA and Pearson methods. Sci. Rep. 6, 36759 (2016).</note>
+</biblStruct>
+
+<biblStruct coords="10,72.32,342.84,489.77,7.86;10,72.32,353.27,129.03,7.89" status="extracted" xml:id="b58">
+	<analytic>
+		<title level="a" type="main">A New Model for Scaling Response Patterns: An Application of the Quasi-Independence Concept</title>
+		<author>
+			<persName><forename type="first">L</forename><forename type="middle">A</forename><surname>Goodman</surname></persName>
+		</author>
+		<idno type="DOI">10.2307/2285434</idno>
+	</analytic>
+	<monogr>
+		<title level="j">J. Am. Stat. Assoc</title>
+		<imprint>
+			<biblScope unit="volume">70</biblScope>
+			<biblScope unit="page" from="755" to="768" />
+			<date type="published" when="1975">1975</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Goodman, L. A. A New Model for Scaling Response Patterns: An Application of the Quasi-Independence Concept. J. Am. Stat. Assoc. 70, 755-768 (1975).</note>
+</biblStruct>
+
+<biblStruct coords="10,72.32,363.73,394.95,7.89" status="extracted" xml:id="b59">
+	<analytic>
+		<title level="a" type="main">Statistics and the Theory of Measurement</title>
+		<author>
+			<persName><forename type="first">D</forename><forename type="middle">J</forename><surname>Hand</surname></persName>
+		</author>
+		<idno type="DOI">10.2307/2983326</idno>
+	</analytic>
+	<monogr>
+		<title level="j">J. R. Statist. Soc. A</title>
+		<imprint>
+			<biblScope unit="volume">159</biblScope>
+			<biblScope unit="page" from="445" to="492" />
+			<date type="published" when="1996">1996</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Hand, D. J. Statistics and the Theory of Measurement. J. R. Statist. Soc. A 159, 445-492 (1996).</note>
+</biblStruct>
+
+<biblStruct coords="10,72.32,374.22,489.78,7.86;10,72.32,384.68,327.67,7.86" status="extracted" xml:id="b60">
+	<monogr>
+		<title level="m" type="main">Stochastic cumulative scales in Theory construction and data analysis in the behavioral sciences</title>
+		<author>
+			<persName><forename type="first">C</forename><forename type="middle">H</forename><surname>Coombs</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">L</forename><forename type="middle">C</forename><surname>Coombs</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">J</forename><forename type="middle">C</forename><surname>Lingoes</surname></persName>
+		</author>
+		<imprint>
+			<date type="published" when="1978">1978</date>
+			<publisher>Jossey-Bass</publisher>
+			<biblScope unit="page" from="280" to="298" />
+			<pubPlace>San Francisco</pubPlace>
+		</imprint>
+	</monogr>
+	<note>(ed. S. Shye</note>
+	<note type="raw_reference">Coombs, C. H., Coombs, L. C. &amp; Lingoes, J. C. Stochastic cumulative scales in Theory construction and data analysis in the behavioral sciences, (ed. S. Shye) 280-298 (Jossey-Bass, San Francisco, 1978).</note>
+</biblStruct>
+
+<biblStruct coords="10,72.32,395.14,489.78,7.86;10,72.32,405.58,143.09,7.89" status="extracted" xml:id="b61">
+	<analytic>
+		<title level="a" type="main">Seeing with the eyes shut: neural basis of enhanced imagery following ayahuasca ingestion</title>
+		<author>
+			<persName><forename type="first">D</forename><forename type="middle">B</forename><surname>De Araujo</surname></persName>
+		</author>
+		<idno type="DOI">10.1002/hbm.21381</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Hum. Brain Mapp</title>
+		<imprint>
+			<biblScope unit="volume">33</biblScope>
+			<biblScope unit="page" from="2550" to="2560" />
+			<date type="published" when="2012">2012</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">De Araujo, D. B. et al. Seeing with the eyes shut: neural basis of enhanced imagery following ayahuasca ingestion. Hum. Brain Mapp. 33, 2550-2560 (2012).</note>
+</biblStruct>
+
+<biblStruct coords="10,72.32,416.04,485.68,7.89" status="extracted" xml:id="b62">
+	<analytic>
+		<title/>
+		<author>
+			<persName><forename type="first">M</forename><surname>Jenkinson</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">C</forename><forename type="middle">F</forename><surname>Beckmann</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">T</forename><forename type="middle">E</forename><surname>Behrens</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">M</forename><forename type="middle">W</forename><surname>Woolrich</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">S</forename><forename type="middle">M</forename><surname>Smith</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Fsl</surname></persName>
+		</author>
+		<idno type="DOI">10.1016/j.neuroimage.2011.09.015</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Neuroimage</title>
+		<imprint>
+			<biblScope unit="volume">62</biblScope>
+			<biblScope unit="page" from="782" to="790" />
+			<date type="published" when="2012">2012</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Jenkinson, M., Beckmann, C. F., Behrens, T. E., Woolrich, M. W. &amp; Smith, S. M. FSL. Neuroimage 62 782-790 (2012).</note>
+</biblStruct>
+
+<biblStruct coords="10,72.32,426.52,489.78,7.86;10,72.32,436.96,74.42,7.89" status="extracted" xml:id="b63">
+	<analytic>
+		<title level="a" type="main">The problem of functional localization in the human brain</title>
+		<author>
+			<persName><forename type="first">M</forename><surname>Brett</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">I</forename><forename type="middle">S</forename><surname>Johnsrude</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">A</forename><forename type="middle">M</forename><surname>Owen</surname></persName>
+		</author>
+		<idno type="DOI">10.1038/nrn756</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Nat. Rev. Neurosci</title>
+		<imprint>
+			<biblScope unit="volume">3</biblScope>
+			<biblScope unit="page" from="243" to="249" />
+			<date type="published" when="2002">2002</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Brett, M., Johnsrude, I. S. &amp; Owen, A. M. The problem of functional localization in the human brain. Nat. Rev. Neurosci. 3, 243-249 (2002).</note>
+</biblStruct>
+
+<biblStruct coords="10,72.32,447.44,489.78,7.86;10,72.32,457.88,210.62,7.89" status="extracted" xml:id="b64">
+	<analytic>
+		<title level="a" type="main">Brain complex network analysis by means of resting state fMRI and graph analysis: Will it be helpful in clinical epilepsy?</title>
+		<author>
+			<persName><forename type="first">H</forename><surname>Onias</surname></persName>
+		</author>
+		<idno type="DOI">10.1016/j.yebeh.2013.11.019</idno>
+	</analytic>
+	<monogr>
+		<title level="j">Epilepsy Behav</title>
+		<imprint>
+			<biblScope unit="volume">38</biblScope>
+			<biblScope unit="page" from="71" to="80" />
+			<date type="published" when="2014">2014</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Onias, H. et al. Brain complex network analysis by means of resting state fMRI and graph analysis: Will it be helpful in clinical epilepsy?. Epilepsy Behav. 38, 71-80 (2014).</note>
+</biblStruct>
+
+<biblStruct coords="10,72.32,468.37,489.78,7.86;10,72.32,478.80,157.26,7.89" status="extracted" xml:id="b65">
+	<analytic>
+		<title level="a" type="main">Measurement of dissociative states with the clinician-administered dissociative states scale (CADSS)</title>
+		<author>
+			<persName><forename type="first">J</forename><forename type="middle">D</forename><surname>Bremner</surname></persName>
+		</author>
+		<idno type="DOI">10.1023/a:1024465317902</idno>
+	</analytic>
+	<monogr>
+		<title level="j">J. Trauma. Stress</title>
+		<imprint>
+			<biblScope unit="volume">11</biblScope>
+			<biblScope unit="page" from="125" to="136" />
+			<date type="published" when="1998">1998</date>
+		</imprint>
+	</monogr>
+	<note type="raw_reference">Bremner, J. D. et al. Measurement of dissociative states with the clinician-administered dissociative states scale (CADSS). J. Trauma. Stress. 11, 125-136 (1998).</note>
+</biblStruct>
+
+				</listBibl>
+			</div>
+		</back>
+	</text>
+</TEI>

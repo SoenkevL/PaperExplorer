@@ -25,6 +25,7 @@ dev = [
     "pyright>=1.1.407",
     "pre-commit>=4.3",
     "testcontainers[postgres]>=4.13",
+    "pillow>=11",
 ]
 
 [tool.ruff]
@@ -52,6 +53,7 @@ typeCheckingMode = "standard"
 strict = ["packages/*/src"]
 
 [tool.pytest.ini_options]
-addopts = ["--import-mode=importlib", "--strict-markers"]
+# Tower-only tests are deselected by default; on the tower run them with `pytest -m tower`.
+addopts = ["--import-mode=importlib", "--strict-markers", "-m", "not tower"]
 testpaths = ["packages", "tests"]
-markers = ["tower: needs tower-only services (Ollama, real Zotero, GPU)"]
+markers = ["tower: needs tower-only services (Ollama, real Zotero, GPU, GROBID, the Seed PDF)"]

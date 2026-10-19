@@ -16,9 +16,9 @@ The seed paper is "A critical review of brain entropy as a biomarker of the psyc
 
 ## Settled decisions
 **Ingest**
-- Parsing: LiteParse (local, no LLM). It produces Markdown, text positions on the page, and runs OCR.
-- References: rules applied to the Markdown find the References heading and split it into entries. Each entry is resolved with Crossref `query.bibliographic`, then enriched from OpenAlex. GROBID `processCitationList` is the fallback for low-confidence entries.
-- Inline citations: numbered `[12]` style and APA author-year. Each link to a reference is stored with a confidence score.
+- Parsing (ADR 0006, superseding the tool choice of ADR 0002): GROBID (CRF image, local service) finds headings, paragraphs, sentences, References and Citation markers; the PDF's own text layer, read with pdfium, gives their text exactly as printed and the PDF's internal link targets. Scans are read by LiteParse's OCR and marked as OCR Text.
+- References: GROBID splits the bibliography into entries (an entry merged across a hanging indent is split again); for scans, rules split it by labels or hanging indent. Each entry is resolved with Crossref `query.bibliographic`, then enriched from OpenAlex.
+- Inline citations: numbered `[12]` style and author-year. Each Citation Link to a Reference carries a confidence and its evidence: the PDF's exact link target (certain), GROBID and a rule agreeing (high), or one source alone (reported as low confidence).
 - Resolving sources: OpenAlex first, including Unpaywall open-access links and abstracts, then arXiv as a fallback.
 - When no full text is available, the source's abstract is indexed instead, and it still gets a proper Zotero item tagged `abstractOnly` or `noSource`.
 

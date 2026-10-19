@@ -1,0 +1,126 @@
+date:    2026-10-19T20:27:35+02:00
+host:    pop-os · Linux 7.2.6-76070206-generic x86_64
+branch:  feat/hybrid-parsing @ a7af9f0
+dirty:   0 files
+uv:      uv 0.13.0 (x86_64-unknown-linux-gnu)
+docker:  29.9.1
+cpus:    12
+
+=== uv sync
+$ uv sync
+
+=== ruff check
+$ uv run ruff check
+All checks passed!
+
+=== ruff format --check
+$ uv run ruff format --check
+48 files already formatted
+
+=== pyright
+$ uv run pyright
+ * Install prebuilt node (26.12.0) ..... done.
+0 errors, 0 warnings, 0 informations
+
+=== pytest
+$ uv run pytest -q -rs
+....................................                                     [100%]
+=============================== warnings summary ===============================
+.venv/lib/python3.14/site-packages/fastapi/testclient.py:1
+  /home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+36 passed, 1 deselected, 1 warning in 128.73s (0:02:08)
+
+=== GROBID up (compose)
+$ docker compose up -d --quiet-pull grobid
+
+=== GROBID alive
+$ grobid_alive
+curl: (56) Recv failure: Connection reset by peer
+curl: (56) Recv failure: Connection reset by peer
+curl: (56) Recv failure: Connection reset by peer
+curl: (56) Recv failure: Connection reset by peer
+true
+{"version":"0.9.1","revision":"0.9.1"}
+
+=== pytest -m tower
+$ uv run pytest -m tower -v -rs
+============================= test session starts ==============================
+platform linux -- Python 3.14.8, pytest-9.1.1, pluggy-1.7.0 -- /home/netinc/Projects/PaperExplorer/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/netinc/Projects/PaperExplorer
+configfile: pyproject.toml
+testpaths: packages, tests
+plugins: anyio-4.15.1, platformdirs-4.13.3
+collecting ... collected 37 items / 36 deselected / 1 selected
+
+packages/core/tests/test_seed_golden.py::test_the_seed_parses_with_printed_text_and_linked_citations PASSED [100%]
+
+=============================== warnings summary ===============================
+.venv/lib/python3.14/site-packages/fastapi/testclient.py:1
+  /home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 1 passed, 36 deselected, 1 warning in 25.90s =================
+
+=== parse the Seed
+$ uv run paperexplorer parse --show 0 /home/soenke/Zotero/storage/YTS2XCEG/Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
+2026-10-19 20:30:42,217 INFO    paperexplorer.parsing: Parsing Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
+2026-10-19 20:30:43,827 INFO    paperexplorer.parsing: Parsed Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: 113 blocks, 184 References, 284 Citation markers
+Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: printed text
+Blocks: 113 (19 headings)
+References: 184
+Citations: 284 (certain 0, high 260, low 19, unlinked 5)
+
+=== build pipeline image
+$ docker compose build pipeline
+
+=== pipeline: the Seed
+$ docker compose run --rm --no-deps -T -e PE_DATA_DIR=/tmp/pe pipeline parse --show 0 /zotero/storage/YTS2XCEG/Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
+ Container paperexplorer-pipeline-run-850714e9b43d Creating 
+ Container paperexplorer-pipeline-run-850714e9b43d Created 
+2026-10-19 18:30:58,195 INFO    paperexplorer.parsing: Parsing Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
+2026-10-19 18:31:04,136 INFO    httpx: HTTP Request: POST http://grobid:8070/api/processFulltextDocument "HTTP/1.1 200 OK"
+2026-10-19 18:31:04,797 INFO    paperexplorer.parsing: Parsed Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: 113 blocks, 184 References, 284 Citation markers
+Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: printed text
+Blocks: 113 (19 headings)
+References: 184
+Citations: 284 (certain 0, high 260, low 19, unlinked 5)
+
+=== pipeline: scan via OCR
+$ docker compose run --rm --no-deps -T -e PE_DATA_DIR=/tmp/pe -v /home/netinc/Projects/PaperExplorer/tests/fixtures/pdfs:/fixtures:ro pipeline parse /fixtures/scan-villiger2024.pdf
+ Container paperexplorer-pipeline-run-d082c8315e93 Creating 
+ Container paperexplorer-pipeline-run-d082c8315e93 Created 
+2026-10-19 18:31:05,918 INFO    paperexplorer.parsing: Parsing scan-villiger2024.pdf
+2026-10-19 18:31:05,920 WARNING paperexplorer.parsing: scan-villiger2024.pdf has no text layer; reading it by OCR, its text is OCR Text
+scan-villiger2024.pdf: OCR Text (a scan)
+Blocks: 37 (6 headings)
+References: 26
+Citations: 35 (certain 0, high 0, low 10, unlinked 25)
+  p1 unlinked: 'Goodwin et al., 2022' in 'In the last decade, an increasing number of studies have investigated the therap'
+  p1 unlinked: 'Palhano-Fontes et al, 2019' in 'In the last decade, an increasing number of studies have investigated the therap'
+  p1 unlinked: 'Raison et al, 2023' in 'In the last decade, an increasing number of studies have investigated the therap'
+  p1 unlinked: 'Reiff et al, 2020' in 'In the last decade, an increasing number of studies have investigated the therap'
+  p1 unlinked: 'Rotz et al, 2023' in 'In the last decade, an increasing number of studies have investigated the therap'
+  p1 unlinked: 'Sanches al,, 2016' in 'In the last decade, an increasing number of studies have investigated the therap'
+  p1 unlinked: 'Gasser et 2016' in 'In the last decade, an increasing number of studies have investigated the therap'
+  p1 unlinked: 'et al, Johnson & Griffiths, Reiff al, 2023' in 'In the last decade, an increasing number of studies have investigated the therap'
+  p1 unlinked: 'et et al., 2016' in 'In the last decade, an increasing number of studies have investigated the therap'
+  p1 unlinked: 'Johnson, Garcia-Romeu, & Griffiths, 2017' in 'In the last decade, an increasing number of studies have investigated the therap'
+
+=== summary
+uv sync                    ok                    3s
+ruff check                 ok                    0s
+ruff format --check        ok                    0s
+pyright                    ok                   15s
+pytest                     ok                  129s
+GROBID up (compose)        ok                    1s
+GROBID alive               ok                   12s
+pytest -m tower            ok                   26s
+parse the Seed             ok                    2s
+build pipeline image       ok                   14s
+pipeline: the Seed         ok                    8s
+pipeline: scan via OCR     ok                    6s

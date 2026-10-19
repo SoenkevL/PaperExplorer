@@ -32,6 +32,12 @@ class Settings(BaseSettings):
         description="Local Zotero `storage/` folder, read-only; else Web API download.",
     )
 
+    grobid_url: str = "http://localhost:8070"
+    tessdata_dir: Path | None = Field(
+        default=None,
+        description="Tesseract `tessdata` folder for OCR of scans; else LiteParse downloads it.",
+    )
+
     log_level: LogLevel = "INFO"
     log_format: LogFormat = "text"
 

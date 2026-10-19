@@ -24,3 +24,8 @@ Key decisions, newest last. Hard-to-reverse ones link to an ADR.
 - 2026-10-17 — Seed of the first Exploration: Zotero item `YAAC9XCX`
 - 2026-10-18 — Zotero desktop runs as the tower's admin user; netinc (SSH user) reads `/home/Admin/Zotero/storage` read-only via ACL
 - 2026-10-18 — Milestone 0 done: Mac and tower set up; tower runs db, api, web; Ollama (bge-m3) on the LAN; Seed PDF synced; tests green on both machines
+- 2026-10-19 — Parsing: GROBID (CRF) finds the structure, pdfium reads the printed text and PDF link targets, LiteParse OCR only for scans → [ADR 0006](adr/0006-grobid-structure-pdf-text-ocr-for-scans.md), [research](research/2026-10-parsing-spike.md)
+- 2026-10-19 — GROBID's CRF image, not the deep-learning image: fewer correct Citation Links and 14.8 GB
+- 2026-10-19 — Citation Links weigh evidence in layers: exact PDF link 1.0, GROBID + rule 0.9, one source reported as low confidence
+- 2026-10-19 — Printed text is changed in two ways only: whitespace to single spaces, TeX-split accents composed
+- 2026-10-19 — Tests read recorded GROBID output; one live GROBID check per run; OCR tests use Tesseract's fast model, the pipeline the best one

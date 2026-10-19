@@ -21,8 +21,8 @@ Each row is one module with a small interface. Internals (caches, tokenizer, reg
 | Module | Interface (sketch) | Dependency kind | Test through |
 |---|---|---|---|
 | `domain` | pydantic models: Work, WorkId, Reference, Citation, CitingSentence, Chunk, Evidence, Scope, RetrievalRun, TextAvailability | in-process | — |
-| `parsing` | `parse(pdf: Path) -> ParsedWork` | local lib (LiteParse), file cache internal | real fixture PDFs |
-| `citations` | `extract(doc: ParsedWork) -> CitationGraph` | in-process | fixture `ParsedWork`s |
+| `parsing` | `parse(pdf, settings) -> ParsedWork`: GROBID finds the structure, pdfium reads the printed text and PDF link targets, LiteParse OCR reads scans (ADR 0006) | GROBID (external service, output cached by PDF hash) + local libs | fixture PDFs + recorded GROBID output; one live GROBID check |
+| `citations` | `extract(doc: ParsedWork) -> CitationGraph`: Citation Links weighed from PDF link, GROBID and rules; Citing Sentences | in-process | parsed fixtures and hand-built `ParsedWork`s |
 | `chunking` | `chunk(doc: ParsedWork) -> list[Chunk]` | in-process (tokenizer internal) | fixture `ParsedWork`s |
 | `resolution` | `resolve(ref: Reference) -> Resolution` | true external (Crossref, OpenAlex, arXiv, GROBID) | hand-written cases + regression cassettes (see Testing) |
 | `library` | port `Library` (find, ensure collection, create, tag, attach/get PDF) | true external (Zotero) | `InMemoryLibrary` adapter |
@@ -74,9 +74,10 @@ The API returns structured JSON only, never HTML: a Work as an ordered list of b
 
 Fake what we don't own, run what we do.
 
-- **Pure modules** (`citations`, `chunking`, `parsing`): tests through the interface with fixture PDFs / `ParsedWork`s.
+- **Pure modules** (`citations`, `chunking`, `parsing`): tests through the interface with fixture PDFs / `ParsedWork`s. Fixtures are CC BY papers (`tests/fixtures/README.md`), plus a synthetic scan and Tesseract's fast English model so OCR runs offline.
+- **GROBID**: a service we run, but slow to start, so `parsing` tests read GROBID output recorded per fixture PDF (`scripts/record_grobid_fixtures.py`); one live test per run starts the pinned image with testcontainers and checks fresh output keeps the recorded structure.
 - **Postgres**: always real. testcontainers starts a throwaway `pgvector` container on Mac and tower alike, or `PE_TEST_DATABASE_URL` points at an existing empty database; each test runs in a rolled-back transaction (ADR 0005).
 - **Zotero, Embedder**: in-memory adapters at the `Library` and `Embedder` seams.
-- **External HTTP** (Crossref, OpenAlex, arXiv, GROBID): `resolution` keeps the matching logic in a pure internal function tested with hand-written cases for the likely and the harmful scenarios (exact DOI, no DOI, wrong-year near-miss, preprint vs published, garbage string, empty result, 429/5xx). HTTP is never live in tests.
+- **External HTTP** (Crossref, OpenAlex, arXiv): `resolution` keeps the matching logic in a pure internal function tested with hand-written cases for the likely and the harmful scenarios (exact DOI, no DOI, wrong-year near-miss, preprint vs published, garbage string, empty result, 429/5xx). HTTP is never live in tests.
 - **Regression rule**: every real failure seen in use is recorded as a cassette (vcrpy) and kept as a named test before it is fixed.
 - `@pytest.mark.tower`: only tests needing Ollama, a real Zotero account or the GPU.

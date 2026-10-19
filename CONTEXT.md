@@ -32,6 +32,10 @@ _Avoid_: Reference (see below), cited paper
 How much of a Work's own text PaperExplorer holds: full text, abstract only, or none.
 _Avoid_: Access level, OA status
 
+**OCR Text**:
+A Work's text recovered by OCR from a scan. It may misread the authors' words, so it is never shown as their exact text.
+_Avoid_: Scanned text
+
 ## Inside a Work
 
 **Chunk**:
@@ -59,6 +63,14 @@ _Avoid_: Missing source, noSource
 **Citation**:
 One place in a Work's body text where the authors point at exactly one Reference. A grouped marker such as "[3–5, 9]" is four Citations sharing one Citing Sentence.
 _Avoid_: Reference, in-text reference, marker
+
+**Citation Link**:
+A Citation's tie to the Reference it points at, with a confidence and the evidence it rests on.
+_Avoid_: Match, resolution (a Resolution ties a Reference to a Work)
+
+**Unlinked Citation**:
+A Citation that no evidence ties to a Reference.
+_Avoid_: Unresolved citation, orphan citation
 
 **Citing Sentence**:
 The sentence a Citation occurs in, with the citation markers removed; the question asked of the cited Work.

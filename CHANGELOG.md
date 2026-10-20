@@ -27,3 +27,4 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Fixed
 - An optional folder left empty in `.env` (`PE_ZOTERO_STORAGE_DIR=`, `PE_TESSDATA_DIR=`) read as the current folder; it is now unset.
+- The `api` and `web` compose services have healthchecks, so `up --wait` and `web` wait until uvicorn answers; the reader check no longer meets a just-started container dropping connections.

@@ -234,3 +234,17 @@ def test_a_bare_year_after_an_author_year_keeps_its_own_reference(
         ("(Lempel and Ziv, 1976,", "Lempel A, Ziv J (1976"),
         ("1977;", "Lempel A, Ziv J (1977"),
     ]
+
+
+def test_numbers_beside_an_author_year_bibliography_are_not_labels(
+    parse_fixture: ParseFixture,
+) -> None:
+    # Regression: the margin's line numbers (Wegner), or the end of the column to the left
+    # (the Seed), were read as labels ("1072", "2024") of author-year entries.
+    work = parse_fixture("wegner2023-rsquare")
+
+    assert [r.label for r in work.references if r.label] == []
+    dong = next(r for r in work.references if r.text.startswith("Dong J, Jing B"))
+    assert dong.label is None
+    numbered = parse_fixture("felippe2021-arxiv")
+    assert [r.label for r in numbered.references[:3]] == ["1", "2", "3"]

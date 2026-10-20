@@ -7,6 +7,9 @@ from typer.testing import CliRunner
 from paperexplorer.cli import app
 from paperexplorer.config import Settings
 from paperexplorer.parsing import Block, CitationMarker, ParsedWork, TextOrigin
+from paperexplorer.parsing.assemble import assemble
+from paperexplorer.parsing.grobid import read_tei
+from paperexplorer.parsing.text_layer import TextLayer
 
 ParseFixture = Callable[[str], ParsedWork]
 RANGE_1_TO_3 = "[1\u20133]"  # as printed, with an en dash
@@ -248,3 +251,25 @@ def test_numbers_beside_an_author_year_bibliography_are_not_labels(
     assert dong.label is None
     numbered = parse_fixture("felippe2021-arxiv")
     assert [r.label for r in numbered.references[:3]] == ["1", "2", "3"]
+
+
+def test_a_one_line_entry_merged_with_the_next_is_split_at_the_hanging_indent(
+    fixture_pdf: Callable[[str], Path],
+) -> None:
+    # Regression: GROBID merged the Seed's one-line entry (Huxley 1959) with the next one, and
+    # the split only looked for a margin line after indented lines. Wegner's one-line entry
+    # (Huberman and Hogg 1986) and the next one, merged here by hand, have the same shape.
+    pdf = fixture_pdf("wegner2023-rsquare")
+    tei = read_tei((pdf.parent.parent / "grobid" / f"{pdf.stem}.tei.xml").read_bytes())
+    refs = tei.references
+    i = next(i for i, r in enumerate(refs) if r.raw_text.startswith("Huberman"))
+    merged = refs[i].model_copy(update={"boxes": refs[i].boxes + refs[i + 1].boxes})
+    tei = tei.model_copy(update={"references": [*refs[:i], merged, *refs[i + 2 :]]})
+
+    with TextLayer(pdf) as layer:
+        work = assemble(tei, layer)
+
+    huberman = next(r for r in work.references if r.text.startswith("Huberman BA, Hogg T"))
+    assert "Irisawa" not in huberman.text
+    assert any(r.text.startswith("Irisawa S, Isotani T, Yagyu T") for r in work.references)
+    assert len(work.references) == len(refs)

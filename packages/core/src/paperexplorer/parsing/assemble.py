@@ -206,6 +206,7 @@ def _references(tr: TeiReference, layer: TextLayer) -> list[Reference]:
         lead = _LEADING_LABEL.match(text)
         label = _label(boxes, layer) or (lead.group(1) if lead else None)
         first = i == 0
+        whole = len(parts) == 1  # else GROBID's fields mix the merged entries
         surname = _SURNAME.match(text)
         year = _YEAR.search(text)
         doi = _DOI.search(text)
@@ -216,13 +217,22 @@ def _references(tr: TeiReference, layer: TextLayer) -> list[Reference]:
                 text=text,
                 page=boxes[0].page,
                 boxes=boxes,
-                surnames=tr.surnames if first else ([surname.group(1).strip()] if surname else []),
-                year=tr.year if first else (year.group(0) if year else None),
-                title=tr.title if first else None,
-                doi=tr.doi if first else (doi.group(0).rstrip(".") if doi else None),
+                surnames=[s for s in tr.surnames if whole or s in text]
+                if first
+                else ([surname.group(1).strip()] if surname else []),
+                year=_kept(tr.year, text, whole) if first else (year.group(0) if year else None),
+                title=_kept(tr.title, text, whole) if first else None,
+                doi=_kept(tr.doi, text, whole)
+                if first
+                else (doi.group(0).rstrip(".") if doi else None),
             )
         )
     return out
+
+
+def _kept(value: str | None, text: str, whole: bool) -> str | None:
+    """A field GROBID read from an entry; of merged entries, only one this part prints."""
+    return value if whole or (value is not None and value in text) else None
 
 
 def _numbered(references: list[Reference]) -> list[Reference]:
@@ -249,14 +259,19 @@ def _numbered(references: list[Reference]) -> list[Reference]:
 
 
 def _split_at_hanging_indent(boxes: list[Box]) -> list[list[Box]]:
-    """Split an entry where a line returns to the entry margin after indented lines."""
+    """Split an entry where a line at the entry margin starts a hanging indent of its own.
+
+    That line follows indented lines, or, after a one-line entry, is followed by them.
+    """
     if not boxes:
         return [boxes]
     parts: list[list[Box]] = [[boxes[0]]]
-    for prev, box in itertools.pairwise(boxes):
+    for i, (prev, box) in enumerate(itertools.pairwise(boxes), start=1):
         column = [b for b in boxes if b.page == box.page and abs(b.x - box.x) < 40]
         margin = min(b.x for b in column)
-        if box.x <= margin + 2 and prev.page == box.page and prev.x > margin + 4:
+        below = next((b for b in boxes[i + 1 :] if b.y > box.y + box.height / 2), None)
+        hangs = below is not None and below.page == box.page and below.x > margin + 4
+        if box.x <= margin + 2 and prev.page == box.page and (prev.x > margin + 4 or hangs):
             parts.append([box])
         else:
             parts[-1].append(box)

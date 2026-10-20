@@ -34,7 +34,7 @@ _SAME_SIZE = 0.3  # points: printed heading sizes this close are one heading lev
 
 def assemble(tei: TeiDocument, layer: TextLayer) -> ParsedWork:
     """Read every GROBID block, marker and Reference from the text layer; add the PDF's links."""
-    references = [r for tr in tei.references for r in _references(tr, layer) if r.text]
+    references = _numbered([r for tr in tei.references for r in _references(tr, layer)])
     blocks: list[Block] = []
     headings: list[tuple[str | None, float] | None] = []
     for tb in tei.blocks:
@@ -203,10 +203,8 @@ def _references(tr: TeiReference, layer: TextLayer) -> list[Reference]:
     out: list[Reference] = []
     for i, boxes in enumerate(parts):
         text = layer.read(boxes).text
-        label = _label(boxes, layer)
-        if lead := _LEADING_LABEL.match(text):
-            label = label or lead.group(1)
-            text = text[lead.end() :]
+        lead = _LEADING_LABEL.match(text)
+        label = _label(boxes, layer) or (lead.group(1) if lead else None)
         first = i == 0
         surname = _SURNAME.match(text)
         year = _YEAR.search(text)
@@ -224,6 +222,29 @@ def _references(tr: TeiReference, layer: TextLayer) -> list[Reference]:
                 doi=tr.doi if first else (doi.group(0).rstrip(".") if doi else None),
             )
         )
+    return out
+
+
+def _numbered(references: list[Reference]) -> list[Reference]:
+    """Keep labels only where they number the bibliography: most entries count up from 1.
+
+    Numbers beside an author-year bibliography (line numbers in the margin, the end of the
+    column to the left) are not labels, and the entry's text keeps them as printed.
+    """
+    counting, last = 0, 0
+    for r in references:
+        number = int(r.label) if r.label else None
+        if number is not None and number in (1, last + 1):
+            counting += 1
+        last = number or last
+    numbered = counting > len(references) / 2
+    out: list[Reference] = []
+    for r in references:
+        text = r.text
+        if numbered and (lead := _LEADING_LABEL.match(text)):
+            text = text[lead.end() :]
+        if text:
+            out.append(r.model_copy(update={"label": r.label if numbered else None, "text": text}))
     return out
 
 

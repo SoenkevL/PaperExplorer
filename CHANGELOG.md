@@ -27,3 +27,6 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Fixed
 - An optional folder left empty in `.env` (`PE_ZOTERO_STORAGE_DIR=`, `PE_TESSDATA_DIR=`) read as the current folder; it is now unset.
+- Parsing: a Citation whose author part and year are linked separately in the PDF (LaTeX natbib) became two Citations of one Reference; it is now one (Wegner fixture: 311 → 153 Citations).
+- Parsing: numbers beside an author-year bibliography (margin line numbers, the end of the column to the left) were read as Reference labels; labels are now read only where they number the bibliography.
+- Parsing: a one-line bibliography entry that GROBID merged with the next one was not split; the split now also starts an entry at a margin line followed by indented lines, and the first part keeps only its own authors (the Seed: 184 → 185 References).

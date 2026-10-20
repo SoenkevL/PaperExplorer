@@ -263,7 +263,12 @@ def test_a_one_line_entry_merged_with_the_next_is_split_at_the_hanging_indent(
     tei = read_tei((pdf.parent.parent / "grobid" / f"{pdf.stem}.tei.xml").read_bytes())
     refs = tei.references
     i = next(i for i, r in enumerate(refs) if r.raw_text.startswith("Huberman"))
-    merged = refs[i].model_copy(update={"boxes": refs[i].boxes + refs[i + 1].boxes})
+    merged = refs[i].model_copy(  # GROBID's fields mix both entries, as on the Seed
+        update={
+            "boxes": refs[i].boxes + refs[i + 1].boxes,
+            "surnames": refs[i].surnames + refs[i + 1].surnames,
+        }
+    )
     tei = tei.model_copy(update={"references": [*refs[:i], merged, *refs[i + 2 :]]})
 
     with TextLayer(pdf) as layer:
@@ -271,5 +276,6 @@ def test_a_one_line_entry_merged_with_the_next_is_split_at_the_hanging_indent(
 
     huberman = next(r for r in work.references if r.text.startswith("Huberman BA, Hogg T"))
     assert "Irisawa" not in huberman.text
+    assert huberman.surnames == ["Huberman", "Hogg"]
     assert any(r.text.startswith("Irisawa S, Isotani T, Yagyu T") for r in work.references)
     assert len(work.references) == len(refs)

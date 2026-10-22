@@ -7,6 +7,9 @@ from typer.testing import CliRunner
 from paperexplorer.cli import app
 from paperexplorer.config import Settings
 from paperexplorer.parsing import Block, CitationMarker, ParsedWork, TextOrigin
+from paperexplorer.parsing.assemble import assemble
+from paperexplorer.parsing.grobid import read_tei
+from paperexplorer.parsing.text_layer import TextLayer
 
 ParseFixture = Callable[[str], ParsedWork]
 RANGE_1_TO_3 = "[1\u20133]"  # as printed, with an en dash
@@ -202,3 +205,77 @@ def test_marker_starting_inside_a_word_is_trimmed_to_the_next_word(
         if "de Vos et al., 2016, p. 207" in m.text
     )
     assert marker.text == "(de Vos et al., 2016, p. 207)"
+
+
+def test_author_and_year_links_of_one_citation_make_one_marker(parse_fixture: ParseFixture) -> None:
+    # Regression: LaTeX links the author part and the year of `(Amigó et al, 2004)` separately;
+    # the year's link stayed a second marker for the same Reference.
+    work = parse_fixture("wegner2023-rsquare")
+
+    paragraph = _block_with(work, "(Amigó et al, 2004). Sur")
+    start = paragraph.text.index("(Amigó et al, 2004)")
+    inside = [m for m in paragraph.citation_markers if start <= m.span.start < start + 19]
+    assert [m.text for m in inside] == ["(Amigó et al, 2004)"]
+    assert _linked_reference_text(work, inside[0]).startswith("Amigó JM, Szczepański J")
+    for block in work.blocks:
+        markers = block.citation_markers
+        for i, a in enumerate(markers):
+            for b in markers[i + 1 :]:
+                same = a.link_target is not None and a.link_target == b.link_target
+                assert not (same and a.span.start < b.span.end and b.span.start < a.span.end)
+
+
+def test_a_bare_year_after_an_author_year_keeps_its_own_reference(
+    parse_fixture: ParseFixture,
+) -> None:
+    work = parse_fixture("wegner2023-rsquare")
+
+    paragraph = _block_with(work, "LZ-78 algorithms (Lempel")
+    start = paragraph.text.index("(Lempel and Ziv, 1976, 1977;")
+    inside = [m for m in paragraph.citation_markers if start <= m.span.start < start + 28]
+    assert [(m.text, _linked_reference_text(work, m)[:21]) for m in inside] == [
+        ("(Lempel and Ziv, 1976,", "Lempel A, Ziv J (1976"),
+        ("1977;", "Lempel A, Ziv J (1977"),
+    ]
+
+
+def test_numbers_beside_an_author_year_bibliography_are_not_labels(
+    parse_fixture: ParseFixture,
+) -> None:
+    # Regression: the margin's line numbers (Wegner), or the end of the column to the left
+    # (the Seed), were read as labels ("1072", "2024") of author-year entries.
+    work = parse_fixture("wegner2023-rsquare")
+
+    assert [r.label for r in work.references if r.label] == []
+    dong = next(r for r in work.references if r.text.startswith("Dong J, Jing B"))
+    assert dong.label is None
+    numbered = parse_fixture("felippe2021-arxiv")
+    assert [r.label for r in numbered.references[:3]] == ["1", "2", "3"]
+
+
+def test_a_one_line_entry_merged_with_the_next_is_split_at_the_hanging_indent(
+    fixture_pdf: Callable[[str], Path],
+) -> None:
+    # Regression: GROBID merged the Seed's one-line entry (Huxley 1959) with the next one, and
+    # the split only looked for a margin line after indented lines. Wegner's one-line entry
+    # (Huberman and Hogg 1986) and the next one, merged here by hand, have the same shape.
+    pdf = fixture_pdf("wegner2023-rsquare")
+    tei = read_tei((pdf.parent.parent / "grobid" / f"{pdf.stem}.tei.xml").read_bytes())
+    refs = tei.references
+    i = next(i for i, r in enumerate(refs) if r.raw_text.startswith("Huberman"))
+    merged = refs[i].model_copy(  # GROBID's fields mix both entries, as on the Seed
+        update={
+            "boxes": refs[i].boxes + refs[i + 1].boxes,
+            "surnames": refs[i].surnames + refs[i + 1].surnames,
+        }
+    )
+    tei = tei.model_copy(update={"references": [*refs[:i], merged, *refs[i + 2 :]]})
+
+    with TextLayer(pdf) as layer:
+        work = assemble(tei, layer)
+
+    huberman = next(r for r in work.references if r.text.startswith("Huberman BA, Hogg T"))
+    assert "Irisawa" not in huberman.text
+    assert huberman.surnames == ["Huberman", "Hogg"]
+    assert any(r.text.startswith("Irisawa S, Isotani T, Yagyu T") for r in work.references)
+    assert len(work.references) == len(refs)

@@ -35,3 +35,5 @@ Key decisions, newest last. Hard-to-reverse ones link to an ADR.
 - 2026-10-19 — Zotero is read with plain httpx (three GETs), not pyzotero: lighter, and testable with hand-written JSON; revisit when catalog uploads files
 - 2026-10-19 — A Stage that succeeds makes every later Stage pending for its Work; a failed Stage keeps none of its writes
 - 2026-10-19 — htmx 2.0.11 is vendored into the web app (no CDN); the API's character offsets count code points, not UTF-16 units
+- 2026-10-20 — PDF links to the same Reference that touch or are separated only by whitespace are one Citation (LaTeX links an author-year's names and year separately)
+- 2026-10-20 — A bibliography is numbered when most entries' labels count up from 1; otherwise no entry has a label

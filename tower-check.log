@@ -1,6 +1,6 @@
-date:    2026-10-20T19:08:37+02:00
+date:    2026-10-20T19:43:15+02:00
 host:    pop-os · Linux 7.2.6-76070206-generic x86_64
-branch:  feat/seed-reader @ 4c61990
+branch:  feat/parsing-gaps @ dfdbf0a
 dirty:   0 files
 uv:      uv 0.13.0 (x86_64-unknown-linux-gnu)
 docker:  29.9.1
@@ -23,15 +23,15 @@ $ uv run pyright
 
 === pytest
 $ uv run pytest -q -rs
-........................................................................ [ 64%]
-........................................                                 [100%]
+........................................................................ [ 62%]
+............................................                             [100%]
 =============================== warnings summary ===============================
 .venv/lib/python3.14/site-packages/fastapi/testclient.py:1
   /home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
     from starlette.testclient import TestClient as TestClient  # noqa
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-112 passed, 3 deselected, 1 warning in 106.91s (0:01:46)
+116 passed, 3 deselected, 1 warning in 110.71s (0:01:50)
 
 === GROBID up (compose)
 $ docker compose up -d --quiet-pull grobid
@@ -50,7 +50,7 @@ rootdir: /home/netinc/Projects/PaperExplorer
 configfile: pyproject.toml
 testpaths: packages, tests
 plugins: anyio-4.15.1, platformdirs-4.13.3
-collecting ... collected 115 items / 112 deselected / 3 selected
+collecting ... collected 119 items / 116 deselected / 3 selected
 
 packages/core/tests/test_seed_golden.py::test_the_seed_parses_with_printed_text_and_linked_citations PASSED [ 33%]
 packages/core/tests/test_zotero_live.py::test_the_real_library_has_the_seed_and_its_pdf PASSED [ 66%]
@@ -62,15 +62,9 @@ tests/e2e/test_seed_e2e.py::test_the_seed_reaches_the_api_with_its_citations PAS
     from starlette.testclient import TestClient as TestClient  # noqa
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-================= 3 passed, 112 deselected, 1 warning in 7.18s =================
-
-=== parse the Seed
-$ uv run paperexplorer parse --show 0 /home/soenke/Zotero/storage/YTS2XCEG/Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
-2026-10-20 19:10:38,307 INFO    paperexplorer.parsing: Parsing Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
-2026-10-20 19:10:39,903 INFO    paperexplorer.parsing: Parsed Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: 113 blocks, 184 References, 284 Citation markers
 Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: printed text
 Blocks: 113 (19 headings)
-References: 184
+References: 185
 Citations: 284 (certain 0, high 260, low 19, unlinked 5)
 
 === build pipeline image
@@ -78,22 +72,22 @@ $ docker compose build pipeline
 
 === pipeline: the Seed
 $ docker compose run --rm --no-deps -T -e PE_DATA_DIR=/tmp/pe pipeline parse --show 0 /zotero/storage/YTS2XCEG/Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
- Container paperexplorer-pipeline-run-5ca22a9c4775 Creating 
- Container paperexplorer-pipeline-run-5ca22a9c4775 Created 
-2026-10-20 17:10:53,264 INFO    paperexplorer.parsing: Parsing Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
-2026-10-20 17:11:18,343 INFO    httpx: HTTP Request: POST http://grobid:8070/api/processFulltextDocument "HTTP/1.1 200 OK"
-2026-10-20 17:11:19,023 INFO    paperexplorer.parsing: Parsed Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: 113 blocks, 184 References, 284 Citation markers
+ Container paperexplorer-pipeline-run-51bcb85b6e68 Creating 
+ Container paperexplorer-pipeline-run-51bcb85b6e68 Created 
+2026-10-20 17:45:33,738 INFO    paperexplorer.parsing: Parsing Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
+2026-10-20 17:45:39,344 INFO    httpx: HTTP Request: POST http://grobid:8070/api/processFulltextDocument "HTTP/1.1 200 OK"
+2026-10-20 17:45:39,999 INFO    paperexplorer.parsing: Parsed Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: 113 blocks, 185 References, 284 Citation markers
 Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: printed text
 Blocks: 113 (19 headings)
-References: 184
+References: 185
 Citations: 284 (certain 0, high 260, low 19, unlinked 5)
 
 === pipeline: scan via OCR
 $ docker compose run --rm --no-deps -T -e PE_DATA_DIR=/tmp/pe -v /home/netinc/Projects/PaperExplorer/tests/fixtures/pdfs:/fixtures:ro pipeline parse /fixtures/scan-villiger2024.pdf
- Container paperexplorer-pipeline-run-8152c492daf4 Creating 
- Container paperexplorer-pipeline-run-8152c492daf4 Created 
-2026-10-20 17:11:20,179 INFO    paperexplorer.parsing: Parsing scan-villiger2024.pdf
-2026-10-20 17:11:20,181 WARNING paperexplorer.parsing: scan-villiger2024.pdf has no text layer; reading it by OCR, its text is OCR Text
+ Container paperexplorer-pipeline-run-cf2d3fb4176d Creating 
+ Container paperexplorer-pipeline-run-cf2d3fb4176d Created 
+2026-10-20 17:45:41,147 INFO    paperexplorer.parsing: Parsing scan-villiger2024.pdf
+2026-10-20 17:45:41,148 WARNING paperexplorer.parsing: scan-villiger2024.pdf has no text layer; reading it by OCR, its text is OCR Text
 scan-villiger2024.pdf: OCR Text (a scan)
 Blocks: 37 (6 headings)
 References: 26
@@ -114,67 +108,64 @@ $ docker compose up -d --wait db
 
 === migrate
 $ uv run paperexplorer migrate
-2026-10-20 19:11:26,840 INFO    paperexplorer.store.migrate: Applied migration 0001_extensions.sql
-2026-10-20 19:11:26,854 INFO    paperexplorer.store.migrate: Applied migration 0002_works_text_citations.sql
-2026-10-20 19:11:26,854 INFO    paperexplorer.store.migrate: Migrations up to date (2 new)
-Applied 0001_extensions.sql
-Applied 0002_works_text_citations.sql
+2026-10-20 19:45:47,622 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+Schema is up to date
 
 === run fetch (host)
 $ uv run paperexplorer run fetch YAAC9XCX
-2026-10-20 19:11:27,228 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
-2026-10-20 19:11:27,257 INFO    paperexplorer.pipeline: Stage fetch started for Work 1
-2026-10-20 19:11:27,814 INFO    httpx: HTTP Request: GET https://api.zotero.org/users/12321588/items/YAAC9XCX "HTTP/1.1 200 OK"
-2026-10-20 19:11:28,121 INFO    httpx: HTTP Request: GET https://api.zotero.org/users/12321588/items/YAAC9XCX/children "HTTP/1.1 200 OK"
-2026-10-20 19:11:28,125 INFO    paperexplorer.pipeline: Stage fetch finished for Work 1: {'pdfs': 1}
+2026-10-20 19:45:47,998 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-20 19:45:48,025 INFO    paperexplorer.pipeline: Stage fetch started for Work 1
+2026-10-20 19:45:48,587 INFO    httpx: HTTP Request: GET https://api.zotero.org/users/12321588/items/YAAC9XCX "HTTP/1.1 200 OK"
+2026-10-20 19:45:48,898 INFO    httpx: HTTP Request: GET https://api.zotero.org/users/12321588/items/YAAC9XCX/children "HTTP/1.1 200 OK"
+2026-10-20 19:45:48,900 INFO    paperexplorer.pipeline: Stage fetch finished for Work 1: {'pdfs': 1}
 fetch YAAC9XCX: pdfs 1
 
 === run parse (host)
 $ uv run paperexplorer run parse YAAC9XCX
-2026-10-20 19:11:28,506 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
-2026-10-20 19:11:28,532 INFO    paperexplorer.pipeline: Stage parse started for Work 1
-2026-10-20 19:11:28,534 INFO    paperexplorer.parsing: Parsing Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
-2026-10-20 19:11:30,137 INFO    paperexplorer.parsing: Parsed Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: 113 blocks, 184 References, 284 Citation markers
-2026-10-20 19:11:30,186 INFO    paperexplorer.pipeline: Stage parse finished for Work 1: {'blocks': 113, 'references': 184, 'citation_markers': 284}
-parse YAAC9XCX: blocks 113, references 184, citation_markers 284
+2026-10-20 19:45:49,283 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-20 19:45:49,309 INFO    paperexplorer.pipeline: Stage parse started for Work 1
+2026-10-20 19:45:49,311 INFO    paperexplorer.parsing: Parsing Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
+2026-10-20 19:45:50,926 INFO    paperexplorer.parsing: Parsed Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: 113 blocks, 185 References, 284 Citation markers
+2026-10-20 19:45:50,983 INFO    paperexplorer.pipeline: Stage parse finished for Work 1: {'blocks': 113, 'references': 185, 'citation_markers': 284}
+parse YAAC9XCX: blocks 113, references 185, citation_markers 284
 
 === run extract_citations (host)
 $ uv run paperexplorer run extract_citations YAAC9XCX
-2026-10-20 19:11:30,571 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
-2026-10-20 19:11:30,597 INFO    paperexplorer.pipeline: Stage extract_citations started for Work 1
-2026-10-20 19:11:30,660 INFO    paperexplorer.pipeline: Stage extract_citations finished for Work 1: {'citations': 284, 'certain': 0, 'high': 260, 'low': 19, 'unlinked': 5}
+2026-10-20 19:45:51,370 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-20 19:45:51,397 INFO    paperexplorer.pipeline: Stage extract_citations started for Work 1
+2026-10-20 19:45:51,465 INFO    paperexplorer.pipeline: Stage extract_citations finished for Work 1: {'citations': 284, 'certain': 0, 'high': 260, 'low': 19, 'unlinked': 5}
 extract_citations YAAC9XCX: citations 284, certain 0, high 260, low 19, unlinked 5
 
 === pipeline: run fetch
 $ docker compose run --rm --no-deps -T -e PE_DATA_DIR=/tmp/pe pipeline run fetch YAAC9XCX
- Container paperexplorer-pipeline-run-bcec25069e4f Creating 
- Container paperexplorer-pipeline-run-bcec25069e4f Created 
-2026-10-20 17:11:31,710 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
-2026-10-20 17:11:31,769 INFO    paperexplorer.pipeline: Stage fetch started for Work 1
-2026-10-20 17:11:32,300 INFO    httpx: HTTP Request: GET https://api.zotero.org/users/12321588/items/YAAC9XCX "HTTP/1.1 200 OK"
-2026-10-20 17:11:32,610 INFO    httpx: HTTP Request: GET https://api.zotero.org/users/12321588/items/YAAC9XCX/children "HTTP/1.1 200 OK"
-2026-10-20 17:11:32,613 INFO    paperexplorer.pipeline: Stage fetch finished for Work 1: {'pdfs': 1}
+ Container paperexplorer-pipeline-run-72bda5c515e2 Creating 
+ Container paperexplorer-pipeline-run-72bda5c515e2 Created 
+2026-10-20 17:45:52,517 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-20 17:45:52,577 INFO    paperexplorer.pipeline: Stage fetch started for Work 1
+2026-10-20 17:45:53,098 INFO    httpx: HTTP Request: GET https://api.zotero.org/users/12321588/items/YAAC9XCX "HTTP/1.1 200 OK"
+2026-10-20 17:45:53,439 INFO    httpx: HTTP Request: GET https://api.zotero.org/users/12321588/items/YAAC9XCX/children "HTTP/1.1 200 OK"
+2026-10-20 17:45:53,441 INFO    paperexplorer.pipeline: Stage fetch finished for Work 1: {'pdfs': 1}
 fetch YAAC9XCX: pdfs 1
 
 === pipeline: run parse
 $ docker compose run --rm --no-deps -T -e PE_DATA_DIR=/tmp/pe pipeline run parse YAAC9XCX
- Container paperexplorer-pipeline-run-1107b835faf1 Creating 
- Container paperexplorer-pipeline-run-1107b835faf1 Created 
-2026-10-20 17:11:33,773 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
-2026-10-20 17:11:33,833 INFO    paperexplorer.pipeline: Stage parse started for Work 1
-2026-10-20 17:11:33,835 INFO    paperexplorer.parsing: Parsing Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
-2026-10-20 17:11:40,011 INFO    httpx: HTTP Request: POST http://grobid:8070/api/processFulltextDocument "HTTP/1.1 200 OK"
-2026-10-20 17:11:40,642 INFO    paperexplorer.parsing: Parsed Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: 113 blocks, 184 References, 284 Citation markers
-2026-10-20 17:11:40,705 INFO    paperexplorer.pipeline: Stage parse finished for Work 1: {'blocks': 113, 'references': 184, 'citation_markers': 284}
-parse YAAC9XCX: blocks 113, references 184, citation_markers 284
+ Container paperexplorer-pipeline-run-f099b02d4264 Creating 
+ Container paperexplorer-pipeline-run-f099b02d4264 Created 
+2026-10-20 17:45:54,607 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-20 17:45:54,667 INFO    paperexplorer.pipeline: Stage parse started for Work 1
+2026-10-20 17:45:54,669 INFO    paperexplorer.parsing: Parsing Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
+2026-10-20 17:46:00,233 INFO    httpx: HTTP Request: POST http://grobid:8070/api/processFulltextDocument "HTTP/1.1 200 OK"
+2026-10-20 17:46:00,914 INFO    paperexplorer.parsing: Parsed Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: 113 blocks, 185 References, 284 Citation markers
+2026-10-20 17:46:00,976 INFO    paperexplorer.pipeline: Stage parse finished for Work 1: {'blocks': 113, 'references': 185, 'citation_markers': 284}
+parse YAAC9XCX: blocks 113, references 185, citation_markers 284
 
 === pipeline: run extract_citations
 $ docker compose run --rm --no-deps -T -e PE_DATA_DIR=/tmp/pe pipeline run extract_citations YAAC9XCX
- Container paperexplorer-pipeline-run-b394d2756f97 Creating 
- Container paperexplorer-pipeline-run-b394d2756f97 Created 
-2026-10-20 17:11:41,889 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
-2026-10-20 17:11:41,948 INFO    paperexplorer.pipeline: Stage extract_citations started for Work 1
-2026-10-20 17:11:42,026 INFO    paperexplorer.pipeline: Stage extract_citations finished for Work 1: {'citations': 284, 'certain': 0, 'high': 260, 'low': 19, 'unlinked': 5}
+ Container paperexplorer-pipeline-run-48f14ea0e843 Creating 
+ Container paperexplorer-pipeline-run-48f14ea0e843 Created 
+2026-10-20 17:46:02,159 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-20 17:46:02,218 INFO    paperexplorer.pipeline: Stage extract_citations started for Work 1
+2026-10-20 17:46:02,293 INFO    paperexplorer.pipeline: Stage extract_citations finished for Work 1: {'citations': 284, 'certain': 0, 'high': 260, 'low': 19, 'unlinked': 5}
 extract_citations YAAC9XCX: citations 284, certain 0, high 260, low 19, unlinked 5
 
 === api + web up (compose)
@@ -275,21 +266,21 @@ uv sync                    ok                    0s
 ruff check                 ok                    0s
 ruff format --check        ok                    0s
 pyright                    ok                    4s
-pytest                     ok                  108s
+pytest                     ok                  111s
 GROBID up (compose)        ok                    0s
 GROBID alive               ok                    0s
-pytest -m tower            ok                    9s
+pytest -m tower            ok                    8s
 parse the Seed             ok                    2s
 build pipeline image       ok                   12s
-pipeline: the Seed         ok                   27s
+pipeline: the Seed         ok                    8s
 pipeline: scan via OCR     ok                    6s
 db up (compose)            ok                    1s
 migrate                    ok                    0s
-run fetch (host)           ok                    2s
-run parse (host)           ok                    2s
+run fetch (host)           ok                    1s
+run parse (host)           ok                    3s
 run extract_citations (host) ok                    0s
 pipeline: run fetch        ok                    2s
 pipeline: run parse        ok                    8s
-pipeline: run extract_citations ok                    2s
-api + web up (compose)     ok                   17s
-reader: the Seed           FAILED (exit 1)       1s
+pipeline: run extract_citations ok                    1s
+api + web up (compose)     ok                   18s
+reader: the Seed           FAILED (exit 1)       0s

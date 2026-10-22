@@ -34,7 +34,7 @@ _SAME_SIZE = 0.3  # points: printed heading sizes this close are one heading lev
 
 def assemble(tei: TeiDocument, layer: TextLayer) -> ParsedWork:
     """Read every GROBID block, marker and Reference from the text layer; add the PDF's links."""
-    references = [r for tr in tei.references for r in _references(tr, layer) if r.text]
+    references = _numbered([r for tr in tei.references for r in _references(tr, layer)])
     blocks: list[Block] = []
     headings: list[tuple[str | None, float] | None] = []
     for tb in tei.blocks:
@@ -109,6 +109,7 @@ def _block(tb: TeiBlock, layer: TextLayer, references: list[Reference]) -> Block
                 )
             )
 
+    linked = _join_fragments(linked, reading.text)
     markers = list(linked)
     for sentence in tb.sentences:
         for ref in sentence.refs:
@@ -167,6 +168,23 @@ def _block(tb: TeiBlock, layer: TextLayer, references: list[Reference]) -> Block
     )
 
 
+def _join_fragments(linked: list[CitationMarker], text: str) -> list[CitationMarker]:
+    """One marker per Citation: LaTeX links an author-year's names and year separately."""
+    out: list[CitationMarker] = []
+    for m in sorted(linked, key=lambda m: m.span.start):
+        prev = out[-1] if out else None
+        if (
+            prev is not None
+            and prev.link_target == m.link_target
+            and not text[prev.span.end : m.span.start].strip()
+        ):
+            prev.span = Span(start=prev.span.start, end=max(prev.span.end, m.span.end))
+            prev.text = text[prev.span.start : prev.span.end]
+        else:
+            out.append(m)
+    return out
+
+
 def _span(read: Reading, positions: dict[tuple[int, int], int]) -> Span | None:
     """Where the glyphs of `read` sit in a block's text, as one span."""
     found = sorted(
@@ -185,11 +203,10 @@ def _references(tr: TeiReference, layer: TextLayer) -> list[Reference]:
     out: list[Reference] = []
     for i, boxes in enumerate(parts):
         text = layer.read(boxes).text
-        label = _label(boxes, layer)
-        if lead := _LEADING_LABEL.match(text):
-            label = label or lead.group(1)
-            text = text[lead.end() :]
+        lead = _LEADING_LABEL.match(text)
+        label = _label(boxes, layer) or (lead.group(1) if lead else None)
         first = i == 0
+        whole = len(parts) == 1  # else GROBID's fields mix the merged entries
         surname = _SURNAME.match(text)
         year = _YEAR.search(text)
         doi = _DOI.search(text)
@@ -200,24 +217,61 @@ def _references(tr: TeiReference, layer: TextLayer) -> list[Reference]:
                 text=text,
                 page=boxes[0].page,
                 boxes=boxes,
-                surnames=tr.surnames if first else ([surname.group(1).strip()] if surname else []),
-                year=tr.year if first else (year.group(0) if year else None),
-                title=tr.title if first else None,
-                doi=tr.doi if first else (doi.group(0).rstrip(".") if doi else None),
+                surnames=[s for s in tr.surnames if whole or s in text]
+                if first
+                else ([surname.group(1).strip()] if surname else []),
+                year=_kept(tr.year, text, whole) if first else (year.group(0) if year else None),
+                title=_kept(tr.title, text, whole) if first else None,
+                doi=_kept(tr.doi, text, whole)
+                if first
+                else (doi.group(0).rstrip(".") if doi else None),
             )
         )
     return out
 
 
+def _kept(value: str | None, text: str, whole: bool) -> str | None:
+    """A field GROBID read from an entry; of merged entries, only one this part prints."""
+    return value if whole or (value is not None and value in text) else None
+
+
+def _numbered(references: list[Reference]) -> list[Reference]:
+    """Keep labels only where they number the bibliography: most entries count up from 1.
+
+    Numbers beside an author-year bibliography (line numbers in the margin, the end of the
+    column to the left) are not labels, and the entry's text keeps them as printed.
+    """
+    counting, last = 0, 0
+    for r in references:
+        number = int(r.label) if r.label else None
+        if number is not None and number in (1, last + 1):
+            counting += 1
+        last = number or last
+    numbered = counting > len(references) / 2
+    out: list[Reference] = []
+    for r in references:
+        text = r.text
+        if numbered and (lead := _LEADING_LABEL.match(text)):
+            text = text[lead.end() :]
+        if text:
+            out.append(r.model_copy(update={"label": r.label if numbered else None, "text": text}))
+    return out
+
+
 def _split_at_hanging_indent(boxes: list[Box]) -> list[list[Box]]:
-    """Split an entry where a line returns to the entry margin after indented lines."""
+    """Split an entry where a line at the entry margin starts a hanging indent of its own.
+
+    That line follows indented lines, or, after a one-line entry, is followed by them.
+    """
     if not boxes:
         return [boxes]
     parts: list[list[Box]] = [[boxes[0]]]
-    for prev, box in itertools.pairwise(boxes):
+    for i, (prev, box) in enumerate(itertools.pairwise(boxes), start=1):
         column = [b for b in boxes if b.page == box.page and abs(b.x - box.x) < 40]
         margin = min(b.x for b in column)
-        if box.x <= margin + 2 and prev.page == box.page and prev.x > margin + 4:
+        below = next((b for b in boxes[i + 1 :] if b.y > box.y + box.height / 2), None)
+        hangs = below is not None and below.page == box.page and below.x > margin + 4
+        if box.x <= margin + 2 and prev.page == box.page and (prev.x > margin + 4 or hangs):
             parts.append([box])
         else:
             parts[-1].append(box)

@@ -49,6 +49,15 @@ grobid_alive() {
   curl -fsS localhost:8070/api/version && echo
 }
 
+# reader_check: the running reader links every Citation of the Seed (scripts/check_reader.py);
+# on failure the api and web containers' last log lines say why.
+reader_check() {
+  uv run python scripts/check_reader.py "$SEED" && return 0
+  echo "--- api and web logs"
+  docker compose logs --no-color --tail 40 api web
+  return 1
+}
+
 context() {
   echo "date:    $(date -Iseconds)"
   echo "host:    $(hostname) · $(uname -srm)"
@@ -105,7 +114,7 @@ main() {
     step "pipeline: run $stage" "${run[@]}" pipeline run "$stage" "$SEED"
   done
   QUIET=1 step "api + web up (compose)" docker compose up -d --build --wait api web
-  step "reader: the Seed" uv run python scripts/check_reader.py "$SEED"
+  step "reader: the Seed" reader_check
 
   printf '\n=== summary\n'
   printf '%s\n' "${RESULTS[@]}"

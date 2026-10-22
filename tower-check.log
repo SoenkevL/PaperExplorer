@@ -62,12 +62,6 @@ tests/e2e/test_seed_e2e.py::test_the_seed_reaches_the_api_with_its_citations PAS
     from starlette.testclient import TestClient as TestClient  # noqa
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-================= 3 passed, 116 deselected, 1 warning in 7.14s =================
-
-=== parse the Seed
-$ uv run paperexplorer parse --show 0 /home/soenke/Zotero/storage/YTS2XCEG/Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
-2026-10-20 19:45:19,090 INFO    paperexplorer.parsing: Parsing Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
-2026-10-20 19:45:20,614 INFO    paperexplorer.parsing: Parsed Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: 113 blocks, 185 References, 284 Citation markers
 Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: printed text
 Blocks: 113 (19 headings)
 References: 185

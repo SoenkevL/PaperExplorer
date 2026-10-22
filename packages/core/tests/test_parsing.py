@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
@@ -6,8 +7,6 @@ from typer.testing import CliRunner
 from paperexplorer.cli import app
 from paperexplorer.config import Settings
 from paperexplorer.parsing import Block, CitationMarker, ParsedWork, TextOrigin
-
-from .conftest import fixture_pdf
 
 ParseFixture = Callable[[str], ParsedWork]
 RANGE_1_TO_3 = "[1\u20133]"  # as printed, with an en dash
@@ -176,7 +175,9 @@ def test_scan_citation_markers_are_found_by_pattern(parse_fixture: ParseFixture)
 
 
 def test_cli_parse_prints_what_was_found(
-    recorded_settings: Settings, monkeypatch: pytest.MonkeyPatch
+    recorded_settings: Settings,
+    fixture_pdf: Callable[[str], Path],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("PE_DATA_DIR", str(recorded_settings.data_dir))
     monkeypatch.setenv("PE_GROBID_URL", recorded_settings.grobid_url)

@@ -6,4 +6,18 @@
 {% else %}
 <p class="status down">API unreachable</p>
 {% endif %}
+{% if works %}
+<ul class="works">
+  {% for w in works %}
+  <li>
+    {% if w.text_origin %}<a href="/works/{{ w.id }}">{{ w.title or w.zotero_key }}</a>
+    {% else %}{{ w.title or w.zotero_key }}{% endif %}
+    <span class="byline">{{ w.creators | join("; ") }}{% if w.year %} ({{ w.year }}){% endif %}</span>
+    <span class="stages">
+      {% for stage, state in w.stages.items() %}<span class="stage {{ state }}">{{ stage }}: {{ state }}</span>{% endfor %}
+    </span>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
 {% endblock %}

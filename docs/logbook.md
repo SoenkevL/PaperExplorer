@@ -29,3 +29,9 @@ Key decisions, newest last. Hard-to-reverse ones link to an ADR.
 - 2026-10-19 — Citation Links weigh evidence in layers: exact PDF link 1.0, GROBID + rule 0.9, one source reported as low confidence
 - 2026-10-19 — Printed text is changed in two ways only: whitespace to single spaces, TeX-split accents composed
 - 2026-10-19 — Tests read recorded GROBID output; one live GROBID check per run; OCR tests use Tesseract's fast model, the pipeline the best one
+- 2026-10-19 — A Work is addressed by a surrogate `WorkId`; its Zotero key, DOI, arXiv and OpenAlex IDs are unique columns → [ADR 0007](adr/0007-surrogate-work-id.md)
+- 2026-10-19 — Store: one row per block, Reference, Citation and Citation Link; per-block value lists (boxes, sentence spans, raw marker evidence) are JSONB
+- 2026-10-19 — The Library port is read-only for now (`item`, `pdf`); the Seed arrives through a `fetch` Stage
+- 2026-10-19 — Zotero is read with plain httpx (three GETs), not pyzotero: lighter, and testable with hand-written JSON; revisit when catalog uploads files
+- 2026-10-19 — A Stage that succeeds makes every later Stage pending for its Work; a failed Stage keeps none of its writes
+- 2026-10-19 — htmx 2.0.11 is vendored into the web app (no CDN); the API's character offsets count code points, not UTF-16 units

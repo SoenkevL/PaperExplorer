@@ -8,7 +8,10 @@
 #   2. GROBID from compose.yaml;
 #   3. the tower-only tests;
 #   4. the Seed through `paperexplorer parse`;
-#   5. the pipeline image with a live GROBID and OCR of the scan fixture.
+#   5. the pipeline image with a live GROBID and OCR of the scan fixture;
+#   6. the Seed's Stages (fetch, parse, extract_citations) on the host and in the pipeline image;
+#   7. the API and web containers, and the reader: every Citation of the Seed is a link that
+#      opens a panel with its Reference.
 #
 # Every step runs even when an earlier one fails.
 #
@@ -19,6 +22,8 @@ set -uo pipefail
 
 LOG="tower-check.log"
 SEED_ATTACHMENT="YTS2XCEG"  # the Seed's PDF in Zotero storage
+SEED="YAAC9XCX"             # the Seed's Zotero item
+STAGES=(fetch parse extract_citations)
 RESULTS=()
 
 # step NAME CMD...: runs CMD, logs its output, status and time, and carries on either way.
@@ -42,6 +47,15 @@ step() {
 grobid_alive() {
   curl -fsS --retry 60 --retry-delay 3 --retry-all-errors localhost:8070/api/isalive && echo
   curl -fsS localhost:8070/api/version && echo
+}
+
+# reader_check: the running reader links every Citation of the Seed (scripts/check_reader.py);
+# on failure the api and web containers' last log lines say why.
+reader_check() {
+  uv run python scripts/check_reader.py "$SEED" && return 0
+  echo "--- api and web logs"
+  docker compose logs --no-color --tail 40 api web
+  return 1
 }
 
 context() {
@@ -89,6 +103,18 @@ main() {
   fi
   step "pipeline: scan via OCR" "${run[@]}" -v "$PWD/tests/fixtures/pdfs:/fixtures:ro" \
     pipeline parse /fixtures/scan-villiger2024.pdf
+
+  QUIET=1 step "db up (compose)" docker compose up -d --wait db
+  step "migrate" uv run paperexplorer migrate
+  local stage
+  for stage in "${STAGES[@]}"; do
+    step "run $stage (host)" uv run paperexplorer run "$stage" "$SEED"
+  done
+  for stage in "${STAGES[@]}"; do
+    step "pipeline: run $stage" "${run[@]}" pipeline run "$stage" "$SEED"
+  done
+  QUIET=1 step "api + web up (compose)" docker compose up -d --build --wait api web
+  step "reader: the Seed" reader_check
 
   printf '\n=== summary\n'
   printf '%s\n' "${RESULTS[@]}"

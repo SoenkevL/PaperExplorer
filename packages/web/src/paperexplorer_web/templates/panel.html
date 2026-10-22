@@ -1,0 +1,30 @@
+<button class="close" type="button" onclick="this.closest('aside').replaceChildren()" aria-label="Close">×</button>
+{% for d in details %}
+<section class="citation-detail">
+  <p class="marker">
+    <span class="printed">{{ d.text }}</span>
+    <span class="level {{ d.link.confidence_level if d.link else 'unlinked' }}">
+      {{ d.link.confidence_level if d.link else "unlinked" }}</span>
+  </p>
+  <blockquote class="citing-sentence">{{ d.citing_sentence }}</blockquote>
+  {% if d.reference %}
+  {% set r = d.reference %}
+  <h2>Reference</h2>
+  <p class="reference{% if d.text_origin == 'ocr' %} ocr{% endif %}">{{ r.text }}</p>
+  {% if d.text_origin == "ocr" %}<p class="note">OCR Text: it may misread the authors' words.</p>{% endif %}
+  <dl class="fields">
+    <dt>Linked by</dt>
+    <dd>{% for e in d.link.evidence %}{{ evidence[e] }}{% if not loop.last %}, {% endif %}{% endfor %}
+      (confidence {{ "%.1f" | format(d.link.confidence) }})</dd>
+    {% if r.label %}<dt>Label read</dt><dd>{{ r.label }}</dd>{% endif %}
+    {% if r.surnames %}<dt>Authors read</dt><dd>{{ r.surnames | join(", ") }}</dd>{% endif %}
+    {% if r.year %}<dt>Year read</dt><dd>{{ r.year }}</dd>{% endif %}
+    {% if r.title %}<dt>Title read</dt><dd>{{ r.title }}</dd>{% endif %}
+    {% if r.doi %}<dt>DOI</dt><dd><a href="https://doi.org/{{ r.doi }}">{{ r.doi }}</a></dd>{% endif %}
+    <dt>Printed on page</dt><dd>{{ r.page }}</dd>
+  </dl>
+  {% else %}
+  <p class="unlinked">Unlinked Citation: no evidence ties it to a Reference.</p>
+  {% endif %}
+</section>
+{% endfor %}

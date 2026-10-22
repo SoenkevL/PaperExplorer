@@ -10,9 +10,12 @@ def _api(handler: httpx.MockTransport) -> ApiClient:
 
 
 def test_index_shows_connected_api_version() -> None:
-    api = _api(
-        httpx.MockTransport(lambda _: httpx.Response(200, json={"status": "ok", "version": "9.9"}))
-    )
+    def respond(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/works":
+            return httpx.Response(200, json=[])
+        return httpx.Response(200, json={"status": "ok", "version": "9.9"})
+
+    api = _api(httpx.MockTransport(respond))
 
     response = TestClient(create_app(api)).get("/")
 

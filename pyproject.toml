@@ -48,7 +48,7 @@ convention = "google"
 pythonVersion = "3.14"
 venvPath = "."
 venv = ".venv"
-include = ["packages"]
+include = ["packages", "tests", "conftest.py"]
 typeCheckingMode = "standard"
 strict = ["packages/*/src"]
 

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{{ work.title or work.zotero_key }} · PaperExplorer{% endblock %}
+{% block content %}
+<header class="work">
+  <p class="back"><a href="/">All Works</a></p>
+  <h1>{{ work.title or work.zotero_key }}</h1>
+  <p class="byline">{{ work.creators | join("; ") }}{% if work.year %} ({{ work.year }}){% endif %}
+    {% if work.doi %}· <a href="https://doi.org/{{ work.doi }}">{{ work.doi }}</a>{% endif %}</p>
+  <p class="legend">Underlined markers are Citations; click one for its Reference.
+    Solid: linked · dashed: low confidence · dotted: Unlinked Citation.</p>
+  {% if work.text_origin == "ocr" %}
+  <p class="banner ocr">This is OCR Text, read from a scan. It may misread the authors' words.</p>
+  {% endif %}
+</header>
+<article class="text">
+{% for v in blocks %}
+{%- set b = v.block -%}
+<{{ v.tag }} class="{{ b.kind }}{% if work.text_origin == 'ocr' %} ocr{% endif %}" id="b{{ b.position }}" data-page="{{ b.page }}"
+  {%- if b.ocr_confidence is not none %} title="OCR confidence {{ '%.2f' | format(b.ocr_confidence) }}"{% endif %}>
+  {%- for s in v.segments -%}
+  {%- if s.citations -%}
+  <a class="citation {{ s.confidence_level }}" href="{{ panel_url(work.id, s.citations) }}" hx-get="{{ panel_url(work.id, s.citations) }}" hx-target="#panel" hx-push-url="false">{{ s.text }}</a>
+  {%- else -%}
+  {{ s.text }}
+  {%- endif -%}
+  {%- endfor -%}
+</{{ v.tag }}>
+{% endfor %}
+</article>
+{% endblock %}
+{% block aside %}
+<aside id="panel" class="panel" aria-live="polite"></aside>
+{% endblock %}

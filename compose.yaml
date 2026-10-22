@@ -24,6 +24,13 @@ services:
     extra_hosts: ["host.docker.internal:host-gateway"]
     ports: ["8000:8000"]
     depends_on: { db: { condition: service_healthy } }
+    # Healthy once uvicorn answers, so `up --wait` and `web` wait for it, not just for the process.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
+      interval: 5s
+      start_period: 30s
+      start_interval: 1s
+      retries: 6
     restart: unless-stopped
 
   web:
@@ -32,7 +39,13 @@ services:
     environment:
       PE_WEB_API_URL: http://api:8000
     ports: ["8080:8080"]
-    depends_on: [api]
+    depends_on: { api: { condition: service_healthy } }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/', timeout=2)"]
+      interval: 5s
+      start_period: 30s
+      start_interval: 1s
+      retries: 6
     restart: unless-stopped
 
   grobid:
@@ -44,7 +57,7 @@ services:
     restart: unless-stopped
 
   pipeline:
-    # One-off runs: docker compose run --rm pipeline explore <zoteroItemKey>
+    # One-off runs: docker compose run --rm pipeline run <stage> <zoteroItemKey>
     build: { context: ., dockerfile: docker/pipeline.Dockerfile }
     profiles: [tools]
     env_file: .env
@@ -53,6 +66,7 @@ services:
       PE_EMBEDDING_BASE_URL: http://host.docker.internal:11434/v1
       PE_GROBID_URL: http://grobid:8070
       PE_DATA_DIR: /data
+      PE_ZOTERO_STORAGE_DIR: /zotero/storage
     extra_hosts: ["host.docker.internal:host-gateway"]
     volumes:
       - ./data:/data

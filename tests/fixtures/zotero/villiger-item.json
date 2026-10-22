@@ -1,0 +1,48 @@
+{
+  "key": "QW3RT5YU",
+  "version": 1203,
+  "library": {
+    "type": "user",
+    "id": 1234567,
+    "name": "example",
+    "links": {"alternate": {"href": "https://www.zotero.org/example", "type": "text/html"}}
+  },
+  "links": {
+    "self": {"href": "https://api.zotero.org/users/1234567/items/QW3RT5YU", "type": "application/json"},
+    "alternate": {"href": "https://www.zotero.org/example/items/QW3RT5YU", "type": "text/html"},
+    "attachment": {
+      "href": "https://api.zotero.org/users/1234567/items/A7B8C9D2",
+      "type": "application/json",
+      "attachmentType": "application/pdf",
+      "attachmentSize": 412345
+    }
+  },
+  "meta": {"creatorSummary": "Villiger", "parsedDate": "2024-11-16", "numChildren": 3},
+  "data": {
+    "key": "QW3RT5YU",
+    "version": 1203,
+    "itemType": "journalArticle",
+    "title": "Personal psychedelic experience of psychedelic therapists during training: should it be required, optional, or prohibited?",
+    "creators": [
+      {"creatorType": "author", "firstName": "Daniel", "lastName": "Villiger"},
+      {"creatorType": "editor", "name": "Editorial Board"}
+    ],
+    "abstractNote": "",
+    "publicationTitle": "International Review of Psychiatry",
+    "volume": "36",
+    "issue": "8",
+    "pages": "869-878",
+    "date": "2024-11-16",
+    "language": "en",
+    "DOI": "10.1080/09540261.2024.2357669",
+    "ISSN": "0954-0261",
+    "url": "https://doi.org/10.1080/09540261.2024.2357669",
+    "accessDate": "2026-10-18T09:12:44Z",
+    "extra": "",
+    "tags": [],
+    "collections": [],
+    "relations": {},
+    "dateAdded": "2026-10-18T09:12:44Z",
+    "dateModified": "2026-10-18T09:12:44Z"
+  }
+}

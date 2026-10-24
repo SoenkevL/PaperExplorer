@@ -264,6 +264,59 @@ def test_a_grobid_link_to_an_entry_by_other_authors_is_dropped() -> None:
 
 
 @pytest.mark.parametrize(
+    ("cue", "entry"),
+    [
+        (
+            "(Van Den Heuvel and Pol, 2010)",
+            "Van Den Heuvel, M.P., Pol, H.E.H., 2010. Exploring the brain network.",
+        ),
+        ("(Uludag and Roebroeck, 2014)", "Uludag, ˘ K., Roebroeck, A., 2014. General overview."),
+        (
+            "de Deus Pontual et al., 2023)",
+            "de Deus Pontual, A.A., Senhorini, H.G., Corradi-Webster, C.M., 2023. A review.",
+        ),
+        (
+            "Vander Weele et al., 2018)",
+            "Vander Weele, C.M., Siciliano, C.A., Matthews, G.A., 2018. Dopamine enhances.",
+        ),
+    ],
+)
+def test_a_grobid_link_stands_when_the_cue_prints_the_first_author_in_parts(
+    cue: str, entry: str
+) -> None:
+    # The Seed's GROBID-only links that are right: no rule reads these names, so GROBID must stay.
+    text = f"As shown {cue}."
+    start = text.index(cue)
+    doc = ParsedWork(
+        text_origin=TextOrigin.PRINTED,
+        blocks=[
+            Block(
+                kind=BlockKind.PARAGRAPH,
+                heading_path=[],
+                page=3,
+                boxes=[],
+                text=text,
+                citation_markers=[
+                    CitationMarker(
+                        span=Span(start=start, end=start + len(cue)),
+                        text=cue,
+                        cue=cue,
+                        grobid_reference_id="b0",
+                    )
+                ],
+            )
+        ],
+        references=[Reference(id="b0", text=entry, page=17)],
+    )
+
+    link = extract(doc).citations[0].link
+
+    assert link is not None
+    assert link.reference_id == "b0"
+    assert Evidence.GROBID in link.evidence
+
+
+@pytest.mark.parametrize(
     ("link", "level"),
     [
         (CitationLink(reference_id="b1", confidence=1.0, evidence=[Evidence.PDF_LINK]), "certain"),

@@ -14,6 +14,7 @@ from paperexplorer.parsing import (
     Block,
     BlockKind,
     CitationMarker,
+    LinkTarget,
     ParsedWork,
     Reference,
     Span,
@@ -188,6 +189,78 @@ def test_author_count_in_the_cue_tells_same_year_entries_apart() -> None:
     graph = extract(doc)
 
     assert [c.link.reference_id if c.link else None for c in graph.citations] == ["b0", "b1"]
+
+
+def test_a_grobid_link_to_an_entry_by_other_authors_is_dropped() -> None:
+    # Regression, the Seed: GROBID linked `(Carhart-Harris, 2025)` to b66, the entry it had
+    # merged with the next one; split, b66 is Huxley 1959. The PDF's own link points at page 14,
+    # where the entry the authors mean is printed without a year. Markers as parsed, 2026-10-24.
+    text = "One view (Carhart-Harris, 2025) and a wider one (Carhart-Harris et al., 2025)."
+    one, many = text.index("(Carhart-Harris, 2025)"), text.index("(Carhart-Harris et al.")
+    doc = ParsedWork(
+        text_origin=TextOrigin.PRINTED,
+        blocks=[
+            Block(
+                kind=BlockKind.PARAGRAPH,
+                heading_path=[],
+                page=3,
+                boxes=[],
+                text=text,
+                citation_markers=[
+                    CitationMarker(
+                        span=Span(start=one, end=one + 22),
+                        text="(Carhart-Harris, 2025)",
+                        cue="(Carhart-Harris, 2025)",
+                        grobid_reference_id="b66",
+                        link_target=LinkTarget(page=14),
+                    ),
+                    CitationMarker(
+                        span=Span(start=many, end=many + 29),
+                        text="(Carhart-Harris et al., 2025)",
+                        cue="(Carhart-Harris et al., 2025)",
+                        grobid_reference_id="b66",
+                    ),
+                ],
+            )
+        ],
+        references=[
+            Reference(
+                id="b17",
+                text="Carhart-Harris, R.L., 2018. The entropic brain - revisited. "
+                "Neuropharmacology 142, 167\u2013178.",
+                page=14,
+                surnames=["Carhart-Harris"],
+                year="2018",
+            ),
+            Reference(
+                id="b18",
+                text="Carhart-Harris, R. The entropic brain today. OSF Preprint.",
+                page=14,
+                surnames=["Carhart-Harris"],
+            ),
+            Reference(
+                id="b66",
+                text="Huxley, A., 1959. The doors of perception: And heaven and hell. "
+                "Random House.",
+                page=15,
+                surnames=["Huxley"],
+                year="1959",
+            ),
+            Reference(
+                id="b66-2",
+                text="Irrmischer, M., Aqil, M., Luan, L., Wang, T., Engelbregt, H., "
+                "Carhart-Harris, R., Linkenkaer-Hansen, K., Timmermann, C., 2025. "
+                "DMT-induced shifts in criticality correlate with self-dissolution.",
+                page=15,
+                surnames=["Irrmischer"],
+                year="2025",
+            ),
+        ],
+    )
+
+    graph = extract(doc)
+
+    assert [c.link for c in graph.citations] == [None, None]
 
 
 @pytest.mark.parametrize(

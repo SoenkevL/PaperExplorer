@@ -12,7 +12,14 @@ from enum import StrEnum
 
 from pydantic import BaseModel
 
-from paperexplorer.parsing import Block, CitationMarker, ParsedWork, Reference, Span
+from paperexplorer.parsing import (
+    Block,
+    CitationMarker,
+    ParsedWork,
+    Reference,
+    Span,
+    sentence_spans,
+)
 
 _NUMBERED = re.compile(r"^\W*(?:refs?\.?\s*)?\d{1,3}(?:\s*[,\u2013\-]\s*\d{1,3})*\W*$")
 _YEAR = re.compile(r"\b(?:1[5-9]|20)\d\d[a-z]?\b")
@@ -20,8 +27,6 @@ _NAME = r"[A-Z][\w'\u2019\-]+(?:\s(?:van|von|de|da|der|den|du|le|la)\s[A-Z][\w'\
 _CUE_NAMES = re.compile(_NAME)
 # "Surname, A. B.," or "Surname A B," as printed at the start of a bibliography entry
 _ENTRY_NAMES = re.compile(rf"({_NAME}),?\s+(?:[A-Z]\.?\s?-?)+(?:,|\s&|\sand|\s\()")
-# A sentence ends at . ! or ? (perhaps with a footnote number: "(DMT).1 The") before a capital.
-_SENTENCE_BREAK = re.compile(r"[.!?](\d{0,3})\s+(?=[A-Z(\[\u201c\"])")
 _CUT = "\x00"
 _CUT_RUN = re.compile(rf"[\s;,(\[{_CUT}]*{_CUT}[\s;,)\]{_CUT}]*")
 _NOT_NAMES = frozenset({"See", "Also", "For", "Review", "Et", "Al", "And", "In", "Cf"})
@@ -110,7 +115,7 @@ def extract(doc: ParsedWork) -> CitationGraph:
 
 def _citing_sentence(block: Block, span: Span) -> str:
     """The sentence holding `span`, with every Citation marker in it removed."""
-    sentences = block.sentences or _split_sentences(block.text)
+    sentences = sentence_spans(block)
     sentence = next(
         (s for s in sentences if s.start <= span.start < s.end), Span(start=0, end=len(block.text))
     )
@@ -121,14 +126,6 @@ def _citing_sentence(block: Block, span: Span) -> str:
     text = _CUT_RUN.sub(" ", "".join(chars))
     text = re.sub(r"\s+([.,;:!?])", r"\1", text)
     return re.sub(r"\s{2,}", " ", text).strip()
-
-
-def _split_sentences(text: str) -> list[Span]:
-    """Sentence spans by end punctuation, for blocks without GROBID's sentences (scans)."""
-    breaks = list(_SENTENCE_BREAK.finditer(text))
-    starts = [0, *(m.end() for m in breaks)]
-    ends = [*(m.start() + 1 + len(m.group(1)) for m in breaks), len(text)]
-    return [Span(start=s, end=e) for s, e in zip(starts, ends, strict=True)]
 
 
 def _link(

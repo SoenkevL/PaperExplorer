@@ -33,6 +33,18 @@ class Settings(BaseSettings):
         description="Cosine an Answer sentence needs with a Chunk sentence for close Support.",
     )
 
+    # The answering agent's chat model, behind any OpenAI-compatible endpoint (Ollama by default).
+    chat_base_url: str = "http://localhost:11434/v1"
+    chat_model: str = Field(
+        default="paperexplorer-chat", description="Ollama alias from scripts/setup-tower.sh."
+    )
+    chat_api_key: SecretStr = SecretStr("ollama")
+    chat_num_ctx: int = Field(
+        default=73728,
+        ge=1,
+        description="The chat model's context in tokens, as its Modelfile sets it; on every trace.",
+    )
+
     zotero_library_id: str | None = None
     zotero_library_type: Literal["user", "group"] = "user"
     zotero_api_key: SecretStr | None = None

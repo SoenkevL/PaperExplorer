@@ -44,6 +44,14 @@ class Settings(BaseSettings):
         ge=1,
         description="The chat model's context in tokens, as its Modelfile sets it; on every trace.",
     )
+    # The API holds Conversations in memory (a restart clears them) and evicts the least recently
+    # used beyond this many, and any left unused for this long.
+    conversations_max: int = Field(
+        default=50, ge=1, description="Conversations the API holds in memory at most."
+    )
+    conversation_idle_minutes: float = Field(
+        default=120, gt=0, description="The API forgets a Conversation unused for this long."
+    )
 
     zotero_library_id: str | None = None
     zotero_library_type: Literal["user", "group"] = "user"

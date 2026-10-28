@@ -1,4 +1,4 @@
-"""Domain records shared across modules: Works, Library Items, Chunks and their store ids."""
+"""Domain records shared across modules: Works, Library Items, Chunks, Scopes and store ids."""
 
 from datetime import datetime
 from enum import StrEnum
@@ -82,3 +82,16 @@ class Chunk(BaseModel):
         return [
             self.text[s.start - self.span.start : s.end - self.span.start] for s in self.sentences
         ]
+
+
+class Scope(BaseModel):
+    """The set of Works a search runs over; for now always one Work, the Seed."""
+
+    model_config = ConfigDict(frozen=True)
+
+    works: frozenset[WorkId]
+
+    @classmethod
+    def of(cls, work: WorkId) -> Scope:
+        """The Scope of one Work alone."""
+        return cls(works=frozenset({work}))

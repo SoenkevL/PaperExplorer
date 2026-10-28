@@ -2,7 +2,8 @@
 
 Evidence is weighed in layers: the PDF's own exact link target is certain; GROBID's link
 and a rule (printed label, or surname and year) agreeing is high; one source alone is medium
-and reported; no evidence leaves an Unlinked Citation.
+and reported; no evidence leaves an Unlinked Citation. GROBID's link is no evidence when its
+Reference's first author is none of the surnames the marker prints.
 """
 
 import re
@@ -99,7 +100,7 @@ def extract(doc: ParsedWork) -> CitationGraph:
             span=marker.span,
             text=marker.text,
             citing_sentence=_citing_sentence(block, marker.span),
-            link=_link(marker, rules.match(marker, block), pages),
+            link=_link(marker, rules.grobid(marker), rules.match(marker, block), pages),
         )
         for i, block in enumerate(doc.blocks)
         for marker in block.citation_markers
@@ -131,11 +132,13 @@ def _split_sentences(text: str) -> list[Span]:
 
 
 def _link(
-    marker: CitationMarker, rule: tuple[str, Evidence] | None, pages: dict[str, int]
+    marker: CitationMarker,
+    grobid: str | None,
+    rule: tuple[str, Evidence] | None,
+    pages: dict[str, int],
 ) -> CitationLink | None:
     """Weigh the evidence for one marker: PDF link, then GROBID with a rule, then one source."""
     target = marker.link_target
-    grobid = marker.grobid_reference_id if marker.grobid_reference_id in pages else None
     ruled = rule[0] if rule else None
     if target is not None and target.reference_id is not None:
         evidence = [Evidence.PDF_LINK]
@@ -183,6 +186,18 @@ class _Rules:
         self._references = references
         self._names = {r.id: _entry_names(r) for r in references}
         self._years = {r.id: r.year or _printed_year(r.text) for r in references}
+        self._first_authors = {r.id: _first_author(r) for r in references}
+
+    def grobid(self, marker: CitationMarker) -> str | None:
+        """GROBID's Reference for the marker, unless it is missing or by other authors."""
+        ref = marker.grobid_reference_id
+        if ref is None or ref not in self._first_authors:
+            return None
+        names, _ = _cue(marker.cue or marker.text)
+        # A loose test, since the cue may print a surname in parts: "Van Den Heuvel and Pol".
+        if names and not any(_letters(n) in self._first_authors[ref] for n in names):
+            return None
+        return ref
 
     def match(self, marker: CitationMarker, block: Block) -> tuple[str, Evidence] | None:
         """The one Reference the marker's cue names, if exactly one fits."""
@@ -257,6 +272,16 @@ def _entry_names(reference: Reference) -> list[str]:
     if printed:
         return printed
     return [_fold(n) for n in reference.surnames]
+
+
+def _first_author(reference: Reference) -> str:
+    """The letters of the entry's first author as printed: everything before its first comma."""
+    return _letters(reference.text.split(",")[0]) or _letters(reference.text)
+
+
+def _letters(text: str) -> str:
+    """Only the letters, folded: hyphens and line-break joins differ between cue and entry."""
+    return "".join(c for c in _fold(text) if c.isalpha())
 
 
 def _printed_year(text: str) -> str | None:

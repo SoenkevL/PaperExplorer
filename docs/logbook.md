@@ -37,3 +37,4 @@ Key decisions, newest last. Hard-to-reverse ones link to an ADR.
 - 2026-10-19 — htmx 2.0.11 is vendored into the web app (no CDN); the API's character offsets count code points, not UTF-16 units
 - 2026-10-20 — PDF links to the same Reference that touch or are separated only by whitespace are one Citation (LaTeX links an author-year's names and year separately)
 - 2026-10-20 — A bibliography is numbered when most entries' labels count up from 1; otherwise no entry has a label
+- 2026-10-24 — GROBID's Citation Link is no evidence when the entry's first author is none of the surnames the marker prints: a wrong link is worse than an Unlinked Citation. An entry printed without a year (the Seed's Carhart-Harris OSF preprint) stays unmatched for now

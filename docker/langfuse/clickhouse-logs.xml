@@ -1,0 +1,21 @@
+<!-- ClickHouse's own logs stay small, so the trace store's disk cap counts traces, not logs.
+     Langfuse reads system.query_log (migration progress), so it stays, kept for 7 days. -->
+<clickhouse>
+    <logger>
+        <level>warning</level>
+        <size>100M</size>
+        <count>3</count>
+    </logger>
+    <query_log>
+        <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
+    </query_log>
+    <trace_log remove="1"/>
+    <text_log remove="1"/>
+    <metric_log remove="1"/>
+    <asynchronous_metric_log remove="1"/>
+    <part_log remove="1"/>
+    <processors_profile_log remove="1"/>
+    <query_metric_log remove="1"/>
+    <latency_log remove="1"/>
+    <error_log remove="1"/>
+</clickhouse>

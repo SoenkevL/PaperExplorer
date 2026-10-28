@@ -41,10 +41,34 @@ class Settings(BaseSettings):
     log_level: LogLevel = "INFO"
     log_format: LogFormat = "text"
 
-    @field_validator("zotero_storage_dir", "tessdata_dir", mode="before")
+    # One key pair serves the tower and Langfuse Cloud: the tower's project is initialised with
+    # the cloud project's keys, so the two differ only by URL. No keys means tracing is off.
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: SecretStr | None = None
+    langfuse_base_url: str | None = Field(
+        default=None, description="The tower's Langfuse; traces go here whenever it answers."
+    )
+    langfuse_fallback_url: str = "https://cloud.langfuse.com"
+    langfuse_environment: str = "development"
+    langfuse_release: str | None = Field(
+        default=None, description="Release on every trace; else the git SHA, where git is."
+    )
+    langfuse_trace_cap_gb: float = Field(
+        default=6.0, description="The tower prunes its oldest traces once they hold this on disk."
+    )
+
+    @field_validator(
+        "zotero_storage_dir",
+        "tessdata_dir",
+        "langfuse_public_key",
+        "langfuse_secret_key",
+        "langfuse_base_url",
+        "langfuse_release",
+        mode="before",
+    )
     @classmethod
     def _empty_is_unset(cls, value: object) -> object:
-        """`.env.example` leaves optional folders empty; empty means unset, not the cwd."""
+        """`.env.example` leaves optional values empty; empty means unset (for folders, not cwd)."""
         return None if value == "" else value
 
     @property

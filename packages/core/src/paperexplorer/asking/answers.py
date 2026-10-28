@@ -6,6 +6,7 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
+from paperexplorer.asking.quotes import find_quotes
 from paperexplorer.domain import Answer, AnswerSentence, Pointer, Support, Vector
 from paperexplorer.embedding import Embedder
 from paperexplorer.parsing import Span
@@ -47,7 +48,17 @@ def resolve_answer(
     embedder: Embedder,
     threshold: float,
 ) -> Answer:
-    """The Answer the reader sees for a complete draft, with its Pointers and Quotes."""
+    """The Answer the reader sees for a complete draft, with its Pointers and Quotes.
+
+    `handles` maps each handle of the Conversation to its Chunk; `read` are the Chunks the model
+    read in this turn. Handles leave the text, so every offset counts into what the reader sees.
+    A handle written right after a sentence's full stop belongs to that sentence; one that ties
+    to no Chunk is dropped. Each Chunk a sentence cites gives one Pointer (design-asking.md):
+    the cited Chunk's closest sentence if it clears `threshold`, else the closest sentence of
+    another Chunk read this turn if that one does, else weak Support at the cited Chunk's
+    closest. Pointers that reach the same place are one. Every sentence to compare is embedded
+    in a single `embedder.embed` call, and none without a handle.
+    """
     text, written = _without_handles(draft)
     spans = _sentences(text)
     cited: list[list[StoredChunk]] = [[] for _ in spans]
@@ -58,52 +69,22 @@ def resolve_answer(
             unknown.append(handle.number)
             continue
         i = _sentence_of(spans, handle.at)
-        if chunk not in cited[i]:
+        if all(c.id != chunk.id for c in cited[i]):
             cited[i].append(chunk)
     if unknown:
         logger.warning("An Answer wrote handles that tie to no Chunk, dropped: %s", unknown)
 
-    pointers: list[list[Pointer]] = [[] for _ in spans]
-    if any(cited):
-        places = [
-            p for c in _distinct([*(c for cs in cited for c in cs), *read]) for p in _places(c)
-        ]
-        asked = [i for i, cs in enumerate(cited) if cs]
-        said = {i: text[spans[i].start : spans[i].end] for i in asked}
-        distinct = list(dict.fromkeys([*said.values(), *(p.text for p in places)]))
-        vectors = dict(zip(distinct, embedder.embed(distinct), strict=True))
-        read_ids = {c.id for c in read}
-        for i in asked:
-            scored = [(p, _cosine(vectors[said[i]], vectors[p.text])) for p in places]
-            for chunk in cited[i]:
-                own = max(((p, s) for p, s in scored if p.chunk.id == chunk.id), key=_similarity)
-                other = max(
-                    (
-                        (p, s)
-                        for p, s in scored
-                        if p.chunk.id != chunk.id and p.chunk.id in read_ids
-                    ),
-                    key=_similarity,
-                    default=None,
-                )
-                if own[1] < threshold and other is not None and other[1] >= threshold:
-                    own = other
-                pointer = _pointer(*own, threshold)
-                if all(_place(p) != _place(pointer) for p in pointers[i]):
-                    pointers[i].append(pointer)
-
+    pointers = _pointers(text, spans, cited, read, embedder, threshold)
+    sentences = [
+        AnswerSentence(
+            start=s.start, end=s.end, substantive=_substantive(text[s.start : s.end]), pointers=p
+        )
+        for s, p in zip(spans, pointers, strict=True)
+    ]
     return Answer(
         text=text,
-        sentences=[
-            AnswerSentence(
-                start=s.start,
-                end=s.end,
-                substantive=_substantive(text[s.start : s.end]),
-                pointers=p,
-            )
-            for s, p in zip(spans, pointers, strict=True)
-        ],
-        quotes=[],
+        sentences=sentences,
+        quotes=find_quotes(text, sentences, read),
         unknown_handles=unknown,
     )
 
@@ -157,9 +138,40 @@ def _sentence_of(spans: list[Span], at: int) -> int:
     return max((i for i, s in enumerate(spans) if s.start < at), default=0)
 
 
-def _distinct(chunks: Sequence[StoredChunk]) -> list[StoredChunk]:
-    seen: set[int] = set()
-    return [c for c in chunks if not (c.id in seen or seen.add(c.id))]
+def _pointers(
+    text: str,
+    spans: list[Span],
+    cited: list[list[StoredChunk]],
+    read: Sequence[StoredChunk],
+    embedder: Embedder,
+    threshold: float,
+) -> list[list[Pointer]]:
+    """Each sentence's Pointers: one per Chunk it cites, in the order cited."""
+    pointers: list[list[Pointer]] = [[] for _ in spans]
+    asked = [i for i, chunks in enumerate(cited) if chunks]
+    if not asked:
+        return pointers
+    candidates = {c.id: c for chunks in cited for c in chunks} | {c.id: c for c in read}
+    places = [p for c in candidates.values() for p in _places(c)]
+    said = {i: text[spans[i].start : spans[i].end] for i in asked}
+    texts = list(dict.fromkeys([*said.values(), *(p.text for p in places)]))
+    unit = {t: _unit(v) for t, v in zip(texts, embedder.embed(texts), strict=True)}
+    read_ids = {c.id for c in read}
+    for i in asked:
+        scored = [(p, math.sumprod(unit[said[i]], unit[p.text])) for p in places]
+        for chunk in cited[i]:
+            best = max((ps for ps in scored if ps[0].chunk.id == chunk.id), key=_similarity)
+            elsewhere = max(
+                (ps for ps in scored if ps[0].chunk.id != chunk.id and ps[0].chunk.id in read_ids),
+                key=_similarity,
+                default=None,
+            )
+            if best[1] < threshold and elsewhere is not None and elsewhere[1] >= threshold:
+                best = elsewhere
+            pointer = _pointer(*best, threshold)
+            if all(_place(p) != _place(pointer) for p in pointers[i]):
+                pointers[i].append(pointer)
+    return pointers
 
 
 def _places(stored: StoredChunk) -> list[_Place]:
@@ -190,6 +202,7 @@ def _similarity(scored: tuple[_Place, float]) -> float:
     return scored[1]
 
 
-def _cosine(a: Vector, b: Vector) -> float:
-    norms = math.sqrt(math.sumprod(a, a)) * math.sqrt(math.sumprod(b, b))
-    return math.sumprod(a, b) / norms if norms else 0.0
+def _unit(vector: Vector) -> Vector:
+    """The Vector scaled to length 1, so that cosines are dot products; zero stays zero."""
+    norm = math.sqrt(math.sumprod(vector, vector))
+    return [x / norm for x in vector] if norm else vector

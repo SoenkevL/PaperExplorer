@@ -5,6 +5,10 @@ product of their counts of distinct content words (stop words such as "the", "wa
 out). Every test resolves at `THRESHOLD`, so a sentence is close where that share clears it.
 """
 
+import random
+import re
+import unicodedata
+
 import pytest
 from pydantic import ValidationError
 
@@ -274,3 +278,186 @@ def test_a_quote_is_exact_only_with_a_whole_place() -> None:
         Quote(start=0, end=4, exact=True)  # pyright: ignore[reportCallIssue]
     with pytest.raises(ValidationError):
         Quote(start=0, end=4, block_id=6)
+
+
+def _quoted(answer_text: str, quote: Quote) -> str:
+    return answer_text[quote.start : quote.end]
+
+
+def _printed(chunk: StoredChunk, quote: Quote) -> str:
+    """The block's text at an exact Quote's place, read from the Chunk that holds it."""
+    assert quote.block_start is not None and quote.block_end is not None
+    start = chunk.chunk.span.start
+    return chunk.chunk.text[quote.block_start - start : quote.block_end - start]
+
+
+def test_words_in_double_quotes_that_match_a_chunk_read_this_turn_are_an_exact_quote() -> None:
+    answer = resolve_answer(
+        "The Methods say “Entropy was computed from each EEG recording” [#1]."
+        ' Results add "Placebo left it unchanged." [#2]',
+        {1: METHODS, 2: RESULTS},
+        [METHODS, RESULTS],
+        FakeEmbedder(),
+        THRESHOLD,
+    )
+
+    curly, straight = answer.quotes
+    assert _quoted(answer.text, curly) == "Entropy was computed from each EEG recording"
+    assert (curly.exact, curly.block_id) == (True, 4)
+    assert curly.block_start == 10 + METHODS.chunk.text.index("Entropy was computed")
+    assert _printed(METHODS, curly) == "Entropy was computed from each EEG recording"
+    assert _quoted(answer.text, straight) == "Placebo left it unchanged."
+    assert (straight.exact, straight.block_id) == (True, 6)
+    assert _printed(RESULTS, straight) == "Placebo left it unchanged."
+
+
+def test_a_quote_counts_as_exact_in_any_chunk_read_this_turn_whatever_its_handle_says() -> None:
+    answer = resolve_answer(
+        "The dose came “at noon to every participant” [#1].",
+        {1: METHODS, 3: DOSING},
+        [METHODS, DOSING],
+        FakeEmbedder(),
+        THRESHOLD,
+    )
+
+    [quote] = answer.quotes
+    assert (quote.exact, quote.block_id) == (True, 2)
+    assert _printed(DOSING, quote) == "at noon to every participant"
+
+
+@pytest.mark.parametrize(
+    "draft",
+    [
+        "They “measured entropy in every EEG recording” [#1].",  # words the Chunk never has
+        "They write “entropy was computed from each EEG recording” [#1].",  # not as printed
+        "They write “Entropy was compute” [#1].",  # inside a longer word
+        "They write “Psilocybin was given at noon” [#3].",  # a Chunk not read this turn
+    ],
+)
+def test_a_quote_without_the_authors_exact_words_in_a_chunk_read_this_turn_is_not_exact(
+    draft: str,
+) -> None:
+    answer = resolve_answer(draft, {1: METHODS, 3: DOSING}, [METHODS], FakeEmbedder(), THRESHOLD)
+
+    [quote] = answer.quotes
+    assert not quote.exact
+    assert (quote.block_id, quote.block_start, quote.block_end) == (None, None, None)
+    assert answer.text[quote.start - 1] == "“" and answer.text[quote.end] == "”"
+
+
+def test_only_double_marks_closed_on_their_line_make_a_quote() -> None:
+    answer = resolve_answer(
+        'Its \u2018set and setting\u2019 mattered, "as the authors put it. An open “quote.\n'
+        "“Placebo left it unchanged” [#2], and the participants\u2019"
+        " “\u2018setting\u2019 mattered”.",
+        {2: RESULTS},
+        [RESULTS],
+        FakeEmbedder(),
+        THRESHOLD,
+    )
+
+    assert [(_quoted(answer.text, q), q.exact) for q in answer.quotes] == [
+        ("Placebo left it unchanged", True),
+        ("\u2018setting\u2019 mattered", False),
+    ]
+    assert (answer.counts().quotes_exact, answer.counts().quotes_not_exact) == (1, 1)
+
+
+# As a text layer may print it: a ligature, a compound whose line-break hyphen was taken for a
+# soft one ("cause-|effect"), and a line-break hyphen pdfium did not mark ("self-| organizing").
+PRINTED = _chunk(
+    11, ["The ﬁrst causeeffect structure was self- organizing in every trial."], block=9, at=3
+)
+
+
+def test_ligatures_line_break_hyphens_and_whitespace_are_folded_for_matching_only() -> None:
+    answer = resolve_answer(
+        "It reads “The first cause-effect structure was self-organizing” [#1]"
+        " and “was self- organizing in every\u00a0 trial.” [#1]",
+        {1: PRINTED},
+        [PRINTED],
+        FakeEmbedder(),
+        THRESHOLD,
+    )
+
+    first, second = answer.quotes
+    assert first.exact and second.exact
+    assert _printed(PRINTED, first) == "The ﬁrst causeeffect structure was self- organizing"
+    assert (first.block_start, first.block_end) == (3, 3 + len(_printed(PRINTED, first)))
+    assert _printed(PRINTED, second) == "was self- organizing in every trial."
+
+
+def test_punctuation_the_model_put_inside_the_closing_mark_stays_outside_an_exact_quote() -> None:
+    answer = resolve_answer(
+        "“Entropy was computed from each EEG recording,” they write. [#1]",
+        {1: METHODS},
+        [METHODS],
+        FakeEmbedder(),
+        THRESHOLD,
+    )
+
+    [quote] = answer.quotes
+    assert quote.exact
+    assert _quoted(answer.text, quote) == "Entropy was computed from each EEG recording"
+    assert _printed(METHODS, quote) == "Entropy was computed from each EEG recording"
+
+
+ECHO = _chunk(12, ["As before, entropy rose after psilocybin."], block=13)
+
+
+def test_a_quote_found_in_several_chunks_links_to_the_one_its_sentence_points_at() -> None:
+    answer = resolve_answer(
+        "The discussion repeats as before that entropy “rose after psilocybin” [#12].",
+        {2: RESULTS, 12: ECHO},
+        [RESULTS, ECHO],
+        FakeEmbedder(),
+        THRESHOLD,
+    )
+
+    assert [p.chunk_id for p in answer.sentences[0].pointers] == [12]
+    [quote] = answer.quotes
+    assert (quote.exact, quote.block_id) == (True, 13)
+
+
+READ = [METHODS, RESULTS, RESULTS_NEXT, DOSING, PRINTED, ECHO]
+
+
+def _letters(text: str) -> str:
+    """Letters and digits in order, ligatures spelled out: what an exact Quote cannot change."""
+    return re.sub(r"[\W_]", "", unicodedata.normalize("NFKC", text))
+
+
+def _drafts() -> list[str]:
+    """Answers quoting runs of the read Chunks' words, half of them with one character changed."""
+    rng = random.Random(2026)
+    drafts: list[str] = []
+    for _ in range(300):
+        words = rng.choice(READ).chunk.text.split(" ")
+        i = rng.randrange(len(words))
+        quoted = " ".join(words[i : rng.randrange(i, min(len(words), i + 6)) + 1])
+        if rng.random() < 0.5:
+            k = rng.randrange(len(quoted))
+            quoted = quoted[:k] + rng.choice("aeEoxz.,-ﬁ ") + quoted[k + 1 :]
+        drafts.append(f"They write “{quoted}” [#{rng.choice([1, 2, 3])}].")
+    return drafts
+
+
+def test_no_quote_is_exact_unless_the_authors_printed_its_words_at_its_place() -> None:
+    exact = 0
+    for draft in _drafts():
+        answer = resolve_answer(
+            draft, {1: METHODS, 2: RESULTS, 3: DOSING}, READ, FakeEmbedder(), THRESHOLD
+        )
+        for quote in answer.quotes:
+            if not quote.exact:
+                continue
+            exact += 1
+            assert quote.block_start is not None and quote.block_end is not None
+            holder = next(
+                c
+                for c in READ
+                if c.chunk.block == quote.block_id
+                and c.chunk.span.start <= quote.block_start < quote.block_end <= c.chunk.span.end
+            )
+            assert _letters(_printed(holder, quote)) == _letters(_quoted(answer.text, quote)), draft
+    assert exact >= 100  # the guard saw real matches, not only misses

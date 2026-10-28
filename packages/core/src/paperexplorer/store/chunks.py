@@ -1,6 +1,6 @@
-"""A Work's Chunks in reading order, as the chunk Stage cut them."""
+"""A Work's Chunks in reading order, as the chunk Stage cut them, and their embeddings."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, LiteralString
 
 import psycopg
@@ -8,7 +8,7 @@ from psycopg.rows import TupleRow, dict_row
 from psycopg.types.json import Jsonb
 from pydantic import BaseModel
 
-from paperexplorer.domain import Chunk, ChunkId, WorkId
+from paperexplorer.domain import Chunk, ChunkId, Vector, WorkId
 from paperexplorer.parsing import Span
 
 
@@ -18,6 +18,14 @@ class StoredChunk(BaseModel):
     id: ChunkId
     work: WorkId
     chunk: Chunk
+
+
+class ChunkEmbedding(BaseModel):
+    """A Chunk's Vector and the model that made it."""
+
+    chunk: ChunkId
+    model: str
+    vector: Vector
 
 
 _CHUNKS = """
@@ -95,6 +103,38 @@ class Chunks:
             " ORDER BY c.position",
             (work, len(heading_path), list(heading_path)),
         )
+
+    def record_embeddings(
+        self, work: WorkId, model: str, vectors: Mapping[ChunkId, Vector]
+    ) -> None:
+        """Store `model`'s Vector for each of the Work's Chunks given, replacing any earlier one."""
+        with self._conn.transaction(), self._conn.cursor() as cur:
+            cur.executemany(
+                "INSERT INTO chunk_embeddings (chunk_id, work_id, model, embedding)"
+                " VALUES (%s, %s, %s, %s::vector)"
+                " ON CONFLICT (chunk_id) DO UPDATE"
+                " SET model = excluded.model, embedding = excluded.embedding",
+                [(chunk, work, model, vector) for chunk, vector in vectors.items()],
+            )
+
+    def without_embedding(self, work: WorkId, model: str) -> list[StoredChunk]:
+        """The Work's Chunks that have no Vector from `model`, in reading order."""
+        return self._query(
+            _CHUNKS + " LEFT JOIN chunk_embeddings e ON e.chunk_id = c.id AND e.model = %s"
+            " WHERE c.work_id = %s AND e.chunk_id IS NULL ORDER BY c.position",
+            (model, work),
+        )
+
+    def embeddings(self, work: WorkId) -> list[ChunkEmbedding]:
+        """The Work's embedded Chunks' Vectors, in reading order."""
+        with self._conn.cursor(row_factory=dict_row) as cur:
+            rows = cur.execute(
+                "SELECT e.chunk_id AS chunk, e.model, e.embedding::real[] AS vector"
+                " FROM chunk_embeddings e JOIN chunks c ON c.id = e.chunk_id"
+                " WHERE e.work_id = %s ORDER BY c.position",
+                (work,),
+            )
+            return [ChunkEmbedding.model_validate(row) for row in rows]
 
     def _query(self, query: LiteralString, params: tuple[object, ...]) -> list[StoredChunk]:
         with self._conn.cursor(row_factory=dict_row) as cur:

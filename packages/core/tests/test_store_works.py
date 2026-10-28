@@ -61,6 +61,19 @@ def test_a_doi_is_stored_lowercased_since_dois_ignore_case(store_db: Conn) -> No
 
 def test_an_unknown_work_is_none(store_db: Conn) -> None:
     assert Works(store_db).get(WorkId(-1)) is None
+    assert Works(store_db).find("NOSUCHKY") is None
+
+
+def test_a_work_is_found_by_its_zotero_key_without_creating_one(store_db: Conn) -> None:
+    works = Works(store_db)
+    work = works.ensure("VILL2024")
+
+    found = works.find("VILL2024")
+
+    assert found is not None
+    assert found.id == work
+    assert works.find("VILL2025") is None
+    assert [w.id for w in works.list()] == [work]
 
 
 def test_a_doi_belongs_to_one_work(store_db: Conn) -> None:

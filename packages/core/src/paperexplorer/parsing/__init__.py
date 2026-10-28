@@ -18,6 +18,7 @@ from paperexplorer.parsing.models import (
     TextOrigin,
 )
 from paperexplorer.parsing.ocr import read_scan
+from paperexplorer.parsing.sentences import sentence_spans
 from paperexplorer.parsing.text_layer import TextLayer
 
 __all__ = [
@@ -31,6 +32,7 @@ __all__ = [
     "Span",
     "TextOrigin",
     "parse",
+    "sentence_spans",
 ]
 
 logger = logging.getLogger(__name__)

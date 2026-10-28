@@ -37,5 +37,6 @@ def test_the_seed_reaches_the_api_with_its_citations(
     assert text.text_origin == "printed"
     assert len(text.blocks) >= 100
     assert len(spans) >= 280
-    assert sum(c.confidence_level == "unlinked" for c in spans) <= 10
+    # 6 cite Carhart-Harris 2025, which has no dated entry in the list (as the golden test)
+    assert sum(c.confidence_level == "unlinked" for c in spans) <= 11
     assert set(text.stages.values()) == {"done"}

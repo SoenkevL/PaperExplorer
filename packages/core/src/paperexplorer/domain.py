@@ -1,14 +1,16 @@
-"""Domain records shared across modules: Works, Library Items and the ids the store gives them."""
+"""Domain records shared across modules: Works, Library Items, Chunks and their store ids."""
 
 from datetime import datetime
+from enum import StrEnum
 from typing import NewType
 
 from pydantic import BaseModel, ConfigDict
 
-from paperexplorer.parsing.models import TextOrigin
+from paperexplorer.parsing.models import Box, Span, TextOrigin
 
 WorkId = NewType("WorkId", int)
 CitationId = NewType("CitationId", int)
+ChunkId = NewType("ChunkId", int)
 
 
 class Attachment(BaseModel):
@@ -43,3 +45,37 @@ class Work(BaseModel):
     pdf: Attachment | None
     synced_at: datetime | None
     text_origin: TextOrigin | None
+
+
+class ChunkFlag(StrEnum):
+    """What sets a Chunk apart from the rest."""
+
+    SHORT = "short"  # under 30 tokens: too little to say much on its own
+    OVERSIZED_SENTENCE = "oversized_sentence"  # cut at a token from one sentence over the limit
+
+
+class Chunk(BaseModel):
+    """A contiguous span of one paragraph or footnote, as `chunking` cuts it for retrieval.
+
+    `span` and each of `sentences` are `[start, end)` code-point offsets into the text of block
+    `block`, so a sentence is already a place in the reader. `position` is the Chunk's place in
+    its Work's reading order; `tokens` counts bge-m3 tokens. Page and boxes are the block's.
+    """
+
+    position: int
+    block: int
+    span: Span
+    text: str
+    sentences: list[Span]
+    heading_path: list[str]
+    page: int
+    boxes: list[Box]
+    tokens: int
+    flags: list[ChunkFlag] = []
+    text_origin: TextOrigin
+
+    def sentence_texts(self) -> list[str]:
+        """Each sentence's text, as printed."""
+        return [
+            self.text[s.start - self.span.start : s.end - self.span.start] for s in self.sentences
+        ]

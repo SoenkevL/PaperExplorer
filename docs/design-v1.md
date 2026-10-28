@@ -33,7 +33,7 @@ The seed paper is "A critical review of brain entropy as a biomarker of the psyc
 - References and citations always point from one work to another, so following the trail one level deeper later runs the same stages with no schema change.
 
 **Chunking and retrieval**
-- A chunk is a paragraph. Paragraphs over 400 tokens are split at sentence borders (found with pysbd rules) into the fewest windows that fit, balanced in size, with one sentence of overlap. Tokens are counted with the bge-m3 tokenizer.
+- A chunk is a paragraph. Paragraphs over 400 tokens are split at sentence borders (GROBID's sentences; for a scan, end punctuation) into the fewest windows that fit, balanced in size, with one sentence of overlap. Tokens are counted with the bge-m3 tokenizer.
 - Edge cases: a single sentence over 400 tokens is hard-split at a token boundary and flagged `oversized_sentence`. Paragraphs under about 30 tokens become their own chunks, flagged `short`, and are never merged across paragraph borders.
 - Each chunk stores its heading path, page number and position on the page.
 - Embeddings: bge-m3, behind an `Embedder` interface that talks to an **OpenAI-compatible** `/v1/embeddings` endpoint (`base_url`, `model` and key are settings). Ollama serves it for now, and any compatible server can replace it later. The model name is stored with each vector.

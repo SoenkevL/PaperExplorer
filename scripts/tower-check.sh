@@ -9,7 +9,8 @@
 #   3. the tower-only tests;
 #   4. the Seed through `paperexplorer parse`;
 #   5. the pipeline image with a live GROBID and OCR of the scan fixture;
-#   6. the Seed's Stages (fetch, parse, extract_citations) on the host and in the pipeline image;
+#   6. the Seed's Stages (fetch, parse, chunk, extract_citations) on the host and in the pipeline
+#      image; chunk logs its counts of Chunks, short and oversized_sentence;
 #   7. the API and web containers, and the reader: every Citation of the Seed is a link that
 #      opens a panel with its Reference.
 #
@@ -23,7 +24,7 @@ set -uo pipefail
 LOG="tower-check.log"
 SEED_ATTACHMENT="YTS2XCEG"  # the Seed's PDF in Zotero storage
 SEED="YAAC9XCX"             # the Seed's Zotero item
-STAGES=(fetch parse extract_citations)
+STAGES=(fetch parse chunk extract_citations)
 RESULTS=()
 
 # step NAME CMD...: runs CMD, logs its output, status and time, and carries on either way.

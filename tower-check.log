@@ -1,0 +1,255 @@
+date:    2026-10-28T19:54:33+01:00
+host:    pop-os · Linux 7.2.6-76070206-generic x86_64
+branch:  feat/chunk-stage @ 1284a48
+dirty:   0 files
+uv:      uv 0.13.0 (x86_64-unknown-linux-gnu)
+docker:  29.9.2
+cpus:    12
+
+=== uv sync
+$ uv sync
+
+=== ruff check
+$ uv run ruff check
+All checks passed!
+
+=== ruff format --check
+$ uv run ruff format --check
+98 files already formatted
+
+=== pyright
+$ uv run pyright
+0 errors, 0 warnings, 0 informations
+
+=== pytest
+$ uv run pytest -q -rs
+........................................................................ [ 45%]
+........................................................................ [ 90%]
+...............                                                          [100%]
+=============================== warnings summary ===============================
+.venv/lib/python3.14/site-packages/fastapi/testclient.py:1
+  /home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+159 passed, 4 deselected, 1 warning in 134.32s (0:02:14)
+
+=== GROBID up (compose)
+$ docker compose up -d --quiet-pull grobid
+
+=== GROBID alive
+$ grobid_alive
+true
+{"version":"0.9.1","revision":"0.9.1"}
+
+=== pytest -m tower
+$ uv run pytest -m tower -v -rs
+============================= test session starts ==============================
+platform linux -- Python 3.14.8, pytest-9.1.1, pluggy-1.7.0 -- /home/netinc/Projects/PaperExplorer/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/netinc/Projects/PaperExplorer
+configfile: pyproject.toml
+testpaths: packages, tests
+plugins: anyio-4.15.1, platformdirs-4.13.3
+collecting ... collected 163 items / 159 deselected / 4 selected
+
+packages/core/tests/test_seed_golden.py::test_the_seed_parses_with_printed_text_and_linked_citations PASSED [ 25%]
+packages/core/tests/test_seed_golden.py::test_every_paragraph_of_the_seed_is_chunked_within_the_token_limit PASSED [ 50%]
+packages/core/tests/test_zotero_live.py::test_the_real_library_has_the_seed_and_its_pdf PASSED [ 75%]
+tests/e2e/test_seed_e2e.py::test_the_seed_reaches_the_api_with_its_citations FAILED [100%]
+
+=================================== FAILURES ===================================
+_______________ test_the_seed_reaches_the_api_with_its_citations _______________
+
+store_db = <psycopg.Connection [INTRANS] (host=localhost port=32772 database=test) at 0x732e846c9fd0>
+
+    @pytest.mark.tower
+    def test_the_seed_reaches_the_api_with_its_citations(
+        store_db: psycopg.Connection[TupleRow],
+    ) -> None:
+        settings = Settings()
+        if not settings.zotero_library_id or settings.zotero_api_key is None:
+            pytest.skip("PE_ZOTERO_LIBRARY_ID / PE_ZOTERO_API_KEY are not set")
+        ctx = StageContext(
+            conn=store_db, settings=settings, library=ZoteroLibrary.from_settings(settings)
+        )
+        work = Works(store_db).ensure(SEED)
+    
+        for stage in STAGES:
+            run_stage(ctx, stage, work)
+    
+        text = ApiClient(TestClient(create_app(lambda: nullcontext(store_db)))).work(work)
+        spans = [c for b in text.blocks for c in b.citations]
+        assert text.text_origin == "printed"
+        assert len(text.blocks) >= 100
+        assert len(spans) >= 280
+>       assert sum(c.confidence_level == "unlinked" for c in spans) <= 10
+E       assert 11 <= 10
+E        +  where 11 = sum(<generator object test_the_seed_reaches_the_api_with_its_citations.<locals>.<genexpr> at 0x732e824901e0>)
+
+tests/e2e/test_seed_e2e.py:40: AssertionError
+=============================== warnings summary ===============================
+.venv/lib/python3.14/site-packages/fastapi/testclient.py:1
+  /home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========== 1 failed, 3 passed, 159 deselected, 1 warning in 10.18s ============
+
+=== parse the Seed
+$ uv run paperexplorer parse --show 0 /home/soenke/Zotero/storage/YTS2XCEG/Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
+2026-10-28 19:57:07,104 INFO    paperexplorer.parsing: Parsing Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
+2026-10-28 19:57:08,733 INFO    paperexplorer.parsing: Parsed Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: 113 blocks, 185 References, 284 Citation markers
+Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: printed text
+Blocks: 113 (19 headings)
+References: 185
+Citations: 284 (certain 0, high 260, low 13, unlinked 11)
+
+=== build pipeline image
+$ docker compose build pipeline
+
+=== pipeline: the Seed
+$ docker compose run --rm --no-deps -T -e PE_DATA_DIR=/tmp/pe pipeline parse --show 0 /zotero/storage/YTS2XCEG/Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
+ Container paperexplorer-pipeline-run-ea466c83209f Creating 
+ Container paperexplorer-pipeline-run-ea466c83209f Created 
+2026-10-28 18:57:28,417 INFO    paperexplorer.parsing: Parsing Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
+2026-10-28 18:57:55,372 INFO    paperexplorer.parsing: Parsed Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: 113 blocks, 185 References, 284 Citation markers
+Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: printed text
+Blocks: 113 (19 headings)
+References: 185
+Citations: 284 (certain 0, high 260, low 13, unlinked 11)
+
+=== pipeline: scan via OCR
+$ docker compose run --rm --no-deps -T -e PE_DATA_DIR=/tmp/pe -v /home/netinc/Projects/PaperExplorer/tests/fixtures/pdfs:/fixtures:ro pipeline parse /fixtures/scan-villiger2024.pdf
+ Container paperexplorer-pipeline-run-43bc867261fd Creating 
+ Container paperexplorer-pipeline-run-43bc867261fd Created 
+2026-10-28 18:57:56,795 INFO    paperexplorer.parsing: Parsing scan-villiger2024.pdf
+2026-10-28 18:57:56,796 WARNING paperexplorer.parsing: scan-villiger2024.pdf has no text layer; reading it by OCR, its text is OCR Text
+scan-villiger2024.pdf: OCR Text (a scan)
+Blocks: 37 (6 headings)
+References: 26
+Citations: 35 (certain 0, high 0, low 10, unlinked 25)
+  p1 unlinked: 'Goodwin et al., 2022' in 'In the last decade, an increasing number of studies have investigated the therap'
+  p1 unlinked: 'Palhano-Fontes et al, 2019' in 'In the last decade, an increasing number of studies have investigated the therap'
+  p1 unlinked: 'Raison et al, 2023' in 'In the last decade, an increasing number of studies have investigated the therap'
+  p1 unlinked: 'Reiff et al, 2020' in 'In the last decade, an increasing number of studies have investigated the therap'
+  p1 unlinked: 'Rotz et al, 2023' in 'In the last decade, an increasing number of studies have investigated the therap'
+  p1 unlinked: 'Sanches al,, 2016' in 'In the last decade, an increasing number of studies have investigated the therap'
+  p1 unlinked: 'Gasser et 2016' in 'In the last decade, an increasing number of studies have investigated the therap'
+  p1 unlinked: 'et al, Johnson & Griffiths, Reiff al, 2023' in 'In the last decade, an increasing number of studies have investigated the therap'
+  p1 unlinked: 'et et al., 2016' in 'In the last decade, an increasing number of studies have investigated the therap'
+  p1 unlinked: 'Johnson, Garcia-Romeu, & Griffiths, 2017' in 'In the last decade, an increasing number of studies have investigated the therap'
+
+=== db up (compose)
+$ docker compose up -d --wait db
+
+=== migrate
+$ uv run paperexplorer migrate
+2026-10-28 19:58:08,992 INFO    paperexplorer.store.migrate: Applied migration 0003_chunks.sql
+2026-10-28 19:58:08,992 INFO    paperexplorer.store.migrate: Migrations up to date (1 new)
+Applied 0003_chunks.sql
+
+=== run fetch (host)
+$ uv run paperexplorer run fetch YAAC9XCX
+2026-10-28 19:58:09,506 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-28 19:58:09,535 INFO    paperexplorer.pipeline: Stage fetch started for Work 1
+2026-10-28 19:58:10,343 INFO    paperexplorer.pipeline: Stage fetch finished for Work 1: {'pdfs': 1}
+fetch YAAC9XCX: pdfs 1
+
+=== run parse (host)
+$ uv run paperexplorer run parse YAAC9XCX
+2026-10-28 19:58:10,889 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-28 19:58:10,916 INFO    paperexplorer.pipeline: Stage parse started for Work 1
+2026-10-28 19:58:10,918 INFO    paperexplorer.parsing: Parsing Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
+2026-10-28 19:58:12,478 INFO    paperexplorer.parsing: Parsed Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: 113 blocks, 185 References, 284 Citation markers
+2026-10-28 19:58:12,546 INFO    paperexplorer.pipeline: Stage parse finished for Work 1: {'blocks': 113, 'references': 185, 'citation_markers': 284}
+parse YAAC9XCX: blocks 113, references 185, citation_markers 284
+
+=== run chunk (host)
+$ uv run paperexplorer run chunk YAAC9XCX
+2026-10-28 19:58:13,098 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-28 19:58:13,130 INFO    paperexplorer.pipeline: Stage chunk started for Work 1
+2026-10-28 19:58:13,900 INFO    paperexplorer.pipeline: Stage chunk finished for Work 1: {'chunks': 105, 'short': 5, 'oversized_sentence': 2}
+chunk YAAC9XCX: chunks 105, short 5, oversized_sentence 2
+
+=== run extract_citations (host)
+$ uv run paperexplorer run extract_citations YAAC9XCX
+2026-10-28 19:58:14,618 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-28 19:58:14,645 INFO    paperexplorer.pipeline: Stage extract_citations started for Work 1
+2026-10-28 19:58:14,719 INFO    paperexplorer.pipeline: Stage extract_citations finished for Work 1: {'citations': 284, 'certain': 0, 'high': 260, 'low': 13, 'unlinked': 11}
+extract_citations YAAC9XCX: citations 284, certain 0, high 260, low 13, unlinked 11
+
+=== pipeline: run fetch
+$ docker compose run --rm --no-deps -T -e PE_DATA_DIR=/tmp/pe pipeline run fetch YAAC9XCX
+ Container paperexplorer-pipeline-run-b6001c99b2af Creating 
+ Container paperexplorer-pipeline-run-b6001c99b2af Created 
+2026-10-28 18:58:16,045 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-28 18:58:16,104 INFO    paperexplorer.pipeline: Stage fetch started for Work 1
+2026-10-28 18:58:16,932 INFO    paperexplorer.pipeline: Stage fetch finished for Work 1: {'pdfs': 1}
+fetch YAAC9XCX: pdfs 1
+
+=== pipeline: run parse
+$ docker compose run --rm --no-deps -T -e PE_DATA_DIR=/tmp/pe pipeline run parse YAAC9XCX
+ Container paperexplorer-pipeline-run-ad362fc45ed3 Creating 
+ Container paperexplorer-pipeline-run-ad362fc45ed3 Created 
+2026-10-28 18:58:18,368 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-28 18:58:18,424 INFO    paperexplorer.pipeline: Stage parse started for Work 1
+2026-10-28 18:58:18,426 INFO    paperexplorer.parsing: Parsing Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
+2026-10-28 18:58:25,192 INFO    paperexplorer.parsing: Parsed Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: 113 blocks, 185 References, 284 Citation markers
+2026-10-28 18:58:25,257 INFO    paperexplorer.pipeline: Stage parse finished for Work 1: {'blocks': 113, 'references': 185, 'citation_markers': 284}
+parse YAAC9XCX: blocks 113, references 185, citation_markers 284
+
+=== pipeline: run chunk
+$ docker compose run --rm --no-deps -T -e PE_DATA_DIR=/tmp/pe pipeline run chunk YAAC9XCX
+ Container paperexplorer-pipeline-run-b2d4724475cd Creating 
+ Container paperexplorer-pipeline-run-b2d4724475cd Created 
+2026-10-28 18:58:26,718 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-28 18:58:26,780 INFO    paperexplorer.pipeline: Stage chunk started for Work 1
+2026-10-28 18:58:27,598 INFO    paperexplorer.pipeline: Stage chunk finished for Work 1: {'chunks': 105, 'short': 5, 'oversized_sentence': 2}
+chunk YAAC9XCX: chunks 105, short 5, oversized_sentence 2
+
+=== pipeline: run extract_citations
+$ docker compose run --rm --no-deps -T -e PE_DATA_DIR=/tmp/pe pipeline run extract_citations YAAC9XCX
+ Container paperexplorer-pipeline-run-46d306b4796b Creating 
+ Container paperexplorer-pipeline-run-46d306b4796b Created 
+2026-10-28 18:58:29,257 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-28 18:58:29,317 INFO    paperexplorer.pipeline: Stage extract_citations started for Work 1
+2026-10-28 18:58:29,392 INFO    paperexplorer.pipeline: Stage extract_citations finished for Work 1: {'citations': 284, 'certain': 0, 'high': 260, 'low': 13, 'unlinked': 11}
+extract_citations YAAC9XCX: citations 284, certain 0, high 260, low 13, unlinked 11
+
+=== api + web up (compose)
+$ docker compose up -d --build --wait api web
+
+=== reader: the Seed
+$ reader_check
+YAAC9XCX is Work 1: 113 blocks, 284 Citations
+stages: {'fetch': 'done', 'parse': 'done', 'chunk': 'done', 'extract_citations': 'done'}
+confidence levels: {'high': 260, 'unlinked': 11, 'low': 13}
+page: 284 Citation links covering 284 distinct Citations
+panel /works/1/panel?c=2557: shows a Reference
+
+=== summary
+uv sync                    ok                    1s
+ruff check                 ok                    0s
+ruff format --check        ok                    0s
+pyright                    ok                    5s
+pytest                     ok                  136s
+GROBID up (compose)        ok                    0s
+GROBID alive               ok                    0s
+pytest -m tower            FAILED (exit 1)      11s
+parse the Seed             ok                    2s
+build pipeline image       ok                   19s
+pipeline: the Seed         ok                   28s
+pipeline: scan via OCR     ok                    7s
+db up (compose)            ok                    6s
+migrate                    ok                    1s
+run fetch (host)           ok                    1s
+run parse (host)           ok                    2s
+run chunk (host)           ok                    2s
+run extract_citations (host) ok                    0s
+pipeline: run fetch        ok                    3s
+pipeline: run parse        ok                    8s
+pipeline: run chunk        ok                    3s
+pipeline: run extract_citations ok                    1s
+api + web up (compose)     ok                   27s
+reader: the Seed           ok                    1s

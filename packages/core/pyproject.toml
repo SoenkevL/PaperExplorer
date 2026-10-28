@@ -12,6 +12,7 @@ dependencies = [
     "liteparse==2.16.0",
     "httpx>=0.28",
     "langfuse>=5.0.4",
+    "tokenizers>=0.22,<0.23",
 ]
 
 [project.scripts]

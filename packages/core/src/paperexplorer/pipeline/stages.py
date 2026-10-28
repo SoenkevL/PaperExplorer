@@ -1,14 +1,14 @@
-"""The Seed's first Stages: fetch its Library Item, parse its PDF, link its Citations."""
+"""The Seed's first Stages: fetch its Library Item, parse its PDF, chunk it, link its Citations."""
 
 import logging
 from collections import Counter
 
-from paperexplorer import citations, parsing
+from paperexplorer import chunking, citations, parsing
 from paperexplorer.citations import ConfidenceLevel, confidence_level
-from paperexplorer.domain import WorkId
+from paperexplorer.domain import ChunkFlag, WorkId
 from paperexplorer.library import ItemNotFoundError
 from paperexplorer.pipeline.stage import StageContext, StageError, StageResult
-from paperexplorer.store import CitationGraphs, Works, WorkTexts
+from paperexplorer.store import Chunks, CitationGraphs, Works, WorkTexts
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +44,17 @@ def parse(ctx: StageContext, work: WorkId) -> StageResult:
             "citation_markers": sum(len(b.citation_markers) for b in parsed.blocks),
         }
     )
+
+
+def chunk(ctx: StageContext, work: WorkId) -> StageResult:
+    """Cut the parsed Work's paragraphs and footnotes into Chunks, replacing earlier ones."""
+    parsed = WorkTexts(ctx.conn).get(work)
+    if parsed is None:
+        raise StageError(f"Work {work} has no text yet; run parse first")
+    chunks = chunking.chunk(parsed)
+    Chunks(ctx.conn).replace(work, chunks)
+    flags = Counter(f for c in chunks for f in c.flags)
+    return StageResult(counts={"chunks": len(chunks)} | {f.value: flags[f] for f in ChunkFlag})
 
 
 def extract_citations(ctx: StageContext, work: WorkId) -> StageResult:

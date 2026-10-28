@@ -8,10 +8,11 @@ import pytest
 from fastapi.testclient import TestClient
 from psycopg.rows import TupleRow
 
+from paperexplorer.chunking import chunk
 from paperexplorer.citations import CitationGraph, extract
 from paperexplorer.domain import Attachment, LibraryItem, WorkId
 from paperexplorer.parsing import ParsedWork
-from paperexplorer.store import CitationGraphs, StageStatuses, Works, WorkTexts
+from paperexplorer.store import Chunks, CitationGraphs, StageStatuses, Works, WorkTexts
 from paperexplorer_api.app import create_app
 
 Conn = psycopg.Connection[TupleRow]
@@ -27,7 +28,7 @@ VILLIGER = LibraryItem(
 
 
 class Stored:
-    """A Work as the pipeline would leave it: snapshot, text, Citations, Stage status."""
+    """A Work as the pipeline would leave it: snapshot, text, Chunks, Citations, Stage status."""
 
     def __init__(self, conn: Conn, item: LibraryItem, parsed: ParsedWork) -> None:
         self.parsed = parsed
@@ -35,8 +36,9 @@ class Stored:
         self.work: WorkId = Works(conn).ensure(item.key)
         Works(conn).record_library_item(self.work, item)
         WorkTexts(conn).replace(self.work, parsed)
+        Chunks(conn).replace(self.work, chunk(parsed))
         CitationGraphs(conn).replace(self.work, self.graph)
-        for stage in ("fetch", "parse", "extract_citations"):
+        for stage in ("fetch", "parse", "chunk", "extract_citations"):
             StageStatuses(conn).start(self.work, stage)
             StageStatuses(conn).done(self.work, stage, {})
 

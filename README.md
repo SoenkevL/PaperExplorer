@@ -1,6 +1,6 @@
 # PaperExplorer
 
-Read a paper by following its citations into the actual words of the works it cites: click `[12]` and see the passages of Work 12 that the citing sentence most likely relies on. Retrieval, not summarisation.
+Read a paper by following its citations into the actual words of the works it cites: click `[12]` and see the passages of Work 12 that the citing sentence most likely relies on. Ask the paper questions in a sidebar: a local model answers, every claim points back to the sentence it rests on, and only words that match the authors' text exactly are shown as theirs.
 
 Start with `docs/design-v1.md` (what v1 is), `CONTEXT.md` (the language) and `docs/architecture.md` (how it is built). Decisions: `docs/logbook.md`.
 

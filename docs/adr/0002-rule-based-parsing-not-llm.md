@@ -1,5 +1,5 @@
 ---
-status: tool choice superseded by ADR-0006; the rule that no generative model touches displayed text stands
+status: tool choice superseded by ADR-0006; the display rule narrowed by ADR-0008 to text shown as the authors'
 ---
 
 # Rule-based parsing with LiteParse, not LLM parsing

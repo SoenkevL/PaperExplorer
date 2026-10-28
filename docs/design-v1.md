@@ -5,12 +5,13 @@ The repo holds only `Paper Explorer Plan 1.md`. Four grilling rounds turned it i
 The goal is a local-first tool for reading a paper and following its citations into the cited sources' actual words, with as little generative AI as possible.
 
 ## v1 scope and definition of done
-One seed paper plus one level of sources. Notes and Q&A come after v1. v1 is done when:
+One seed paper plus one level of sources. Notes come after v1; asking the Seed Questions is in v1 and comes before resolution ([design-asking.md](design-asking.md), 2026-10-28). v1 is done when:
 1. `paperexplorer explore <zoteroItemKey>` runs every stage for the seed paper and can be restarted safely.
 2. The Exploration's Zotero collection holds every resolved source, tagged `pe:fullText` / `pe:abstractOnly` / `pe:noSource`, and no duplicates were created.
 3. Open-access PDFs are attached in Zotero, and the sources' full texts are chunked and embedded.
 4. The seed paper renders in the browser on the Mac. Every `[n]` and APA citation is clickable and opens a side panel with the top 5 chunks, their scores, and a Scope toggle (cited Work / whole Exploration).
 5. A report lists unmatched and low-confidence references.
+6. A sidebar beside the Seed answers Questions about it; every Pointer leads back to the sentence it rests on, and the eval meets the bar in `design-asking.md`.
 
 The seed paper is "A critical review of brain entropy as a biomarker of the psychedelic state", from your Zotero library.
 

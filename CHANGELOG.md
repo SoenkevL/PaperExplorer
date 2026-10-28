@@ -5,6 +5,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 ## [Unreleased]
 
 ### Added
+- Design for asking the Seed Questions: `docs/design-asking.md`, ADR 0008 (a model may answer; words count as the authors' only when they match exactly), ADR 0009 (pydantic-ai), the Conversation terms in `CONTEXT.md`, and point 6 of v1's definition of done.
 - Repo skeleton: uv workspace with `core`, `api` and `web` packages; ruff, pyright strict, pytest, pre-commit.
 - Settings (`PE_*` env), logging setup (text/JSON), `paperexplorer` CLI with `version`.
 - SQL migration runner with pgvector migration; store tests on real Postgres via testcontainers.

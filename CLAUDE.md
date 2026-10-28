@@ -1,6 +1,6 @@
 # PaperExplorer
 
-A reader for following a paper's citations into the cited Works' own words. Every text the reader sees is the authors' text, exactly as extracted; generative models only produce embeddings (ADR 0002).
+A reader for following a paper's citations into the cited Works' own words. Text shown as the authors' is their text exactly as extracted; a local model may write Answers to the reader's Questions, and its words count as the authors' only where they match exactly (ADR 0008).
 
 ## Read first
 
@@ -8,6 +8,7 @@ A reader for following a paper's citations into the cited Works' own words. Ever
 - `docs/architecture.md`: packages, modules, seams, pipeline stages, API contract, testing rules. Check it before adding a module, a dependency or a seam.
 - `docs/adr/`: decisions that are hard to reverse. Reversing one is the user's call.
 - `docs/design-v1.md`: v1 scope and its definition of done.
+- `docs/design-asking.md`: asking the Seed Questions (Pointers, Quotes, the agent, tracing, eval). Read it before touching `asking`, `tracing` or the Conversation routes.
 
 ## Workflow
 

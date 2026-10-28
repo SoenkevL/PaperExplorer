@@ -12,6 +12,9 @@ WorkId = NewType("WorkId", int)
 CitationId = NewType("CitationId", int)
 ChunkId = NewType("ChunkId", int)
 
+type Vector = list[float]
+"""An embedding of one text, as an `Embedder` returns it."""
+
 
 class Attachment(BaseModel):
     """A PDF attached to a Library Item: its own Zotero key and file name."""

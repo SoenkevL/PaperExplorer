@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     embedding_base_url: str = "http://localhost:11434/v1"
     embedding_model: str = "bge-m3"
     embedding_api_key: SecretStr = SecretStr("ollama")
+    embedding_batch_size: int = Field(default=32, ge=1, description="Texts per embedding request.")
 
     zotero_library_id: str | None = None
     zotero_library_type: Literal["user", "group"] = "user"

@@ -8,9 +8,11 @@ import logging
 import subprocess
 from collections.abc import Generator, Mapping, Sequence
 from contextlib import contextmanager
+from typing import Self
 
 import httpx
-from langfuse import Langfuse, propagate_attributes
+from langfuse import Langfuse, LangfuseEmbedding, propagate_attributes
+from opentelemetry import trace as otel_trace
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SpanExporter
@@ -25,6 +27,21 @@ logger = logging.getLogger(__name__)
 HEALTH_TIMEOUT_S = 2.0
 
 
+class Observation:
+    """An observation being recorded; `update` adds what it produced. Without one, a no-op."""
+
+    def __init__(self, observation: LangfuseEmbedding | None = None) -> None:
+        self._observation = observation
+
+    def update(self, *, output: object = None, usage: Mapping[str, int] | None = None) -> None:
+        """Record the observation's output and its token usage."""
+        if self._observation is not None:
+            self._observation.update(output=output, usage_details=dict(usage) if usage else None)
+
+
+_NOT_RECORDED = Observation()
+
+
 class Tracing:
     """Where this process sends its traces; `configure_tracing` builds it once at start."""
 
@@ -34,6 +51,11 @@ class Tracing:
         self._langfuse = langfuse
         self._tracer_provider = tracer_provider
         self._base_url = base_url
+
+    @classmethod
+    def off(cls) -> Self:
+        """Tracing that records nothing: no keys, and every test that does not check traces."""
+        return cls(None, NoOpTracerProvider(), None)
 
     @property
     def base_url(self) -> str | None:
@@ -69,6 +91,21 @@ class Tracing:
         ):
             yield self._langfuse.get_current_trace_id()
 
+    @contextmanager
+    def embedding(self, model: str, texts: Sequence[str]) -> Generator[Observation]:
+        """Record one embedding call under the current trace; outside a trace, or off, nothing.
+
+        An embedding call never opens a trace of its own: its caller's trace (`question`,
+        `stage.embed`) is how it is found.
+        """
+        if self._langfuse is None or not otel_trace.get_current_span().get_span_context().is_valid:
+            yield _NOT_RECORDED
+            return
+        with self._langfuse.start_as_current_observation(
+            name=f"embeddings {model}", as_type="embedding", model=model, input=list(texts)
+        ) as observation:
+            yield Observation(observation)
+
     def flush(self) -> None:
         """Send every finished observation now; short-lived processes call this before exit."""
         if self._langfuse is not None:
@@ -85,7 +122,7 @@ def configure_tracing(
     public_key, secret_key = settings.langfuse_public_key, settings.langfuse_secret_key
     if public_key is None or secret_key is None:
         logger.info("Tracing is off: PE_LANGFUSE_PUBLIC_KEY and PE_LANGFUSE_SECRET_KEY are unset")
-        return Tracing(None, NoOpTracerProvider(), None)
+        return Tracing.off()
     if http is None:
         with httpx.Client() as client:
             base_url = _pick_base_url(settings, client)

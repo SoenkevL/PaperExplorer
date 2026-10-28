@@ -1,14 +1,26 @@
 """Typed HTTP client for the API; the web app's only way to reach data."""
 
-from collections.abc import Mapping
+from collections.abc import Generator, Iterable, Iterator, Mapping
+from contextlib import AbstractContextManager
 from typing import Any, Protocol
 
 import httpx
 from pydantic import TypeAdapter
 
-from paperexplorer_api.schemas import CitationDetail, Health, WorkSummary, WorkText
+from paperexplorer_api.schemas import (
+    AnswerEvent,
+    CitationDetail,
+    Conversation,
+    Health,
+    WorkSummary,
+    WorkText,
+)
 
 _WORK_SUMMARIES = TypeAdapter(list[WorkSummary])
+_ANSWER_EVENT: TypeAdapter[AnswerEvent] = TypeAdapter(AnswerEvent)
+# A turn's stream may sit idle while the model thinks; the API sends a keep-alive comment every
+# 15 s, so only a minute without a byte means it is gone.
+STREAM_TIMEOUT_S = 60.0
 
 
 class _Response(Protocol):
@@ -18,6 +30,11 @@ class _Response(Protocol):
     def headers(self) -> Mapping[str, str]: ...
     def json(self, **kwargs: Any) -> Any: ...
     def raise_for_status(self) -> object: ...
+
+
+class _StreamedResponse(_Response, Protocol):
+    def iter_lines(self) -> Iterator[str]: ...
+    def read(self) -> bytes: ...
 
 
 class HttpClient(Protocol):
@@ -31,13 +48,27 @@ class HttpClient(Protocol):
         """GET `url`, relative to the client's base URL."""
         ...
 
+    def post(self, url: str, *, json: Any = None) -> _Response:
+        """POST `json` to `url`."""
+        ...
+
+    def stream(
+        self, method: str, url: str, *, json: Any, timeout: float
+    ) -> AbstractContextManager[_StreamedResponse]:
+        """Send a request and read its response as it arrives, within the context."""
+        ...
+
 
 class NotFoundError(LookupError):
-    """The API has no such Work or Citation (HTTP 404)."""
+    """The API has no such Work, Citation or Conversation (HTTP 404)."""
+
+
+class ConflictError(RuntimeError):
+    """The API cannot do it yet (HTTP 409): a Work not embedded, a Conversation still answering."""
 
 
 class ApiClient:
-    """Thin typed wrapper over the API's JSON endpoints."""
+    """Thin typed wrapper over the API's JSON endpoints and its Questions' event streams."""
 
     def __init__(self, http: HttpClient) -> None:
         self._http = http
@@ -63,10 +94,56 @@ class ApiClient:
         """One Citation with its Citation Link and Reference."""
         return CitationDetail.model_validate(self._get(f"/citations/{citation_id}"))
 
+    def start_conversation(self, work_id: int) -> Conversation:
+        """A new Conversation about a Work; `ConflictError` until its Chunks are embedded."""
+        path = f"/works/{work_id}/conversations"
+        response = self._http.post(path)
+        _check(response, path)
+        return Conversation.model_validate(response.json())
+
+    def ask(self, conversation_id: str, text: str) -> Generator[AnswerEvent]:
+        """Ask a Question: its steps and draft as they come, then the Answer or an error.
+
+        The request goes out when iteration starts, and `NotFoundError` (no such Conversation,
+        or evicted) or `ConflictError` (still answering) are raised then. Closing the iterator
+        early closes the stream, which cancels the turn.
+        """
+        path = f"/conversations/{conversation_id}/questions"
+        with self._http.stream(
+            "POST", path, json={"text": text}, timeout=STREAM_TIMEOUT_S
+        ) as response:
+            if response.status_code >= 400:
+                response.read()
+            _check(response, path)
+            yield from _events(response.iter_lines())
+
     def _get(self, path: str) -> Any:
         response = self._http.get(path)
-        if response.status_code == 404:
-            is_json = response.headers.get("content-type", "").startswith("application/json")
-            raise NotFoundError(response.json().get("detail", path) if is_json else path)
-        response.raise_for_status()
+        _check(response, path)
         return response.json()
+
+
+def _check(response: _Response, path: str) -> None:
+    """Raise `NotFoundError` on 404, `ConflictError` on 409, the HTTP client's error otherwise."""
+    if response.status_code in (404, 409):
+        is_json = response.headers.get("content-type", "").startswith("application/json")
+        detail = response.json().get("detail", path) if is_json else path
+        raise (NotFoundError if response.status_code == 404 else ConflictError)(detail)
+    response.raise_for_status()
+
+
+def _events(lines: Iterable[str]) -> Iterator[AnswerEvent]:
+    """The `AnswerEvent` in each server-sent event's data; comments (keep-alives) are skipped.
+
+    The event's name repeats its data's `type`, so the data alone is read.
+    """
+    data: list[str] = []
+    for line in lines:
+        if not line:
+            if data:
+                yield _ANSWER_EVENT.validate_json("\n".join(data))
+            data = []
+            continue
+        field, _, value = line.partition(":")
+        if field == "data":
+            data.append(value.removeprefix(" "))

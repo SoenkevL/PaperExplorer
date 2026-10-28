@@ -40,7 +40,7 @@ for stage in fetch parse chunk embed extract_citations; do
 done
 ```
 
-Then open `http://tower:8080`: the Seed's page links every Citation to a panel with its Reference.
+Then open `http://tower:8080`: the Seed's page links every Citation to a panel with its Reference, and its sidebar (a drawer on narrower screens) answers Questions about it; a chip after a sentence of an Answer scrolls the reader to the sentence that bears it out.
 
 Search the Seed's Chunks (hybrid: bge-m3 Vectors and English full text, fused by RRF):
 

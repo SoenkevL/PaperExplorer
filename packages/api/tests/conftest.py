@@ -11,6 +11,7 @@ from psycopg.rows import TupleRow
 from paperexplorer.chunking import chunk
 from paperexplorer.citations import CitationGraph, extract
 from paperexplorer.domain import Attachment, LibraryItem, WorkId
+from paperexplorer.embedding import FakeEmbedder
 from paperexplorer.parsing import ParsedWork
 from paperexplorer.store import Chunks, CitationGraphs, StageStatuses, Works, WorkTexts
 from paperexplorer_api.app import create_app
@@ -28,7 +29,7 @@ VILLIGER = LibraryItem(
 
 
 class Stored:
-    """A Work as the pipeline would leave it: snapshot, text, Chunks, Citations, Stage status."""
+    """A Work as the pipeline leaves it: snapshot, text, embedded Chunks, Citations, Stages."""
 
     def __init__(self, conn: Conn, item: LibraryItem, parsed: ParsedWork) -> None:
         self.parsed = parsed
@@ -37,8 +38,14 @@ class Stored:
         Works(conn).record_library_item(self.work, item)
         WorkTexts(conn).replace(self.work, parsed)
         Chunks(conn).replace(self.work, chunk(parsed))
+        stored = Chunks(conn).for_work(self.work)
+        embedder = FakeEmbedder()
+        vectors = embedder.embed([s.chunk.text for s in stored])
+        Chunks(conn).record_embeddings(
+            self.work, embedder.model, {s.id: v for s, v in zip(stored, vectors, strict=True)}
+        )
         CitationGraphs(conn).replace(self.work, self.graph)
-        for stage in ("fetch", "parse", "chunk", "extract_citations"):
+        for stage in ("fetch", "parse", "chunk", "embed", "extract_citations"):
             StageStatuses(conn).start(self.work, stage)
             StageStatuses(conn).done(self.work, stage, {})
 

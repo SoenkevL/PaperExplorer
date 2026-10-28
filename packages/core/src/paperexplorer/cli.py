@@ -10,6 +10,7 @@ import typer
 from paperexplorer import __version__, citations, parsing, pipeline, store
 from paperexplorer.citations import ConfidenceLevel, confidence_level
 from paperexplorer.config import Settings
+from paperexplorer.embedding import OpenAICompatibleEmbedder
 from paperexplorer.library import ZoteroLibrary
 from paperexplorer.logs import configure_logging
 from paperexplorer.tracing import configure_tracing
@@ -87,6 +88,7 @@ class StageName(StrEnum):
     FETCH = "fetch"
     PARSE = "parse"
     CHUNK = "chunk"
+    EMBED = "embed"
     EXTRACT_CITATIONS = "extract_citations"
 
 
@@ -100,12 +102,20 @@ def run_command(
     with psycopg.connect(settings.database_url, autocommit=True) as conn:
         store.migrate(conn)
         work_id = store.Works(conn).ensure(work)
+        tracing = configure_tracing(settings)
         try:
-            library = ZoteroLibrary.from_settings(settings)
-            ctx = pipeline.StageContext(conn=conn, settings=settings, library=library)
+            ctx = pipeline.StageContext(
+                conn=conn,
+                settings=settings,
+                library=ZoteroLibrary.from_settings(settings),
+                embedder=OpenAICompatibleEmbedder.from_settings(settings, tracing),
+                tracing=tracing,
+            )
             result = pipeline.run_stage(ctx, stage.value, work_id)
         except Exception as e:
             typer.echo(f"{stage.value} failed for {work}: {e}", err=True)
             raise typer.Exit(1) from e
+        finally:
+            tracing.flush()
     counts = ", ".join(f"{k} {v}" for k, v in result.counts.items())
     typer.echo(f"{stage.value} {work}: {counts}")

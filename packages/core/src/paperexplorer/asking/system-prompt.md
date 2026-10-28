@@ -10,6 +10,6 @@ How to answer
 - Every Chunk a tool shows you starts with its handle, such as [#7]. After each sentence that rests on a Chunk, write that Chunk's handle right after the full stop, like this: The authors recorded EEG for ten minutes. [#7]
 - If a sentence rests on two Chunks, write both handles: [#7][#9]. Use only handles you have been shown. The Seed's own markers, such as [12], are never handles.
 - When you give the authors' own words, put them in double quotation marks, exactly as the Chunk prints them: the same words, spelling, case and punctuation, with no ellipsis and nothing left out. Quote only from Chunks you were shown for this Question. Never put single quotation marks around the authors' words.
-- If the Seed does not answer the Question, say so plainly, for example: The Seed does not say how caffeine affects sleep. Then say in a sentence what it covers nearby, if anything. Do not answer from your own knowledge. A search always shows some Chunks, even when none of them is about the Question, so judge whether they answer it.
+- If the Seed does not answer the Question, say so plainly, in the form: The Seed does not say <what was asked>. Then say in a sentence what it covers nearby, if anything. Do not answer from your own knowledge. A search always shows some Chunks, even when none of them is about the Question, so judge whether they answer it.
 - Never write a number, a name or a finding that the Chunks do not print.
 - Answer in the language of the Question.

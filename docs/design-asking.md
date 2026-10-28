@@ -25,7 +25,8 @@ Before resolution and Sources, the reader can ask the Seed Questions in a sideba
 
 ## The agent
 - pydantic-ai (ADR 0009) in the core module `asking`, against Ollama's OpenAI-compatible endpoint. Settings: `PE_CHAT_BASE_URL`, `PE_CHAT_MODEL`.
-- **Model:** `paperexplorer-chat`, a Modelfile alias created by `scripts/setup-tower.sh`: the community gemma-4 12B fine-tune `hf.co/yuxinlu1/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF:Q6_K` (digest `f87405c6d8ad`, 9.8 GB) with `num_ctx` 73728. If `ollama ps` shows it not fully on the GPU beside bge-m3: `OLLAMA_KV_CACHE_TYPE=q8_0` with flash attention first, then a smaller `num_ctx`.
+- **Model:** `paperexplorer-chat`, a Modelfile alias created by `scripts/setup-tower.sh`: the community gemma-4 12B fine-tune `hf.co/yuxinlu1/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF:Q6_K` (digest `f87405c6d8ad`, 9.8 GB) with `num_ctx` 73728. Measured: 10 GB and fully on the GPU; with bge-m3 beside it, 13.0 of 16.4 GB. Should it ever spill: `OLLAMA_KV_CACHE_TYPE=q8_0` with flash attention first, then a smaller `num_ctx`.
+- **Thinking:** the model reasons before it answers. Ollama's OpenAI-compatible endpoint returns that as `reasoning`, apart from `content`; it is traced and never shown in the Answer.
 - **Always in context:** the system prompt (kept in git, its version on every trace), the Seed's map (its heading tree with a handle per section, plus its abstract) and the Conversation so far.
 - **Tools:**
   - `search(query, k=8)`: hybrid RRF over the Seed's Chunks; each result has its handle, Heading Path, page and text.
@@ -45,7 +46,8 @@ Before resolution and Sources, the reader can ask the Seed Questions in a sideba
 As `design-v1.md`: paragraph Chunks of at most 400 bge-m3 tokens, HNSW plus English full-text search, RRF with k=60, both scores kept. No reranker; one may come later as an experiment measured against the eval.
 
 ## Tracing
-- Langfuse v4, self-hosted on the tower in `compose.langfuse.yaml`, memory-capped at about 6 GB with 90-day retention.
+- Langfuse v4, self-hosted on the tower in `compose.langfuse.yaml`, memory-capped at about 6 GB of RAM.
+- Traces are kept until their store on disk reaches 6 GB, or until someone deletes them; there is no time-based retention. Langfuse's own retention counts days, so a pruning job of ours (`scripts/langfuse_prune.py` on a tower timer) deletes the oldest traces through the Public API once the cap is reached. ClickHouse frees space only after its merges, so the job deletes in steps and checks again on its next run.
 - Langfuse Cloud (EU) is the fallback. Each process picks its host once at start, the tower if its health endpoint answers, and logs a WARNING when it falls back; switching is only a URL.
 - There is no live sync. `scripts/sync_langfuse.py`, adapted from Langfuse's data-migration cookbook, copies a time window of cloud traces to the tower when run by hand.
 - The Langfuse SDK with pydantic-ai's OpenTelemetry instrumentation. Settings `PE_LANGFUSE_*`; tracing is off when they are unset and never blocks an Answer.
@@ -61,12 +63,15 @@ As `design-v1.md`: paragraph Chunks of at most 400 bge-m3 tokens, HNSW plus Engl
 
 ## Order of work
 1. Docs: ADRs 0008 and 0009, `CONTEXT.md`, this design, `design-v1.md`, `architecture.md`, logbook.
-2. Tracing: settings, Langfuse client, in-memory exporter test, `compose.langfuse.yaml`, fallback, sync script.
+2. Tracing: settings, Langfuse client, in-memory exporter test, `compose.langfuse.yaml`, fallback, copy script, pruning job.
 3. Retrieval milestone: `chunk` Stage with its migration; `Embedder` with the `embed` Stage; `retrieval`. Check in with the user.
 4. Asking milestone: Modelfile, settings and `asking` (agent, tools, Pointer and Quote resolution); API Conversations with SSE; web sidebar; eval set and report. Check in with the eval report.
 
-## Facts to check while building
-- The Seed's length in tokens (estimated 20–35k with its bibliography).
-- Whether 72k context fits on the 4060 Ti beside bge-m3.
-- The tower's free disk for Langfuse.
+## Measured on the tower (2026-10-28)
+- The Seed's body is 113 blocks, 91.6k characters, 18,380 tokens for the chat model; its 185 References come on top.
+- The chat model loads in 15 s and reads a prompt at about 1,500 tokens/s: the whole body in context costs about 12 s before the first token.
+- 72k context fits fully on the GPU beside bge-m3 (above). When bge-m3 was loaded first, loading the chat model evicted it once; it reloads on the next embedding call.
+- 703 GB free on the tower's root disk, where Docker keeps its volumes.
+
+## Still to check while building
 - What the cookbook's copy keeps: trace IDs, scores, sessions.

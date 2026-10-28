@@ -41,9 +41,9 @@ Key decisions, newest last. Hard-to-reverse ones link to an ADR.
 - 2026-10-28 — A model may answer Questions; words count as the authors' only when they match exactly → [ADR 0008](adr/0008-model-answers-authors-words-only-when-exact.md)
 - 2026-10-28 — Pointers mark Support (close, weak) and Quotes mark exactness, separately; Quotes are checked against every Chunk the model read, whatever the handle
 - 2026-10-28 — The answering agent runs on pydantic-ai; retrieval stays hand-written SQL offered as tools → [ADR 0009](adr/0009-pydantic-ai-for-the-answering-agent.md)
-- 2026-10-28 — Chat model: community gemma-4 12B Q6_K (digest `f87405c6d8ad`) as Modelfile alias `paperexplorer-chat`, `num_ctx` 72k; if it spills off the GPU, q8_0 KV cache first, then less context
+- 2026-10-28 — Chat model: community gemma-4 12B Q6_K (digest `f87405c6d8ad`) as Modelfile alias `paperexplorer-chat`, `num_ctx` 72k; measured fully on the GPU beside bge-m3 (13.0 of 16.4 GB); if it ever spills, q8_0 KV cache first, then less context
 - 2026-10-28 — The Seed's map (headings and abstract) is always in context; retrieval tools fetch the rest; the first search is forced; at most 6 model requests per Question
 - 2026-10-28 — No reranker: RRF only until the eval can measure one
 - 2026-10-28 — Conversations live in the API's memory for now; Postgres with login later
-- 2026-10-28 — Langfuse v4 self-hosted on the tower, Langfuse Cloud as per-process fallback, a hand-run copy script instead of a sync; one trace per Question, `session_id` = Conversation
+- 2026-10-28 — Langfuse v4 self-hosted on the tower, Langfuse Cloud as per-process fallback, a hand-run copy script instead of a sync; one trace per Question, `session_id` = Conversation; traces kept until 6 GB on disk (oldest pruned first) or deleted by hand, no time-based retention
 - 2026-10-28 — Eval: about 20 Questions judged by Claude; bar hit@8 ≥ 0.8, Pointer coverage ≥ 0.8, ≥ 80% grounded and correct

@@ -20,17 +20,17 @@ Each row is one module with a small interface. Internals (caches, tokenizer, reg
 
 | Module | Interface (sketch) | Dependency kind | Test through |
 |---|---|---|---|
-| `domain` | pydantic models: Work, WorkId, CitationId, ChunkId, LibraryItem, Attachment, Chunk, ChunkFlag (later: Evidence, Scope, RetrievalRun, TextAvailability, Conversation, Question, Answer, Pointer, Quote); Reference stays in `parsing`, Citation in `citations` | in-process | — |
+| `domain` | pydantic models: Work, WorkId, CitationId, ChunkId, LibraryItem, Attachment, Chunk, ChunkFlag, Vector (later: Evidence, Scope, RetrievalRun, TextAvailability, Conversation, Question, Answer, Pointer, Quote); Reference stays in `parsing`, Citation in `citations` | in-process | — |
 | `parsing` | `parse(pdf, settings) -> ParsedWork`: GROBID finds the structure, pdfium reads the printed text and PDF link targets, LiteParse OCR reads scans (ADR 0006) | GROBID (external service, output cached by PDF hash) + local libs | fixture PDFs + recorded GROBID output; one live GROBID check |
 | `citations` | `extract(doc: ParsedWork) -> CitationGraph`: Citation Links weighed from PDF link, GROBID and rules; Citing Sentences | in-process | parsed fixtures and hand-built `ParsedWork`s |
 | `chunking` | `chunk(doc: ParsedWork) -> list[Chunk]`: paragraphs and footnotes into Chunks of at most 400 bge-m3 tokens, split at sentence borders (`parsing.sentence_spans`); a Chunk's span and sentences are code-point offsets into its block's text | in-process (bge-m3 tokenizer internal, shipped xz-compressed in the package) | fixture `ParsedWork`s and hand-built blocks |
 | `resolution` | `resolve(ref: Reference) -> Resolution` | true external (Crossref, OpenAlex, arXiv, GROBID) | hand-written cases + regression cassettes (see Testing) |
 | `library` | port `Library`: `item(key)`, `pdf(attachment)` so far (later: find, ensure collection, create, tag, attach); `ZoteroLibrary` reads the Web API with httpx | true external (Zotero) | `InMemoryLibrary` adapter; Zotero adapter over hand-written Web API JSON |
-| `embedding` | port `Embedder.embed(texts) -> list[Vector]` | true external (OpenAI-compatible) | `FakeEmbedder` adapter |
-| `store` | repositories per aggregate (`Works`, `WorkTexts`, `Chunks`, `CitationGraphs`, `StageStatuses`) + `migrate()`; `Chunks` reads a Work's Chunks in reading order, by id, `around` one (its neighbours) and `under` a Heading Path | Postgres + pgvector (local-substitutable) | real pgvector via testcontainers |
+| `embedding` | port `Embedder`: `model` (its name, stored with each Vector) and `embed(texts) -> list[Vector]`, one per text in order; `OpenAICompatibleEmbedder` POSTs batches of `PE_EMBEDDING_BATCH_SIZE` to `<PE_EMBEDDING_BASE_URL>/embeddings`, each batch one embedding observation in the current trace; `FakeEmbedder` hashes a text's content words into 1024 dimensions, so texts that share words come out closer | true external (OpenAI-compatible) | `FakeEmbedder` adapter; the OpenAI-compatible one over `httpx.MockTransport`; one live bge-m3 check |
+| `store` | repositories per aggregate (`Works`, `WorkTexts`, `Chunks`, `CitationGraphs`, `StageStatuses`) + `migrate()`; `Chunks` reads a Work's Chunks in reading order, by id, `around` one (its neighbours) and `under` a Heading Path, and records and reads their embeddings (`record_embeddings`, `embeddings`, `without_embedding` a model) | Postgres + pgvector (local-substitutable) | real pgvector via testcontainers |
 | `retrieval` | `search(text, scope, k) -> list[ScoredChunk]` (hybrid RRF); `find_evidence(citation, scope) -> RetrievalRun` on top of it | store + embedder | store + `FakeEmbedder` |
 | `asking` | `ask(conversation, question) -> AsyncIterator[AnswerEvent]`: a pydantic-ai agent over the Seed's map and retrieval tools, then Pointer and Quote resolution (ADR 0008, 0009, `design-asking.md`) | chat model (OpenAI-compatible) + store + embedder | `FunctionModel` + real Postgres + `FakeEmbedder` |
-| `tracing` | `configure_tracing(settings) -> Tracing`: the tower's Langfuse, else the cloud; `Tracing.trace(name, tags, session_id, metadata)` opens the trace every model call runs inside, `Tracing.tracer_provider` goes to pydantic-ai; `retention.prune` keeps the tower's store under its disk cap (see Tracing) | Langfuse (tower, cloud fallback) | in-memory span exporter; Public API over `httpx.MockTransport` |
+| `tracing` | `configure_tracing(settings) -> Tracing`: the tower's Langfuse, else the cloud; `Tracing.trace(name, tags, session_id, metadata)` opens the trace every model call runs inside, `Tracing.embedding(model, texts)` records one embedding call under the current trace (nothing outside one), `Tracing.tracer_provider` goes to pydantic-ai; `retention.prune` keeps the tower's store under its disk cap (see Tracing) | Langfuse (tower, cloud fallback) | in-memory span exporter; Public API over `httpx.MockTransport` |
 | `catalog` | `ensure_work(resolution, exploration) -> LibraryItemRef` (dedupe: works table → Library search → create) | store + library | store + `InMemoryLibrary` |
 | `pipeline` | `run_stage(ctx, name, work) -> StageResult` over `STAGES`; later `explore(seed_key, …) -> ExplorationReport` | everything, injected via `StageContext` | real Postgres, `InMemoryLibrary`, recorded GROBID |
 | `config`, `logs` | `Settings` (pydantic-settings), `configure_logging(settings)` | in-process | — |
@@ -60,10 +60,11 @@ PaperExplorer/
 
 `explore()` is a chain of independent `Stage`s. A Stage is a function `(ctx: StageContext, work: WorkId) -> StageResult`; it reads and writes only through the store, records its status per Work, and is safe to re-run. The chain is a list, so stages can be run singly (`paperexplorer run parse <work>`), reordered or replaced.
 
-- `StageContext` holds the store connection, the settings and the `Library`; `StageResult` holds counts.
+- `StageContext` holds the store connection, the settings, the `Library`, the `Embedder` and `Tracing`; `StageResult` holds counts.
 - `run_stage` records `running`, runs the Stage in one transaction, then records `done` with its counts, or `failed` with its error and none of its writes kept.
 - A Stage that succeeds makes every later Stage pending for that Work, since what they read has changed (a re-parse cascades the old Chunks and Citations away).
-- Built so far: `fetch → parse → chunk → extract_citations`. The CLI names a Work by its Zotero key (ADR 0007).
+- Built so far: `fetch → parse → chunk → embed → extract_citations`. The CLI names a Work by its Zotero key (ADR 0007) and builds the Embedder and tracing from `Settings`.
+- `embed` embeds only the Work's Chunks without a Vector from the Embedder's model, so running it again embeds none, and a new model re-embeds them all. Re-chunking deletes the Vectors with their Chunks.
 
 ```
 Seed:    fetch → parse → chunk → embed → extract_citations → resolve → catalog
@@ -92,7 +93,8 @@ Every model call, chat and embedding alike, runs inside a Langfuse trace and nev
 - **One trace per Question**, named `question`. `session_id` is the Conversation's id; `user_id` stays empty until login. Tags: `asking`, `work:<zotero_key>`. Metadata: WorkId, Zotero key, the Question's position in the Conversation, prompt version, model, `num_ctx`.
 - **Inside it:** the forced first search, each model request (a generation with token usage), each tool call, every embedding call and the Pointer and Quote resolution.
 - **Scores on the trace,** sortable and filterable: Pointer coverage, counts per Support, exact and not-exact Quotes, tool calls, model requests, latency. Eval runs add `judge.grounded` and `judge.correct`.
-- **Stages:** `embed` traces as `stage.embed`, tagged `pipeline` and `work:<key>`, with one embedding observation per batch.
+- **Stages:** `embed` traces as `stage.embed`, tagged `pipeline` and `work:<key>`, with one embedding observation per batch (named `embeddings <model>`: the batch's texts, its token usage, the count and length of its Vectors).
+- An embedding call made outside any trace records nothing; with tracing off, `Tracing.embedding` returns at once.
 - **Environment** is `development` (Mac), `tower` or `eval`; eval runs keep the name `question`, so live and eval traces compare directly. The release is the git SHA.
 - `tracing` builds its own OpenTelemetry tracer provider, never the global one, with environment and release on its resource; instrumentation reaches Langfuse only when handed that provider.
 

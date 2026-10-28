@@ -5,6 +5,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 ## [Unreleased]
 
 ### Added
+- Embeddings: the `Embedder` port with `OpenAICompatibleEmbedder` (any OpenAI-compatible `/v1/embeddings`, Ollama's bge-m3 in use; batches of `PE_EMBEDDING_BATCH_SIZE`, each one embedding observation in the current Langfuse trace) and `FakeEmbedder` for tests (hashed bag of words); migration 0004 with `chunk_embeddings` (one Vector per Chunk with its model's name, deleted with its Chunk, HNSW cosine index); the `embed` Stage after `chunk` (`paperexplorer run embed <zotero_key>`), traced as `stage.embed`, which tower-check runs on the Seed.
 - Chunks: `chunking.chunk` cuts a parsed Work's paragraphs and footnotes into Chunks of at most 400 bge-m3 tokens at sentence borders, windows of one paragraph sharing a sentence, flagged `short` or `oversized_sentence`; migration 0003 with the `chunks` table and its English full-text index; the `Chunks` repository; the `chunk` Stage (`paperexplorer run chunk <zotero_key>`), which tower-check runs on the Seed.
 - Tracing: `tracing.configure_tracing` sends traces to the tower's Langfuse, or to Langfuse Cloud when the tower does not answer; `Tracing.trace` opens a trace whose name, session, tags and metadata reach every model call inside it. `paperexplorer trace-check` sends one and says where it went.
 - `compose.langfuse.yaml`: Langfuse v4.71.0 on the tower, about 6 GB of RAM, its project initialised with the `PE_LANGFUSE_*` keys; the tower wizard sets it up as stage 8.

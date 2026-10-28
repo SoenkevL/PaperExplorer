@@ -25,8 +25,9 @@ def test_migrate_brings_the_database_up_to_date() -> None:
 
 
 @pytest.mark.usefixtures("cli_env")
-def test_run_says_what_is_missing_and_fails() -> None:
-    result = CliRunner().invoke(app, ["run", "extract_citations", "YAAC9XCX"])
+@pytest.mark.parametrize("stage", ["chunk", "extract_citations"])
+def test_run_says_what_is_missing_and_fails(stage: str) -> None:
+    result = CliRunner().invoke(app, ["run", stage, "YAAC9XCX"])
 
     assert result.exit_code == 1
     assert "run parse first" in result.output

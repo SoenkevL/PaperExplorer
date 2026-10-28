@@ -26,7 +26,9 @@ def test_works_are_listed_with_their_metadata_and_stages(api: TestClient, villig
     assert work["creators"] == ["Villiger, Daniel"]
     assert work["year"] == 2024
     assert work["text_origin"] == "printed"
-    assert work["stages"] == {"fetch": "done", "parse": "done", "extract_citations": "done"}
+    assert work["stages"] == {
+        "fetch": "done", "parse": "done", "chunk": "done", "extract_citations": "done",
+    }  # fmt: skip
 
 
 def test_a_stage_that_never_ran_is_pending(api: TestClient, store_db: Conn) -> None:
@@ -35,7 +37,7 @@ def test_a_stage_that_never_ran_is_pending(api: TestClient, store_db: Conn) -> N
     [work] = api.get("/works").json()
 
     assert work["stages"] == {
-        "fetch": "pending", "parse": "pending", "extract_citations": "pending",
+        "fetch": "pending", "parse": "pending", "chunk": "pending", "extract_citations": "pending",
     }  # fmt: skip
     assert work["text_origin"] is None
 

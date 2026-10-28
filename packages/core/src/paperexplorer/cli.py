@@ -86,6 +86,7 @@ class StageName(StrEnum):
 
     FETCH = "fetch"
     PARSE = "parse"
+    CHUNK = "chunk"
     EXTRACT_CITATIONS = "extract_citations"
 
 

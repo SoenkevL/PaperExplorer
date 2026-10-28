@@ -15,7 +15,7 @@ import base64
 import json
 import sys
 from collections.abc import Iterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from itertools import batched
 from typing import Any
 
@@ -68,8 +68,10 @@ def text(value: Any) -> str:
 
 
 def nanoseconds(moment: datetime | None) -> int | None:
-    """An OpenTelemetry timestamp."""
-    return None if moment is None else int(moment.timestamp() * 1e9)
+    """An OpenTelemetry timestamp, in integers so no float rounds it."""
+    if moment is None:
+        return None
+    return (moment - datetime(1970, 1, 1, tzinfo=UTC)) // timedelta(microseconds=1) * 1000
 
 
 def attributes(o: ObservationV2) -> dict[str, Any]:

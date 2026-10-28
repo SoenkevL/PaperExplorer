@@ -104,6 +104,19 @@ def attributes(o: ObservationV2) -> dict[str, Any]:
     return {k: v for k, v in values.items() if v is not None}
 
 
+def otlp_provider(dest_url: str, public_key: str, secret: str) -> tuple[TracerProvider, SourceIds]:
+    """A provider that sends spans to `dest_url`'s OTLP endpoint with the IDs set on SourceIds."""
+    ids = SourceIds()
+    provider = TracerProvider(id_generator=ids)
+    token = base64.b64encode(f"{public_key}:{secret}".encode()).decode()
+    exporter = OTLPSpanExporter(
+        endpoint=f"{dest_url.rstrip('/')}/api/public/otel/v1/traces",
+        headers={"Authorization": f"Basic {token}", "x-langfuse-ingestion-version": "4"},
+    )
+    provider.add_span_processor(BatchSpanProcessor(exporter))
+    return provider, ids
+
+
 def copy_trace(
     source: LangfuseAPI, tracer: otel_trace.Tracer, ids: SourceIds, trace_id: str
 ) -> int:
@@ -199,14 +212,7 @@ def main() -> int:
     source = LangfuseAPI(base_url=source_url, username=public_key, password=secret)
     dest = LangfuseAPI(base_url=dest_url, username=public_key, password=secret)
 
-    ids = SourceIds()
-    provider = TracerProvider(id_generator=ids)
-    token = base64.b64encode(f"{public_key}:{secret}".encode()).decode()
-    exporter = OTLPSpanExporter(
-        endpoint=f"{dest_url.rstrip('/')}/api/public/otel/v1/traces",
-        headers={"Authorization": f"Basic {token}", "x-langfuse-ingestion-version": "4"},
-    )
-    provider.add_span_processor(BatchSpanProcessor(exporter))
+    provider, ids = otlp_provider(dest_url, public_key, secret)
     tracer = provider.get_tracer("paperexplorer.sync_langfuse")
 
     roots = pages(

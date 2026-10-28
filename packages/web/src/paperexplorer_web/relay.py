@@ -11,7 +11,7 @@ import re
 import threading
 import uuid
 from collections import OrderedDict
-from collections.abc import Iterator, Sequence
+from collections.abc import Generator, Sequence
 from contextlib import closing
 from itertools import chain
 
@@ -109,7 +109,7 @@ class Views:
 
 def relay(
     api: ApiClient, question_id: str, question: PendingQuestion | None, views: Views
-) -> Iterator[str]:
+) -> Generator[str]:
     """The Question's events as server-sent events carrying HTML, ending in `answer` or `error`.
 
     Events: `step`, `delta` (draft text to append), `conversation` (the Conversation was gone
@@ -129,7 +129,7 @@ def relay(
 
 def _relay(
     api: ApiClient, question_id: str, question: PendingQuestion, views: Views
-) -> Iterator[str]:
+) -> Generator[str]:
     events = api.ask(question.conversation_id, question.text)
     try:
         first = next(events, None)

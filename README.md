@@ -32,6 +32,7 @@ cp .env.example .env        # fill in secrets
 ollama pull bge-m3          # Ollama runs natively on the tower
 ollama pull hf.co/yuxinlu1/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF:Q6_K
 ollama create paperexplorer-chat -f scripts/paperexplorer-chat.Modelfile   # the chat model
+export PE_LANGFUSE_RELEASE=$(git rev-parse --short HEAD)   # the containers have no git
 docker compose up -d        # db, grobid :8070, api :8000, web :8080
 docker compose run --rm pipeline migrate
 for stage in fetch parse chunk embed extract_citations; do
@@ -51,6 +52,14 @@ Ask the Seed a Question: the answering agent streams its draft, then lists the A
 
 ```sh
 uv run paperexplorer ask YAAC9XCX "What are the shortcomings of this work?"
+```
+
+Or over the running API, as the web app will: start a Conversation about a Work, then stream a Question's events (`step`, `delta`, then `answer` or `error`):
+
+```sh
+curl -X POST localhost:8000/works/<work_id>/conversations          # {"id": "<conversation_id>"}
+curl -N -X POST localhost:8000/conversations/<conversation_id>/questions \
+  -H 'content-type: application/json' -d '{"text": "What are the shortcomings of this work?"}'
 ```
 
 Tower-only tests (real Zotero storage, GROBID, the Seed) run there with `uv run pytest -m tower`.

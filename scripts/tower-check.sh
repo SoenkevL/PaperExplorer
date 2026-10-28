@@ -24,9 +24,14 @@
 #      requests and latency, and whether it says the Seed does not cover the Question, never its
 #      text (each is traced to Langfuse as `question`);
 #   9. the API and web containers, and the reader: every Citation of the Seed is a link that
-#      opens a panel with its Reference.
+#      opens a panel with its Reference;
+#  10. a Conversation on the running API (`scripts/check_conversation.py`): one Question about the
+#      Seed over HTTP, logging its events counted by type, the tools run, the time to the first
+#      delta and to the Answer, and the Answer's counts, never its text (traced as `question`,
+#      with this commit as its release).
 #
-# Every step runs even when an earlier one fails.
+# Every step runs even when an earlier one fails. Containers have no git, so the release on
+# their traces is this commit, passed as PE_LANGFUSE_RELEASE.
 #
 # Run on the tower, from the repo:
 #   git fetch && git switch <branch> && git pull --ff-only && scripts/tower-check.sh
@@ -128,10 +133,20 @@ seed_questions() {
   return "$status"
 }
 
+# conversation_check: one Question asked of the Seed over the running API's HTTP stream; on
+# failure the api container's last log lines say why.
+conversation_check() {
+  uv run python scripts/check_conversation.py "$SEED" "${QUESTIONS[0]}" && return 0
+  echo "--- api logs"
+  docker compose logs --no-color --tail 40 api
+  return 1
+}
+
 context() {
   echo "date:    $(date -Iseconds)"
   echo "host:    $(hostname) · $(uname -srm)"
   echo "branch:  $(git rev-parse --abbrev-ref HEAD) @ $(git rev-parse --short HEAD)"
+  echo "release: $PE_LANGFUSE_RELEASE (on every trace, the containers' too)"
   echo "dirty:   $(git status --porcelain | grep -cv " $LOG\$") files"
   echo "uv:      $(uv --version)"
   echo "docker:  $(docker version --format '{{.Server.Version}}' 2>&1)"
@@ -139,6 +154,8 @@ context() {
 }
 
 main() {
+  # compose.yaml passes it into the api and pipeline containers, which have no git.
+  export PE_LANGFUSE_RELEASE="${PE_LANGFUSE_RELEASE:-$(git rev-parse --short HEAD)}"
   context
 
   QUIET=1 step "uv sync" uv sync
@@ -190,6 +207,7 @@ main() {
   done
   QUIET=1 step "api + web up (compose)" docker compose up -d --build --wait api web
   step "reader: the Seed" reader_check
+  step "conversation (api)" conversation_check
 
   printf '\n=== summary\n'
   printf '%s\n' "${RESULTS[@]}"

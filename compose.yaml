@@ -1,6 +1,8 @@
 # Runs on the tower. Postgres binds to the tower's loopback only: reach it via `ssh -L 5432:localhost:5432 tower`.
 # Ollama runs natively on the tower (not in compose); containers reach it at host.docker.internal.
 # Langfuse runs beside this stack (compose.langfuse.yaml); containers reach it the same way.
+# The containers have no git, so the release on their traces comes from the shell:
+#   PE_LANGFUSE_RELEASE=$(git rev-parse --short HEAD) docker compose up -d --build
 name: paperexplorer
 
 services:
@@ -24,6 +26,7 @@ services:
       PE_CHAT_BASE_URL: http://host.docker.internal:11434/v1
       PE_LANGFUSE_BASE_URL: http://host.docker.internal:3000
       PE_LANGFUSE_ENVIRONMENT: tower
+      PE_LANGFUSE_RELEASE: ${PE_LANGFUSE_RELEASE:-}
       PE_LOG_FORMAT: json
     extra_hosts: ["host.docker.internal:host-gateway"]
     ports: ["8000:8000"]
@@ -72,6 +75,7 @@ services:
       PE_GROBID_URL: http://grobid:8070
       PE_LANGFUSE_BASE_URL: http://host.docker.internal:3000
       PE_LANGFUSE_ENVIRONMENT: tower
+      PE_LANGFUSE_RELEASE: ${PE_LANGFUSE_RELEASE:-}
       PE_DATA_DIR: /data
       PE_ZOTERO_STORAGE_DIR: /zotero/storage
     extra_hosts: ["host.docker.internal:host-gateway"]

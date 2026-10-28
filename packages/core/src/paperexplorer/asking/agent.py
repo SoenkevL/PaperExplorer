@@ -66,17 +66,29 @@ LAST_REQUEST = (
     "This is your last request for this Question: no tools are left. Answer now from what you"
     " have read, and where it does not settle the Question, say what the Seed does not say."
 )
+# The eval's baseline (design-asking.md, Eval) reads the whole Seed instead of searching it.
+WHOLE_SEED = (
+    "For this Question you have no tools, and no search has run: the Seed's whole text is below,"
+    " every Chunk under its handle. What is said above about searching and reading with tools"
+    " does not apply; read the text below instead. Everything else above does."
+)
 
 
 @dataclass(frozen=True)
 class AskingContext:
-    """What answering works with: the store, the Embedder, the chat model, settings and tracing."""
+    """What answering works with: the store, the Embedder, the chat model, settings and tracing.
+
+    `tags` go on every Question's trace beside its own (the eval's run id). `whole_seed` is the
+    eval's baseline: the whole Seed in context, every Chunk with its handle, and no tools.
+    """
 
     conn: psycopg.Connection[TupleRow]
     embedder: Embedder
     model: Model
     settings: Settings
     tracing: Tracing
+    tags: tuple[str, ...] = ()
+    whole_seed: bool = False
 
 
 def chat_model(settings: Settings) -> Model:
@@ -129,24 +141,25 @@ async def _turn(
         "model": ctx.model.model_name,
         "num_ctx": str(ctx.settings.chat_num_ctx),
     }
+    tags = ["asking", f"work:{key}", *(["whole-seed"] if ctx.whole_seed else []), *ctx.tags]
     try:
         with ctx.tracing.trace(
-            "question",
-            tags=["asking", f"work:{key}"],
-            session_id=conversation.id,
-            metadata=metadata,
-        ):
+            "question", tags=tags, session_id=conversation.id, metadata=metadata
+        ) as trace_id:
             try:
                 answer, messages, usage = await _answer(ctx, conversation, question, emit)
             except UsageLimitExceeded:
                 logger.warning("No Answer within %d model requests", REQUEST_LIMIT)
                 emit(
-                    ErrorEvent(message=f"The model did not answer within {REQUEST_LIMIT} requests.")
+                    ErrorEvent(
+                        message=f"The model did not answer within {REQUEST_LIMIT} requests.",
+                        trace_id=trace_id,
+                    )
                 )
                 return
             except Exception as error:
                 logger.exception("Question %d of Conversation %s failed", position, conversation.id)
-                emit(ErrorEvent(message=f"The model could not answer: {error}"))
+                emit(ErrorEvent(message=f"The model could not answer: {error}", trace_id=trace_id))
                 return
             conversation.messages = _without_thinking(messages)
             conversation.questions = position
@@ -158,7 +171,7 @@ async def _turn(
             usage.requests,
             time.monotonic() - started,
         )
-        emit(AnsweredEvent(answer=answer))
+        emit(AnsweredEvent(answer=answer, trace_id=trace_id))
     finally:
         emit(None)
 
@@ -171,26 +184,22 @@ async def _answer(
 ) -> tuple[Answer, list[ModelMessage], RunUsage]:
     """Run the agent on the Question and resolve its draft into the Answer."""
     tools = SeedTools(ctx.conn, ctx.embedder, conversation)
-    instructions = f"{SYSTEM_PROMPT.strip()}\n\n{tools.seed_map()}"
-    emit(StepEvent(tool="search", args={"query": question}))
-    with ctx.tracing.span("forced search", as_type="tool", input={"query": question}) as span:
-        found = tools.search(question)
-        span.update(output=found)
-    call = ToolCallPart(
-        "search", {"query": question}, tool_call_id=f"forced-{conversation.questions + 1}"
-    )
-    history: list[ModelMessage] = [
-        *conversation.messages,
-        ModelRequest(parts=[UserPromptPart(question)]),
-        ModelResponse(parts=[call]),
-        ModelRequest(parts=[ToolReturnPart("search", found, tool_call_id=call.tool_call_id)]),
-    ]
+    if ctx.whole_seed:
+        instructions = f"{SYSTEM_PROMPT.strip()}\n\n{WHOLE_SEED}\n\n{tools.whole_seed()}"
+        history: list[ModelMessage] = [
+            *conversation.messages,
+            ModelRequest(parts=[UserPromptPart(question)]),
+        ]
+    else:
+        instructions = f"{SYSTEM_PROMPT.strip()}\n\n{tools.seed_map()}"
+        forced = _forced_search(ctx, tools, conversation, question, emit)
+        history = [*conversation.messages, *forced]
     agent = Agent(
         ctx.model,
         deps_type=SeedTools,
         name="asking",
         instructions=[instructions, _last_request],
-        tools=_TOOLS,
+        tools=[] if ctx.whole_seed else _TOOLS,
         capabilities=[
             PrepareTools(_no_tools_on_the_last_request),
             Instrumentation(
@@ -228,6 +237,28 @@ async def _answer(
         )
         span.update(output=answer.counts().model_dump())
     return answer, result.all_messages(), result.usage
+
+
+def _forced_search(
+    ctx: AskingContext,
+    tools: SeedTools,
+    conversation: Conversation,
+    question: str,
+    emit: Callable[[AnswerEvent | None], None],
+) -> list[ModelMessage]:
+    """Search the Seed for the Question: the Question, then the search as the model's own call."""
+    emit(StepEvent(tool="search", args={"query": question}))
+    with ctx.tracing.span("forced search", as_type="tool", input={"query": question}) as span:
+        found = tools.search(question)
+        span.update(output=found)
+    call = ToolCallPart(
+        "search", {"query": question}, tool_call_id=f"forced-{conversation.questions + 1}"
+    )
+    return [
+        ModelRequest(parts=[UserPromptPart(question)]),
+        ModelResponse(parts=[call]),
+        ModelRequest(parts=[ToolReturnPart("search", found, tool_call_id=call.tool_call_id)]),
+    ]
 
 
 def _draft(event: AgentStreamEvent) -> str | None:

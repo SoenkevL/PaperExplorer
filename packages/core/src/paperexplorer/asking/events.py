@@ -23,10 +23,14 @@ class DeltaEvent(BaseModel):
 
 
 class AnsweredEvent(BaseModel):
-    """The resolved Answer, with its Pointers and Quotes; the turn's last event."""
+    """The resolved Answer, with its Pointers and Quotes; the turn's last event.
+
+    `trace_id` is the Question's `question` trace (None with tracing off), for scores added later.
+    """
 
     type: Literal["answer"] = "answer"
     answer: Answer
+    trace_id: str | None = None
 
 
 class ErrorEvent(BaseModel):
@@ -34,6 +38,7 @@ class ErrorEvent(BaseModel):
 
     type: Literal["error"] = "error"
     message: str
+    trace_id: str | None = None
 
 
 type AnswerEvent = Annotated[

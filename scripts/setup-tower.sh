@@ -191,6 +191,12 @@ TOWER="${TOWER:-tower}"
 SEED_ITEM_KEY="YAAC9XCX"
 EMBED_MODEL="bge-m3"
 EMBED_DIM=1024
+# The answering agent's chat model: a Modelfile alias over a pinned community build.
+CHAT_BASE="hf.co/yuxinlu1/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF:Q6_K"
+CHAT_DIGEST="f87405c6d8ad"
+CHAT_MODEL="paperexplorer-chat"
+CHAT_MODELFILE="scripts/paperexplorer-chat.Modelfile"
+CHAT_NUM_CTX=73728
 
 # tw CMD runs CMD on the tower in a login shell (so ~/.local/bin etc. are on PATH).
 tw()  { ssh "$TOWER" "bash -lc $(printf '%q' "$1")"; }
@@ -298,6 +304,22 @@ dim=$(tw "curl -fsS localhost:11434/v1/embeddings -H 'Content-Type: application/
   | uv run --quiet python -c 'import json,sys; print(len(json.load(sys.stdin)["data"][0]["embedding"]))' || echo 0)
 if [[ "$dim" == "$EMBED_DIM" ]]; then ok "OpenAI-compatible /v1/embeddings returns $dim dimensions"
 else warn "embedding test returned '$dim' dimensions, expected $EMBED_DIM"; SKIPPED+=("check Ollama embeddings with $EMBED_MODEL"); fi
+if tw "ollama list | grep -q '^$CHAT_BASE '"; then ok "the chat model's base is already pulled"; else
+  say "Pulling the chat model's base, $CHAT_BASE (about 9.8 GB)…"; twt "ollama pull $CHAT_BASE"
+fi
+digest=$(tw "ollama list" | awk -v name="$CHAT_BASE" '$1 == name {print $2}')
+if [[ "$digest" == "$CHAT_DIGEST" ]]; then ok "its digest is $CHAT_DIGEST"
+else warn "its digest is '$digest', expected $CHAT_DIGEST (docs/design-asking.md)"; SKIPPED+=("check the chat model's digest"); fi
+if tw "cd $REMOTE_DIR && ollama create $CHAT_MODEL -f $CHAT_MODELFILE" >/dev/null; then
+  ok "created $CHAT_MODEL from $CHAT_MODELFILE"
+else warn "ollama create $CHAT_MODEL failed"; SKIPPED+=("ollama create $CHAT_MODEL -f $CHAT_MODELFILE (on the tower, in the repo)"); fi
+ctx=$(tw "ollama show $CHAT_MODEL --parameters" 2>/dev/null | awk '$1 == "num_ctx" {print $2}')
+if [[ "$ctx" == "$CHAT_NUM_CTX" ]]; then ok "$CHAT_MODEL has num_ctx $ctx"
+else warn "$CHAT_MODEL has num_ctx '$ctx', expected $CHAT_NUM_CTX"; SKIPPED+=("check num_ctx of $CHAT_MODEL"); fi
+reply=$(tw "curl -fsS localhost:11434/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"$CHAT_MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with the one word: ready\"}]}'" \
+  | uv run --quiet python -c 'import json,sys; m=json.load(sys.stdin)["choices"][0]["message"]; print(repr((m.get("content") or "").strip()[:40]), "with reasoning" if m.get("reasoning") else "without reasoning")' || echo "")
+if [[ -n "$reply" ]]; then ok "$CHAT_MODEL answers on /v1/chat/completions: $reply"
+else warn "$CHAT_MODEL gave no answer on /v1/chat/completions"; SKIPPED+=("check $CHAT_MODEL answers"); fi
 if curl -fsS --max-time 4 "http://$TOWER_HOST:11434/api/version" >/dev/null 2>&1; then
   ok "Ollama is reachable from the Mac and from containers"
 else
@@ -367,6 +389,9 @@ tower_env POSTGRES_PASSWORD "$pg_password"
 tower_env PE_DATABASE_URL "postgresql://paperexplorer:$pg_password@localhost:5432/paperexplorer"
 tower_env PE_EMBEDDING_BASE_URL "http://localhost:11434/v1"
 tower_env PE_EMBEDDING_MODEL "$EMBED_MODEL"
+tower_env PE_CHAT_BASE_URL "http://localhost:11434/v1"
+tower_env PE_CHAT_MODEL "$CHAT_MODEL"
+tower_env PE_CHAT_NUM_CTX "$CHAT_NUM_CTX"
 tower_env PE_ZOTERO_LIBRARY_ID "$zid"
 tower_env PE_ZOTERO_LIBRARY_TYPE user
 tower_env PE_ZOTERO_API_KEY "$zkey"

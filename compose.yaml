@@ -21,6 +21,7 @@ services:
     environment:
       PE_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       PE_EMBEDDING_BASE_URL: http://host.docker.internal:11434/v1
+      PE_CHAT_BASE_URL: http://host.docker.internal:11434/v1
       PE_LANGFUSE_BASE_URL: http://host.docker.internal:3000
       PE_LANGFUSE_ENVIRONMENT: tower
       PE_LOG_FORMAT: json

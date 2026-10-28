@@ -379,7 +379,7 @@ def test_one_question_is_one_trace_holding_every_model_tool_and_embedding_call(
     )
     recording = chunk(store_db, small_seed, RECORDING)
     script = Script(
-        [Call("read_section", {"heading": "§3"})],
+        [Think("The recording section says how."), Call("read_section", {"heading": "§3"})],
         [
             lambda: (
                 f"Entropy was computed from each EEG recording. [#{conversation.handle(recording)}]"
@@ -430,7 +430,11 @@ def test_one_question_is_one_trace_holding_every_model_tool_and_embedding_call(
         "forced search",
         "resolve answer",
     ]
-    assert len(by_name["chat paperexplorer-chat"]) == 2
+    chats = by_name["chat paperexplorer-chat"]
+    assert len(chats) == 2
+    # The model's thinking is traced with its request, though never shown.
+    thought = json.loads(str((chats[0].attributes or {})["gen_ai.output.messages"]))
+    assert {"type": "thinking", "content": "The recording section says how."} in thought[0]["parts"]
     [read_section] = by_name["execute_tool read_section"]
     assert parent(read_section) == parent(by_name["chat paperexplorer-chat"][0])
     named = {str(s["name"]): s["value"] for s in scores}

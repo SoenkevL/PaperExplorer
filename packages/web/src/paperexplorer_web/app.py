@@ -6,15 +6,16 @@ from typing import Annotated
 from urllib.parse import urlencode
 
 import httpx
-from fastapi import FastAPI, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Form, Query, Request, Response
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from paperexplorer_api.client import ApiClient, NotFoundError
+from paperexplorer_api.client import ApiClient, ConflictError, NotFoundError
 from paperexplorer_api.schemas import Block, CitationDetail, WorkSummary
+from paperexplorer_web.relay import PendingQuestion, PendingQuestions, Views, not_embedded, relay
 from paperexplorer_web.segments import Segment, segments
 
 logger = logging.getLogger(__name__)
@@ -94,6 +95,59 @@ def create_app(api: ApiClient) -> FastAPI:
         if any(d.work_id != work_id for d in details):
             return not_found(request, f"Not all of {c} are Citations of Work {work_id}")
         return templates.TemplateResponse(request, "panel.html", {"details": _distinct(details)})
+
+    pending = PendingQuestions()
+    views = Views(templates.env)
+
+    @app.post("/works/{work_id}/questions", response_class=HTMLResponse)
+    def ask(  # pyright: ignore[reportUnusedFunction]
+        request: Request,
+        work_id: int,
+        text: Annotated[str, Form()] = "",
+        conversation_id: Annotated[str, Form()] = "",
+    ) -> Response:
+        """Hold the sidebar's Question for its stream; the first starts the Conversation."""
+        text = text.strip()
+        if not text:
+            return Response(status_code=204)
+
+        def refuse(message: str) -> HTMLResponse:
+            context = {"text": text, "refused": message}
+            return templates.TemplateResponse(request, "conversation/question.html", context)
+
+        new_conversation = not conversation_id
+        if new_conversation:
+            try:
+                conversation_id = api.start_conversation(work_id).id
+            except ConflictError as e:
+                return refuse(not_embedded(e))
+            except NotFoundError as e:
+                return refuse(f"Not asked: {e}.")
+            except httpx.HTTPError:
+                logger.warning("API unreachable", exc_info=True)
+                return refuse("Not asked: the API is unreachable.")
+            logger.info("Started Conversation %s about Work %d", conversation_id, work_id)
+        question = PendingQuestion(work_id=work_id, conversation_id=conversation_id, text=text)
+        question_id = pending.put(question)
+        logger.info("Question %s waits for its stream", question_id)
+        return templates.TemplateResponse(
+            request,
+            "conversation/question.html",
+            {
+                "text": text,
+                "question_id": question_id,
+                "conversation_id": conversation_id,
+                "new_conversation": new_conversation,
+            },
+        )
+
+    @app.get("/questions/{question_id}/stream")
+    def stream(question_id: str) -> StreamingResponse:  # pyright: ignore[reportUnusedFunction]
+        """The Question's Answer as it streams: the API's events relayed as HTML."""
+        events = relay(api, question_id, pending.take(question_id), views)
+        return StreamingResponse(
+            events, media_type="text/event-stream", headers={"Cache-Control": "no-cache"}
+        )
 
     return app
 

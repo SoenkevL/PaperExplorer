@@ -1,0 +1,25 @@
+{#- The resolved Answer, cut in Python (answers.answer_runs) at its code-point offsets. Two marks:
+    a chip per Pointer shows its Support; quoted words show whether they are exact. Whitespace
+    inside .answer would show (pre-wrap), so every tag here trims it. -#}
+<div class="reply answered">{% include "conversation/steps.html" %}<div class="answer">
+{%- for run in runs -%}
+{%- if run.sentence %}<span class="sentence">{% endif -%}
+{%- for piece in run.pieces -%}
+{%- set q = piece.quote -%}
+{%- if q and q.exact -%}
+<a class="quote exact" href="#b{{ q.block_id }}" data-block="{{ q.block_id }}" data-start="{{ q.block_start }}" data-end="{{ q.block_end }}" title="The authors' words, exactly as printed">{{ piece.text }}</a>
+{%- elif q -%}
+<span class="quote not-exact" title="Not exact: the Work does not print these words as quoted">{{ piece.text }}</span>
+{%- else -%}
+{{ piece.text }}
+{%- endif -%}
+{%- endfor -%}
+{%- for chip in run.pointers -%}
+{%- set p = chip.pointer -%}
+<a class="pointer {{ p.support }}" href="#b{{ p.block_id }}" data-block="{{ p.block_id }}" data-start="{{ p.start }}" data-end="{{ p.end }}" data-chunk-start="{{ p.chunk_start }}" data-chunk-end="{{ p.chunk_end }}" title="
+{%- if p.support == 'close' %}Close Support: the place says what this sentence says
+{%- else %}Weak Support: the place bears this sentence out only loosely{% endif %}">{{ chip.number }}</a>
+{%- endfor -%}
+{%- if run.sentence %}</span>{% endif -%}
+{%- endfor -%}
+</div></div>

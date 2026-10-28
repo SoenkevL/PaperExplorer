@@ -1,0 +1,16 @@
+{# A posted Question and the reply its stream fills: steps and draft until `answer` or `error`
+   replaces the reply, which removes the EventSource with it. #}
+<section class="turn">
+  <p class="question">{{ text }}</p>
+  {% if refused %}
+  <p class="refused">{{ refused }}</p>
+  {% else %}
+  <p class="notice" id="notice-{{ question_id }}"></p>
+  <div class="reply" hx-ext="sse" sse-connect="/questions/{{ question_id }}/stream" sse-swap="answer,error" hx-swap="outerHTML">
+    <div hidden sse-swap="conversation" hx-swap="none"></div>
+    <ol class="steps" sse-swap="step" hx-swap="beforeend"></ol>
+    <div class="draft" sse-swap="delta" hx-swap="beforeend"></div>
+  </div>
+  {% endif %}
+</section>
+{% if new_conversation %}{% include "conversation/conversation_id.html" %}{% endif %}

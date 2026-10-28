@@ -10,9 +10,15 @@ from fastapi.testclient import TestClient
 
 from paperexplorer_api.client import ApiClient
 from paperexplorer_api.schemas import (
+    Answer,
+    AnsweredEvent,
     AnswerEvent,
+    AnswerSentence,
     Block,
     CitationSpan,
+    DeltaEvent,
+    Pointer,
+    StepEvent,
     WorkText,
 )
 from paperexplorer_web.app import create_app
@@ -101,3 +107,106 @@ def test_below_92rem_the_sidebar_is_a_drawer_opened_by_a_button() -> None:
     assert re.search(r"@media \(min-width: 92rem\)", css)
     assert "conversation.js" in page
     assert "sse.min.js" in page
+
+
+QUESTION = "How was <entropy> measured?"
+PLACE = Pointer(block_id=1, start=45, end=67, support="close", chunk_start=0, chunk_end=67)
+ANSWERED = AnsweredEvent(
+    answer=Answer(
+        text="Entropy rose. It fell.",
+        sentences=[
+            AnswerSentence(start=0, end=13, pointers=[]),
+            AnswerSentence(start=14, end=22, pointers=[PLACE]),
+        ],
+        quotes=[],
+    )
+)
+
+
+def _post(client: TestClient, text: str = QUESTION, conversation_id: str = "") -> str:
+    data = {"text": text, "conversation_id": conversation_id}
+    return client.post("/works/7/questions", data=data).raise_for_status().text
+
+
+def _stream_url(turn: str) -> str:
+    found = re.search(r'sse-connect="([^"]+)"', turn)
+    assert found, "the Question does not stream"
+    return html.unescape(found[1])
+
+
+def _events(body: str) -> list[tuple[str, str]]:
+    """Each server-sent event's name and data."""
+    events: list[tuple[str, str]] = []
+    for block in body.split("\n\n"):
+        if not block.strip():
+            continue
+        name, data = "", list[str]()
+        for line in block.split("\n"):
+            field, _, value = line.partition(":")
+            if field == "event":
+                name = value.removeprefix(" ")
+            elif field == "data":
+                data.append(value.removeprefix(" "))
+        events.append((name, "\n".join(data)))
+    return events
+
+
+def _ask(client: TestClient, text: str = QUESTION, conversation: str = "") -> list[tuple[str, str]]:
+    return _events(client.get(_stream_url(_post(client, text, conversation))).text)
+
+
+def _text(fragment: str) -> str:
+    return html.unescape(re.sub(r"<[^>]+>", "", fragment))
+
+
+def test_the_first_question_starts_the_conversation_and_streams_from_the_web_app() -> None:
+    api = FakeApi()
+
+    turn = _post(api.client())
+
+    assert api.started == [7]
+    assert "How was &lt;entropy&gt; measured?" in turn
+    # The browser's EventSource GETs the web app; the Question waits there, not in the URL.
+    assert re.fullmatch(r"/questions/[0-9a-f]{32}/stream", _stream_url(turn))
+    assert re.search(r'<input type="hidden" id="conversation-id" name="conversation_id"'
+                     r' value="conv-1" hx-swap-oob="true">', turn)  # fmt: skip
+    assert api.asked == []
+
+
+def test_a_later_question_is_asked_in_the_same_conversation() -> None:
+    api = FakeApi([ANSWERED])
+
+    events = _ask(api.client(), "And then?", "conv-1")
+
+    assert api.started == []
+    assert api.asked == [("conv-1", "And then?")]
+    assert [name for name, _ in events] == ["answer"]
+
+
+def test_each_event_is_relayed_as_html_for_its_place_in_the_question() -> None:
+    api = FakeApi(
+        [
+            StepEvent(tool="search", args={"query": "entropy measured"}),
+            DeltaEvent(text="Entropy rose. [#"),
+            StepEvent(tool="read_around", args={"handle": 3, "n": 1}),
+            DeltaEvent(text="3] It fell."),
+            ANSWERED,
+        ]
+    )
+    client = api.client()
+    turn = _post(client)
+
+    events = _events(client.get(_stream_url(turn)).text)
+
+    assert [name for name, _ in events] == ["step", "delta", "step", "delta", "answer"]
+    search, first, read, second, answer = (data for _, data in events)
+    assert _text(search) == "search entropy measured"
+    assert _text(read) == "read_around 3, 1"
+    # The draft grows at the end of the draft; a handle waits until it is whole, then is a chip.
+    assert re.search(r'sse-swap="delta" hx-swap="beforeend"', turn)
+    assert first == "Entropy rose. "
+    assert re.fullmatch(r'<span class="chip"[^>]*>#3</span> It fell\.', second)
+    # The Answer replaces the whole reply, steps and draft, and so closes the EventSource.
+    assert re.search(r'<div class="reply"[^>]*sse-swap="answer,error" hx-swap="outerHTML"', turn)
+    assert answer.startswith('<div class="reply answered">')
+    assert "Entropy rose. It fell." in _text(answer)

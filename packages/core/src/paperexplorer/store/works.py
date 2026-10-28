@@ -66,6 +66,11 @@ class Works:
         with self._conn.cursor(row_factory=class_row(Work)) as cur:
             return cur.execute(_WORK + " WHERE id = %s", (work,)).fetchone()
 
+    def find(self, zotero_key: str) -> Work | None:
+        """The Work recorded for a Library Item, if there is one; unlike `ensure`, creates none."""
+        with self._conn.cursor(row_factory=class_row(Work)) as cur:
+            return cur.execute(_WORK + " WHERE zotero_key = %s", (zotero_key,)).fetchone()
+
     def list(self) -> list[Work]:
         """Every Work, in the order they were first seen."""
         with self._conn.cursor(row_factory=class_row(Work)) as cur:

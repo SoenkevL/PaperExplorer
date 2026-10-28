@@ -1,5 +1,6 @@
 """The `paperexplorer` command line; pipeline commands attach here."""
 
+import textwrap
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
@@ -7,9 +8,10 @@ from typing import Annotated
 import psycopg
 import typer
 
-from paperexplorer import __version__, citations, parsing, pipeline, store
+from paperexplorer import __version__, citations, parsing, pipeline, retrieval, store
 from paperexplorer.citations import ConfidenceLevel, confidence_level
 from paperexplorer.config import Settings
+from paperexplorer.domain import Scope
 from paperexplorer.embedding import OpenAICompatibleEmbedder
 from paperexplorer.library import ZoteroLibrary
 from paperexplorer.logs import configure_logging
@@ -119,3 +121,45 @@ def run_command(
             tracing.flush()
     counts = ", ".join(f"{k} {v}" for k, v in result.counts.items())
     typer.echo(f"{stage.value} {work}: {counts}")
+
+
+def _placing(placing: retrieval.Placing | None) -> str:
+    return f"{placing.rank:>2} {placing.score:.3f}" if placing else " -     -"
+
+
+@app.command("search")
+def search_command(
+    work: Annotated[str, typer.Argument(help="The Work's Zotero item key, e.g. YAAC9XCX.")],
+    query: Annotated[str, typer.Argument(help="What to search for, e.g. a Question.")],
+    k: Annotated[int, typer.Option("-k", min=1, help="How many Chunks to list.")] = 8,
+    show_text: Annotated[
+        bool, typer.Option("--text/--no-text", help="Print the start of each Chunk's text.")
+    ] = True,
+) -> None:
+    """Search a Work's Chunks and list them best first, with both rankings and their RRF."""
+    settings = Settings()
+    with psycopg.connect(settings.database_url, autocommit=True) as conn:
+        store.migrate(conn)
+        found = store.Works(conn).find(work)
+        if found is None:
+            typer.echo(f"No Work {work}; run fetch, parse, chunk and embed first", err=True)
+            raise typer.Exit(1)
+        tracing = configure_tracing(settings)
+        embedder = OpenAICompatibleEmbedder.from_settings(settings, tracing)
+        try:
+            with tracing.trace(
+                "search", tags=["cli", f"work:{work}"], metadata={"work_id": str(found.id)}
+            ):
+                results = retrieval.search(conn, embedder, query, Scope.of(found.id), k=k)
+        finally:
+            tracing.flush()
+    chunks = "Chunk" if len(results) == 1 else "Chunks"
+    typer.echo(f"{work}: {len(results)} {chunks} for {query!r} ({embedder.model})")
+    for i, r in enumerate(results, start=1):
+        heading = " > ".join(r.chunk.heading_path) or "(no heading)"
+        typer.echo(
+            f"{i:>2}  rrf {r.rrf:.4f}  vector {_placing(r.vector)}  "
+            f"full text {_placing(r.full_text)}  p{r.chunk.page}  {heading}"
+        )
+        if show_text:
+            typer.echo(textwrap.indent(textwrap.shorten(r.chunk.text, 240), "     "))

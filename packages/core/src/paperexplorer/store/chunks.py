@@ -1,6 +1,6 @@
-"""A Work's Chunks in reading order, as the chunk Stage cut them, and their embeddings."""
+"""A Work's Chunks in reading order, as the chunk Stage cut them, their embeddings and search."""
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from typing import Any, LiteralString
 
 import psycopg
@@ -28,11 +28,80 @@ class ChunkEmbedding(BaseModel):
     vector: Vector
 
 
-_CHUNKS = """
-    SELECT c.id, c.work_id, c.position, c.block, lower(c.span) AS start, upper(c.span) AS "end",
-           c.text, c.sentences, c.heading_path, c.page, c.boxes, c.tokens, c.flags, c.text_origin
-    FROM chunks c
+class Placing(BaseModel):
+    """Where one ranking put a Chunk: its rank, counted from 1, and the score it ranked by."""
+
+    rank: int
+    score: float
+
+
+class ScoredChunk(StoredChunk):
+    """A Chunk a search found, with its places in the vector and full-text rankings and their RRF.
+
+    `vector.score` is the cosine similarity of the Chunk's Vector to the query's, `full_text.score`
+    Postgres's `ts_rank`; a ranking that did not list the Chunk leaves its place empty. `rrf` sums
+    1 / (60 + rank) over the rankings that list it.
+    """
+
+    rrf: float
+    vector: Placing | None
+    full_text: Placing | None
+
+
+_COLUMNS = """
+    c.id, c.work_id, c.position, c.block, lower(c.span) AS start, upper(c.span) AS "end",
+    c.text, c.sentences, c.heading_path, c.page, c.boxes, c.tokens, c.flags, c.text_origin
 """
+_CHUNKS = "SELECT" + _COLUMNS + "FROM chunks c"
+
+# Hybrid search (design-v1): the nearest Vectors of one model and the English full-text matches,
+# each ranked `depth` deep, fused by Reciprocal Rank Fusion with k=60. Ties go in reading order.
+_SEARCH = (
+    """
+    WITH query AS (
+        -- Any of the text's stems, not all: a question's words are rarely all in one Chunk.
+        -- A tsquery's text quotes each lexeme, so ' & ' in it is only ever the AND operator.
+        SELECT replace(plainto_tsquery('english', %(text)s)::text, ' & ', ' | ')::tsquery AS q
+    ),
+    nearest AS (
+        -- ORDER BY the distance alone, then LIMIT: the shape the HNSW index serves
+        SELECT e.chunk_id, 1 - (e.embedding <=> %(vector)s::vector) AS score
+        FROM chunk_embeddings e
+        WHERE e.work_id = ANY(%(works)s::bigint[]) AND e.model = %(model)s
+        ORDER BY e.embedding <=> %(vector)s::vector
+        LIMIT %(depth)s
+    ),
+    by_vector AS (
+        SELECT n.chunk_id, n.score,
+               row_number() OVER (ORDER BY n.score DESC, c.work_id, c.position) AS rank
+        FROM nearest n JOIN chunks c ON c.id = n.chunk_id
+    ),
+    by_full_text AS (
+        SELECT c.id AS chunk_id, ts_rank(c.text_search, query.q) AS score,
+               row_number() OVER (
+                   ORDER BY ts_rank(c.text_search, query.q) DESC, c.work_id, c.position
+               ) AS rank
+        FROM chunks c CROSS JOIN query
+        WHERE c.work_id = ANY(%(works)s::bigint[]) AND c.text_search @@ query.q
+        ORDER BY rank
+        LIMIT %(depth)s
+    ),
+    fused AS (
+        SELECT coalesce(v.chunk_id, t.chunk_id) AS chunk_id,
+               v.rank AS vector_rank, v.score AS vector_score,
+               t.rank AS full_text_rank, t.score AS full_text_score,
+               coalesce(1 / (60 + v.rank)::float8, 0) + coalesce(1 / (60 + t.rank)::float8, 0)
+                   AS rrf
+        FROM by_vector v FULL JOIN by_full_text t ON t.chunk_id = v.chunk_id
+    )
+    SELECT"""
+    + _COLUMNS
+    + """, f.rrf, f.vector_rank, f.vector_score, f.full_text_rank, f.full_text_score
+    FROM fused f JOIN chunks c ON c.id = f.chunk_id
+    ORDER BY f.rrf DESC, c.work_id, c.position
+    LIMIT %(k)s
+"""
+)
 
 
 def _stored(row: dict[str, Any]) -> StoredChunk:
@@ -42,6 +111,17 @@ def _stored(row: dict[str, Any]) -> StoredChunk:
         work=row.pop("work_id"),
         chunk=Chunk.model_validate(row | {"span": Span(start=start, end=end)}),
     )
+
+
+def _placing(rank: int | None, score: float | None) -> Placing | None:
+    return None if rank is None or score is None else Placing(rank=rank, score=score)
+
+
+def _scored(row: dict[str, Any]) -> ScoredChunk:
+    rrf = row.pop("rrf")
+    vector = _placing(row.pop("vector_rank"), row.pop("vector_score"))
+    full_text = _placing(row.pop("full_text_rank"), row.pop("full_text_score"))
+    return ScoredChunk(**dict(_stored(row)), rrf=rrf, vector=vector, full_text=full_text)
 
 
 class Chunks:
@@ -135,6 +215,36 @@ class Chunks:
                 (work,),
             )
             return [ChunkEmbedding.model_validate(row) for row in rows]
+
+    def search(
+        self,
+        works: Collection[WorkId],
+        model: str,
+        vector: Vector,
+        text: str,
+        *,
+        k: int,
+        depth: int,
+    ) -> list[ScoredChunk]:
+        """The `k` Chunks of `works` best by RRF of two rankings, each `depth` deep.
+
+        One ranks by cosine distance from `vector` among `model`'s Vectors, the other by English
+        full text matching any stem of `text`.
+        """
+        params = {
+            "works": list(works),
+            "model": model,
+            "vector": vector,
+            "text": text,
+            "k": k,
+            "depth": depth,
+        }
+        with self._conn.transaction(), self._conn.cursor(row_factory=dict_row) as cur:
+            # A Scope filter is applied after the HNSW index finds its nearest Vectors; scanning
+            # on until `depth` of them pass keeps a small Scope among many Works from coming back
+            # short. The order may relax slightly; by_vector ranks them strictly again.
+            cur.execute("SET LOCAL hnsw.iterative_scan = relaxed_order")
+            return [_scored(row) for row in cur.execute(_SEARCH, params)]
 
     def _query(self, query: LiteralString, params: tuple[object, ...]) -> list[StoredChunk]:
         with self._conn.cursor(row_factory=dict_row) as cur:

@@ -126,7 +126,13 @@ p.unlinked { color: var(--unlinked); }
   visibility: hidden;
   transition: transform 0.2s, visibility 0.2s;
 }
-.conversation.open { transform: none; visibility: visible; box-shadow: 4px 0 16px rgb(0 0 0 / 12%); }
+/* Visible at once when opening, so its Question box can take focus; hidden after sliding out. */
+.conversation.open {
+  transform: none;
+  visibility: visible;
+  transition: transform 0.2s;
+  box-shadow: 4px 0 16px rgb(0 0 0 / 12%);
+}
 .conversation header { display: flex; align-items: baseline; padding: 0.8rem 1rem 0; }
 .conversation h2 { font-size: 1rem; margin: 0; flex: 1; }
 .drawer-close {
@@ -151,7 +157,9 @@ p.unlinked { color: var(--unlinked); }
   box-shadow: 0 2px 8px rgb(0 0 0 / 12%);
 }
 @media (min-width: 92rem) {
-  main { margin-left: max(22rem, calc(50vw - 24rem)); }
+  /* The reader sits between the sidebar and the Citation panel (26rem plus its padding). */
+  body { padding: 0 28.4rem 0 22rem; }
+  main { margin-left: auto; }
   .conversation { width: 22rem; transform: none; visibility: visible; box-shadow: none; }
   .drawer-toggle, .drawer-close { display: none; }
 }

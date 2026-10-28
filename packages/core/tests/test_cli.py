@@ -1,8 +1,12 @@
+from collections.abc import AsyncIterator, Callable
+
 import psycopg
 import pytest
+from pydantic_ai.messages import ModelMessage
+from pydantic_ai.models.function import AgentInfo, FunctionModel
 from typer.testing import CliRunner
 
-from paperexplorer import chunking, store
+from paperexplorer import asking, chunking, store
 from paperexplorer.cli import StageName, app
 from paperexplorer.config import Settings
 from paperexplorer.embedding import FakeEmbedder, OpenAICompatibleEmbedder
@@ -147,6 +151,62 @@ def test_search_without_text_prints_no_words_of_the_chunks() -> None:
 @pytest.mark.usefixtures("cli_env")
 def test_search_says_when_the_work_is_unknown_and_fails() -> None:
     result = CliRunner().invoke(app, ["search", "NOSUCHKY", "entropy"])
+
+    assert result.exit_code == 1
+    assert "No Work NOSUCHKY" in result.output
+
+
+def _scripted(*responses: str) -> Callable[[Settings], FunctionModel]:
+    """A chat model that answers each request with the next of `responses`."""
+    queue = list(responses)
+
+    async def stream(messages: list[ModelMessage], info: AgentInfo) -> AsyncIterator[str]:
+        yield queue.pop(0)
+
+    return lambda settings: FunctionModel(stream_function=stream, model_name=settings.chat_model)
+
+
+@pytest.mark.usefixtures("embedded_seed")
+def test_ask_streams_the_draft_then_lists_the_answers_pointers_and_quotes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    draft = 'Sample entropy was measured "in every participant". [#1]'
+    monkeypatch.setattr(asking, "chat_model", _scripted(draft))
+
+    result = CliRunner().invoke(app, ["ask", "YAAC9XCX", "How was entropy measured?"])
+
+    assert result.exit_code == 0, result.output
+    lines = result.stdout.splitlines()
+    assert lines[:6] == [
+        '→ search {"query": "How was entropy measured?"}',
+        draft,
+        "",
+        "Answer",
+        'Sample entropy was measured "in every participant".',
+        "",
+    ]
+    assert lines[6] == "Pointers"
+    assert lines[7].split() == ["s1", "close", "0.91", "p4", "2", "Methods", ">", "2.3", "EEG"]
+    assert lines[8].strip() == MEASURED
+    assert lines[9:11] == ["Quotes", '  "in every participant"  exact  p4']
+    assert lines[11].startswith("summary: sentences 1, substantive 1, pointer coverage 1.00,")
+    assert "close 1, weak 0, quotes exact 1, not exact 0, unknown handles 0" in lines[11]
+    assert "model requests 1, tool calls 0, latency " in lines[11]
+
+
+@pytest.mark.usefixtures("embedded_seed")
+def test_ask_marks_a_quote_that_is_not_the_authors_words(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(asking, "chat_model", _scripted('They "measured it twice". [#1]'))
+
+    result = CliRunner().invoke(app, ["ask", "YAAC9XCX", "How was entropy measured?"])
+
+    assert result.exit_code == 0, result.output
+    assert '  "measured it twice"  not exact' in result.stdout.splitlines()
+
+
+@pytest.mark.usefixtures("cli_env")
+def test_ask_says_when_the_work_is_unknown_and_fails() -> None:
+    result = CliRunner().invoke(app, ["ask", "NOSUCHKY", "Why?"])
 
     assert result.exit_code == 1
     assert "No Work NOSUCHKY" in result.output

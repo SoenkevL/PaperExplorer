@@ -1,6 +1,6 @@
 # PaperExplorer
 
-A reading tool for following a paper's citations into the actual words of the works it cites. The reader explores; the tool retrieves, it does not summarise.
+A reading tool for following a paper's citations into the actual words of the works it cites. The reader explores; the tool retrieves. A model may answer the reader's Questions, but only words that match the authors' text exactly are shown as theirs.
 
 ## Works and the library
 
@@ -87,5 +87,31 @@ The set of Works searched for Evidence: the cited Work alone, or every Work in t
 _Avoid_: Filter, mode, whole collection
 
 **Retrieval Run**:
-One recorded search for Evidence: the Citing Sentence, the Scope, the parameters and the ranked Evidence returned.
+One recorded search for Evidence: the Citing Sentence, the Scope, the parameters and the ranked Evidence returned. The searches a model runs to answer a Question are not Retrieval Runs.
 _Avoid_: Query, search
+
+## Asking
+
+**Conversation**:
+The reader's Questions and a model's Answers about one Work, in order.
+_Avoid_: Chat, session, thread
+
+**Question**:
+What the reader asks in a Conversation.
+_Avoid_: Query, prompt
+
+**Answer**:
+A model's reply to a Question; the only text written by a model that PaperExplorer shows.
+_Avoid_: Response, summary
+
+**Pointer**:
+A mark that ties one sentence of an Answer to the place in a Chunk the model read that best bears it out, with its Support.
+_Avoid_: Citation, reference, source, link
+
+**Support**:
+How well a Pointer's place bears out its sentence: close or weak.
+_Avoid_: Confidence (a Citation Link has one), score
+
+**Quote**:
+Words an Answer puts in quotation marks. Exact when they match the authors' text in a Chunk the model read; only an exact Quote is shown as the authors' words.
+_Avoid_: Citation, excerpt

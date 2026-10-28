@@ -13,9 +13,11 @@ from psycopg.rows import TupleRow
 
 from paperexplorer.config import Settings
 from paperexplorer.domain import Attachment, CitationId, LibraryItem, WorkId
+from paperexplorer.embedding import FakeEmbedder
 from paperexplorer.library import InMemoryLibrary
 from paperexplorer.pipeline import STAGES, StageContext, run_stage
 from paperexplorer.store import CitationGraphs, Works
+from paperexplorer.tracing import Tracing
 from paperexplorer_api.app import create_app as create_api
 from paperexplorer_api.client import ApiClient
 from paperexplorer_web.app import create_app as create_web
@@ -42,7 +44,13 @@ def explored(
     library = InMemoryLibrary(
         ITEMS.values(), {i.pdf.key: fixture_pdf(name) for name, i in ITEMS.items() if i.pdf}
     )
-    ctx = StageContext(conn=store_db, settings=recorded_settings, library=library)
+    ctx = StageContext(
+        conn=store_db,
+        settings=recorded_settings,
+        library=library,
+        embedder=FakeEmbedder(),
+        tracing=Tracing.off(),
+    )
     works: dict[str, WorkId] = {}
     for name, item in ITEMS.items():
         works[name] = Works(store_db).ensure(item.key)

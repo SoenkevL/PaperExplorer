@@ -8,9 +8,11 @@ from fastapi.testclient import TestClient
 from psycopg.rows import TupleRow
 
 from paperexplorer.config import Settings
+from paperexplorer.embedding import OpenAICompatibleEmbedder
 from paperexplorer.library import ZoteroLibrary
 from paperexplorer.pipeline import STAGES, StageContext, run_stage
 from paperexplorer.store import Works
+from paperexplorer.tracing import Tracing
 from paperexplorer_api.app import create_app
 from paperexplorer_api.client import ApiClient
 
@@ -25,7 +27,11 @@ def test_the_seed_reaches_the_api_with_its_citations(
     if not settings.zotero_library_id or settings.zotero_api_key is None:
         pytest.skip("PE_ZOTERO_LIBRARY_ID / PE_ZOTERO_API_KEY are not set")
     ctx = StageContext(
-        conn=store_db, settings=settings, library=ZoteroLibrary.from_settings(settings)
+        conn=store_db,
+        settings=settings,
+        library=ZoteroLibrary.from_settings(settings),
+        embedder=OpenAICompatibleEmbedder.from_settings(settings, Tracing.off()),
+        tracing=Tracing.off(),
     )
     work = Works(store_db).ensure(SEED)
 

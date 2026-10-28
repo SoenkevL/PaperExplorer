@@ -1,4 +1,4 @@
-"""The Seed's first Stages: fetch its Library Item, parse its PDF, chunk it, link its Citations."""
+"""The Seed's first Stages: fetch, parse, chunk and embed its text, link its Citations."""
 
 import logging
 from collections import Counter
@@ -55,6 +55,27 @@ def chunk(ctx: StageContext, work: WorkId) -> StageResult:
     Chunks(ctx.conn).replace(work, chunks)
     flags = Counter(f for c in chunks for f in c.flags)
     return StageResult(counts={"chunks": len(chunks)} | {f.value: flags[f] for f in ChunkFlag})
+
+
+def embed(ctx: StageContext, work: WorkId) -> StageResult:
+    """Embed the Work's Chunks that have no Vector from the Embedder's model yet."""
+    chunks = Chunks(ctx.conn)
+    total = len(chunks.for_work(work))
+    if total == 0:
+        raise StageError(f"Work {work} has no Chunks yet; run chunk first")
+    model = ctx.embedder.model
+    missing = chunks.without_embedding(work, model)
+    if not missing:
+        return StageResult(counts={"chunks": total, "embedded": 0})
+    stored = Works(ctx.conn).get(work)
+    key = stored.zotero_key if stored is not None else None
+    tags = ["pipeline"] + ([f"work:{key}"] if key else [])
+    with ctx.tracing.trace(
+        "stage.embed", tags=tags, metadata={"work_id": str(work), "model": model}
+    ):
+        vectors = ctx.embedder.embed([s.chunk.text for s in missing])
+    chunks.record_embeddings(work, model, {s.id: v for s, v in zip(missing, vectors, strict=True)})
+    return StageResult(counts={"chunks": total, "embedded": len(missing)})
 
 
 def extract_citations(ctx: StageContext, work: WorkId) -> StageResult:

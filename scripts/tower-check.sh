@@ -6,11 +6,13 @@
 # Steps:
 #   1. the gate (ruff, pyright, pytest);
 #   2. GROBID from compose.yaml;
-#   3. the tower-only tests;
+#   3. the tower-only tests (Ollama's bge-m3 among them);
 #   4. the Seed through `paperexplorer parse`;
 #   5. the pipeline image with a live GROBID and OCR of the scan fixture;
-#   6. the Seed's Stages (fetch, parse, chunk, extract_citations) on the host and in the pipeline
-#      image; chunk logs its counts of Chunks, short and oversized_sentence;
+#   6. the Seed's Stages (fetch, parse, chunk, embed, extract_citations) on the host and in the
+#      pipeline image, each with its time; chunk logs its counts of Chunks, short and
+#      oversized_sentence, embed how many Chunks it embedded with Ollama's bge-m3 (traced to
+#      Langfuse as stage.embed), and embed run again on the host embeds none;
 #   7. the API and web containers, and the reader: every Citation of the Seed is a link that
 #      opens a panel with its Reference.
 #
@@ -24,7 +26,7 @@ set -uo pipefail
 LOG="tower-check.log"
 SEED_ATTACHMENT="YTS2XCEG"  # the Seed's PDF in Zotero storage
 SEED="YAAC9XCX"             # the Seed's Zotero item
-STAGES=(fetch parse chunk extract_citations)
+STAGES=(fetch parse chunk embed extract_citations)
 RESULTS=()
 
 # step NAME CMD...: runs CMD, logs its output, status and time, and carries on either way.
@@ -111,6 +113,9 @@ main() {
   for stage in "${STAGES[@]}"; do
     step "run $stage (host)" uv run paperexplorer run "$stage" "$SEED"
   done
+  # Every Chunk has its Vector now, so a second run embeds none (and makes extract_citations
+  # pending, which the pipeline image runs again below).
+  step "run embed again (host)" uv run paperexplorer run embed "$SEED"
   for stage in "${STAGES[@]}"; do
     step "pipeline: run $stage" "${run[@]}" pipeline run "$stage" "$SEED"
   done

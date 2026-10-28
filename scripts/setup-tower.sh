@@ -186,7 +186,7 @@ finish() {
 # ──────────────────────────────────────────────────────────────────────────
 
 cd "$(dirname "$0")/.."
-TOTAL_STAGES=9
+TOTAL_STAGES=10
 TOWER="${TOWER:-tower}"
 SEED_ITEM_KEY="YAAC9XCX"
 EMBED_MODEL="bge-m3"
@@ -396,11 +396,53 @@ tw "cd $REMOTE_DIR && docker compose run --rm pipeline version" | sed 's/^/  pip
 pause
 
 # ── 8 ─────────────────────────────────────────────────────────────────────
+stage "Langfuse: a trace of every model call"
+say "Langfuse runs beside the stack (compose.langfuse.yaml); Langfuse Cloud (EU) is the fallback."
+say "One key pair serves both, so the two differ only by URL: create a project on Langfuse Cloud"
+say "and paste its keys here. Leave them empty to start with tower-only keys and add the cloud's later."
+open_url "https://cloud.langfuse.com"
+ask PE_LANGFUSE_PUBLIC_KEY "Langfuse public key (pk-lf-…; Enter alone for tower-only keys):"
+if [[ -n "$PE_LANGFUSE_PUBLIC_KEY" ]]; then
+  ask_secret PE_LANGFUSE_SECRET_KEY "Langfuse secret key (sk-lf-…):"
+else
+  PE_LANGFUSE_PUBLIC_KEY="pk-lf-$(uuidgen | tr 'A-Z' 'a-z')"
+  PE_LANGFUSE_SECRET_KEY="sk-lf-$(uuidgen | tr 'A-Z' 'a-z')"
+  note "generated tower-only keys; re-run this stage with the cloud project's keys for the fallback"
+fi
+tower_env PE_LANGFUSE_PUBLIC_KEY "$PE_LANGFUSE_PUBLIC_KEY"
+tower_env PE_LANGFUSE_SECRET_KEY "$PE_LANGFUSE_SECRET_KEY"
+tower_env PE_LANGFUSE_BASE_URL "http://localhost:3000"
+tower_env PE_LANGFUSE_ENVIRONMENT tower
+tower_env LANGFUSE_NEXTAUTH_URL "http://$TOWER_HOST:3000"
+for secret in NEXTAUTH_SECRET SALT ENCRYPTION_KEY POSTGRES_PASSWORD CLICKHOUSE_PASSWORD REDIS_PASSWORD MINIO_PASSWORD; do
+  # Generated once: changing them later locks Langfuse out of its own data.
+  tw "cd $REMOTE_DIR && grep -q '^LANGFUSE_$secret=.' .env" || tower_env "LANGFUSE_$secret" "$(openssl rand -hex 32)"
+done
+write_env PE_LANGFUSE_PUBLIC_KEY "$PE_LANGFUSE_PUBLIC_KEY"
+write_env PE_LANGFUSE_SECRET_KEY "$PE_LANGFUSE_SECRET_KEY"
+write_env PE_LANGFUSE_BASE_URL "http://$TOWER_HOST:3000"
+say "Starting Langfuse on the tower (the first pull takes a few minutes)…"
+twt "cd $REMOTE_DIR && docker compose -f compose.langfuse.yaml up -d --wait"
+tw "cd $REMOTE_DIR && uv run --quiet paperexplorer trace-check" | sed 's/^/  /' \
+  && ok "a trace reached the tower's Langfuse" || { warn "trace-check failed"; SKIPPED+=("Langfuse trace-check"); }
+say "Traces are kept until they hold 6 GB on disk (PE_LANGFUSE_TRACE_CAP_GB); then a job deletes the oldest."
+if confirm "Run that job every six hours from $(tw whoami)'s crontab on the tower?"; then
+  job="17 */6 * * * cd \$HOME/$REMOTE_DIR && mkdir -p data && \$HOME/.local/bin/uv run --quiet python scripts/langfuse_prune.py >> data/langfuse-prune.log 2>&1"
+  tw "(crontab -l 2>/dev/null | grep -v langfuse_prune.py; echo '$job') | crontab -" && ok "pruning job installed"
+else
+  SKIPPED+=("Langfuse pruning job (crontab)")
+fi
+step "Open http://$TOWER_HOST:3000 and sign up: the first account owns the PaperExplorer project."
+step "Then set LANGFUSE_DISABLE_SIGNUP=true in the tower's .env and run docker compose -f compose.langfuse.yaml up -d."
+open_url "http://$TOWER_HOST:3000"
+pause
+
+# ── 9 ─────────────────────────────────────────────────────────────────────
 stage "Python environment and tests on the tower"
 twt "cd $REMOTE_DIR && uv sync && uv run pre-commit install && uv run pytest -q -rs"
 pause
 
-# ── 9 ─────────────────────────────────────────────────────────────────────
+# ── 10 ────────────────────────────────────────────────────────────────────
 stage "VS Code Remote-SSH from the Mac"
 if command -v code >/dev/null 2>&1; then
   code --install-extension ms-vscode-remote.remote-ssh >/dev/null && ok "Remote-SSH extension installed"

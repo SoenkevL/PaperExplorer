@@ -41,3 +41,13 @@ def test_run_rejects_an_unknown_stage() -> None:
 
 def test_run_takes_every_stage_of_the_chain() -> None:
     assert [s.value for s in StageName] == list(STAGES)
+
+
+def test_trace_check_says_tracing_is_off_without_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PE_LANGFUSE_PUBLIC_KEY", "")
+    monkeypatch.setenv("PE_LANGFUSE_SECRET_KEY", "")
+
+    result = CliRunner().invoke(app, ["trace-check"])
+
+    assert result.exit_code == 1
+    assert "Tracing is off" in result.output

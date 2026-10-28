@@ -46,11 +46,12 @@ Before resolution and Sources, the reader can ask the Seed Questions in a sideba
 As `design-v1.md`: paragraph Chunks of at most 400 bge-m3 tokens, HNSW plus English full-text search, RRF with k=60, both scores kept. No reranker; one may come later as an experiment measured against the eval.
 
 ## Tracing
-- Langfuse v4, self-hosted on the tower in `compose.langfuse.yaml`, memory-capped at about 6 GB of RAM.
-- Traces are kept until their store on disk reaches 6 GB, or until someone deletes them; there is no time-based retention. Langfuse's own retention counts days, so a pruning job of ours (`scripts/langfuse_prune.py` on a tower timer) deletes the oldest traces through the Public API once the cap is reached. ClickHouse frees space only after its merges, so the job deletes in steps and checks again on its next run.
-- Langfuse Cloud (EU) is the fallback. Each process picks its host once at start, the tower if its health endpoint answers, and logs a WARNING when it falls back; switching is only a URL.
-- There is no live sync. `scripts/sync_langfuse.py`, adapted from Langfuse's data-migration cookbook, copies a time window of cloud traces to the tower when run by hand.
-- The Langfuse SDK with pydantic-ai's OpenTelemetry instrumentation. Settings `PE_LANGFUSE_*`; tracing is off when they are unset and never blocks an Answer.
+- Langfuse v4, self-hosted on the tower in `compose.langfuse.yaml`, memory-capped at about 6 GB of RAM (about 1.4 GB idle).
+- Traces are kept until their store on disk reaches 6 GB (`PE_LANGFUSE_TRACE_CAP_GB`), or until someone deletes them; there is no time-based retention. Langfuse's own retention counts days, so a pruning job of ours (`scripts/langfuse_prune.py`, every six hours from the tower's crontab) measures what ClickHouse and MinIO hold on disk and, over the cap, deletes the oldest tenth of the traces through the Public API. ClickHouse frees space only after its merges, so the next run measures again before deleting more. ClickHouse's diagnostic logs are off and its `query_log`, which Langfuse reads, keeps 7 days, so the cap counts traces.
+- Langfuse Cloud (EU) is the fallback. Each process picks its host once at start, the tower if its health endpoint answers within 2 s, and logs a WARNING when it falls back. One key pair serves both: the tower's project is initialised with the cloud project's keys, so switching is only a URL.
+- There is no live sync. `scripts/sync_langfuse.py`, adapted from Langfuse's data-migration cookbook, copies a time window of cloud traces to the tower when run by hand. A copy keeps trace and observation IDs, times to the microsecond, nesting, input, output, metadata, model, usage and cost, and each trace's name, session, tags, environment and release; scores keep their IDs and times. Only the metadata key `scope.name` changes, to `langfuse-sdk`. Copying a window twice is safe.
+- The Langfuse Python SDK v5 (it needs Langfuse ≥ 4.59) with pydantic-ai's OpenTelemetry instrumentation, handed the tracer provider of `tracing`. Settings `PE_LANGFUSE_*`; tracing is off when the keys are unset and never blocks an Answer. `paperexplorer trace-check` sends one trace and says where it went.
+- The scripts use only Langfuse v4's APIs (Observations v2, Scores v3, OTLP ingestion): Langfuse Cloud removes the v3 endpoints on 2026-11-16.
 - Trace shape: `architecture.md`.
 
 ## Eval
@@ -72,6 +73,7 @@ As `design-v1.md`: paragraph Chunks of at most 400 bge-m3 tokens, HNSW plus Engl
 - The chat model loads in 15 s and reads a prompt at about 1,500 tokens/s: the whole body in context costs about 12 s before the first token.
 - 72k context fits fully on the GPU beside bge-m3 (above). When bge-m3 was loaded first, loading the chat model evicted it once; it reloads on the next embedding call.
 - 703 GB free on the tower's root disk, where Docker keeps its volumes.
+- Langfuse 4.71.0 idles at about 1.4 GB of RAM (web 0.7, worker 0.35, ClickHouse 0.2 GB).
 
 ## Still to check while building
-- What the cookbook's copy keeps: trace IDs, scores, sessions.
+- The release on traces from the compose containers: they have no git, so `PE_LANGFUSE_RELEASE` must reach them when the API starts tracing.

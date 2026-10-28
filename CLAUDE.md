@@ -36,4 +36,4 @@ A reader for following a paper's citations into the cited Works' own words. Text
 ## Machines
 
 - Mac: editing, Claude Code, the full test suite.
-- Tower (pop-os, 4060 Ti): `compose.yaml` services (Postgres, API, web); Ollama and Zotero desktop run natively. Code is edited there through VS Code Remote-SSH (`ssh tower`). Postgres is reached only through an SSH tunnel.
+- Tower (pop-os, 4060 Ti): `compose.yaml` services (Postgres, API, web) and Langfuse (`compose.langfuse.yaml`, UI on port 3000); Ollama and Zotero desktop run natively. Code is edited there through VS Code Remote-SSH (`ssh tower`). Postgres is reached only through an SSH tunnel.

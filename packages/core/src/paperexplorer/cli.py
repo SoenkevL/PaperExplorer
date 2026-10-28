@@ -12,6 +12,7 @@ from paperexplorer.citations import ConfidenceLevel, confidence_level
 from paperexplorer.config import Settings
 from paperexplorer.library import ZoteroLibrary
 from paperexplorer.logs import configure_logging
+from paperexplorer.tracing import configure_tracing
 
 app = typer.Typer(no_args_is_help=True, help="Follow a paper's citations into its sources.")
 
@@ -57,6 +58,19 @@ def parse_command(
         typer.echo(
             f"  p{work.blocks[c.block].page} {state}: {c.text!r} in {c.citing_sentence[:80]!r}"
         )
+
+
+@app.command("trace-check")
+def trace_check_command() -> None:
+    """Send one trace to Langfuse and say where it went: the tower, or the cloud fallback."""
+    tracing = configure_tracing(Settings())
+    if tracing.base_url is None:
+        typer.echo("Tracing is off: set PE_LANGFUSE_PUBLIC_KEY and PE_LANGFUSE_SECRET_KEY.")
+        raise typer.Exit(1)
+    with tracing.trace("trace-check", tags=["check"]) as trace_id:
+        pass
+    tracing.flush()
+    typer.echo(f"Sent trace {trace_id} to {tracing.base_url}")
 
 
 @app.command("migrate")

@@ -47,3 +47,4 @@ Key decisions, newest last. Hard-to-reverse ones link to an ADR.
 - 2026-10-28 — Conversations live in the API's memory for now; Postgres with login later
 - 2026-10-28 — Langfuse v4 self-hosted on the tower, Langfuse Cloud as per-process fallback, a hand-run copy script instead of a sync; one trace per Question, `session_id` = Conversation; traces kept until 6 GB on disk (oldest pruned first) or deleted by hand, no time-based retention
 - 2026-10-28 — Eval: about 20 Questions judged by Claude; bar hit@8 ≥ 0.8, Pointer coverage ≥ 0.8, ≥ 80% grounded and correct
+- 2026-10-24 — GROBID's Citation Link is no evidence when the entry's first author is none of the surnames the marker prints: a wrong link is worse than an Unlinked Citation. An entry printed without a year (the Seed's Carhart-Harris OSF preprint) stays unmatched for now

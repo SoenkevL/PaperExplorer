@@ -1,6 +1,7 @@
 """Typed HTTP client for the API; the web app's only way to reach data."""
 
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, Protocol
 
 import httpx
 from pydantic import TypeAdapter
@@ -10,6 +11,27 @@ from paperexplorer_api.schemas import CitationDetail, Health, WorkSummary, WorkT
 _WORK_SUMMARIES = TypeAdapter(list[WorkSummary])
 
 
+class _Response(Protocol):
+    @property
+    def status_code(self) -> int: ...
+    @property
+    def headers(self) -> Mapping[str, str]: ...
+    def json(self, **kwargs: Any) -> Any: ...
+    def raise_for_status(self) -> object: ...
+
+
+class HttpClient(Protocol):
+    """What `ApiClient` needs of an HTTP client: an `httpx.Client`, or Starlette's `TestClient`.
+
+    Starlette's `TestClient` is an `httpx2.Client` once httpx2 is installed (pydantic-ai brings
+    it), so the client is typed by what it does rather than by its class.
+    """
+
+    def get(self, url: str) -> _Response:
+        """GET `url`, relative to the client's base URL."""
+        ...
+
+
 class NotFoundError(LookupError):
     """The API has no such Work or Citation (HTTP 404)."""
 
@@ -17,7 +39,7 @@ class NotFoundError(LookupError):
 class ApiClient:
     """Thin typed wrapper over the API's JSON endpoints."""
 
-    def __init__(self, http: httpx.Client) -> None:
+    def __init__(self, http: HttpClient) -> None:
         self._http = http
 
     @classmethod

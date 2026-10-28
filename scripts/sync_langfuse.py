@@ -31,6 +31,9 @@ from opentelemetry.trace import NonRecordingSpan, SpanContext, TraceFlags
 from paperexplorer.config import Settings
 
 FIELDS = "core,basic,time,io,metadata,model,usage,prompt,trace_context"
+# Langfuse files the raw attributes of spans from other scopes under metadata; copies sent under
+# the SDK's own scope keep the metadata the source observation had.
+SCOPE = "langfuse-sdk"
 
 
 class SourceIds(IdGenerator):
@@ -101,7 +104,7 @@ def attributes(o: ObservationV2) -> dict[str, Any]:
     if isinstance(o.metadata, dict):
         for key, value in o.metadata.items():  # pyright: ignore[reportUnknownVariableType]
             values[f"langfuse.observation.metadata.{key}"] = text(value)
-    return {k: v for k, v in values.items() if v is not None}
+    return {k: v for k, v in values.items() if v not in (None, "", "{}", "[]")}
 
 
 def otlp_provider(dest_url: str, public_key: str, secret: str) -> tuple[TracerProvider, SourceIds]:
@@ -213,7 +216,7 @@ def main() -> int:
     dest = LangfuseAPI(base_url=dest_url, username=public_key, password=secret)
 
     provider, ids = otlp_provider(dest_url, public_key, secret)
-    tracer = provider.get_tracer("paperexplorer.sync_langfuse")
+    tracer = provider.get_tracer(SCOPE)
 
     roots = pages(
         lambda cursor: source.observations.get_many(

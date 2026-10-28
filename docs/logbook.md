@@ -48,3 +48,6 @@ Key decisions, newest last. Hard-to-reverse ones link to an ADR.
 - 2026-10-28 — Langfuse v4 self-hosted on the tower, Langfuse Cloud as per-process fallback, a hand-run copy script instead of a sync; one trace per Question, `session_id` = Conversation; traces kept until 6 GB on disk (oldest pruned first) or deleted by hand, no time-based retention
 - 2026-10-28 — Eval: about 20 Questions judged by Claude; bar hit@8 ≥ 0.8, Pointer coverage ≥ 0.8, ≥ 80% grounded and correct
 - 2026-10-24 — GROBID's Citation Link is no evidence when the entry's first author is none of the surnames the marker prints: a wrong link is worse than an Unlinked Citation. An entry printed without a year (the Seed's Carhart-Harris OSF preprint) stays unmatched for now
+- 2026-10-28 — One Langfuse key pair for tower and cloud: the tower's project is initialised with the cloud project's keys, so the fallback is only a URL
+- 2026-10-28 — Trace pruning: every six hours, over 6 GB of ClickHouse and MinIO on disk, delete the oldest tenth of traces; ClickHouse's diagnostic logs off, `query_log` 7 days
+- 2026-10-28 — Langfuse Python SDK v5 on its own tracer provider (never the global one); scripts use only v4's APIs, since Langfuse Cloud drops the v3 endpoints on 2026-11-16

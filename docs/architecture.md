@@ -30,7 +30,7 @@ Each row is one module with a small interface. Internals (caches, tokenizer, reg
 | `store` | repositories per aggregate (`Works`, `WorkTexts`, `CitationGraphs`, `StageStatuses`) + `migrate()` | Postgres + pgvector (local-substitutable) | real pgvector via testcontainers |
 | `retrieval` | `search(text, scope, k) -> list[ScoredChunk]` (hybrid RRF); `find_evidence(citation, scope) -> RetrievalRun` on top of it | store + embedder | store + `FakeEmbedder` |
 | `asking` | `ask(conversation, question) -> AsyncIterator[AnswerEvent]`: a pydantic-ai agent over the Seed's map and retrieval tools, then Pointer and Quote resolution (ADR 0008, 0009, `design-asking.md`) | chat model (OpenAI-compatible) + store + embedder | `FunctionModel` + real Postgres + `FakeEmbedder` |
-| `tracing` | `configure_tracing(settings)` and the trace helpers every model call runs inside (see Tracing) | Langfuse (tower, cloud fallback) | in-memory span exporter |
+| `tracing` | `configure_tracing(settings) -> Tracing`: the tower's Langfuse, else the cloud; `Tracing.trace(name, tags, session_id, metadata)` opens the trace every model call runs inside, `Tracing.tracer_provider` goes to pydantic-ai; `retention.prune` keeps the tower's store under its disk cap (see Tracing) | Langfuse (tower, cloud fallback) | in-memory span exporter; Public API over `httpx.MockTransport` |
 | `catalog` | `ensure_work(resolution, exploration) -> LibraryItemRef` (dedupe: works table → Library search → create) | store + library | store + `InMemoryLibrary` |
 | `pipeline` | `run_stage(ctx, name, work) -> StageResult` over `STAGES`; later `explore(seed_key, …) -> ExplorationReport` | everything, injected via `StageContext` | real Postgres, `InMemoryLibrary`, recorded GROBID |
 | `config`, `logs` | `Settings` (pydantic-settings), `configure_logging(settings)` | in-process | — |
@@ -52,7 +52,7 @@ PaperExplorer/
 ├── tests/e2e/     cross-package tests
 ├── tests/fixtures/  open-access PDFs + cassettes
 ├── data/          gitignored: cache/pdfs, cache/parsed (top-level, never in packages)
-├── scripts/       setup wizard
+├── scripts/       setup wizards, tower checks, Langfuse pruning and copy
 └── docs/          adr/, logbook.md, design-v1.md, design-asking.md, architecture.md
 ```
 
@@ -94,6 +94,7 @@ Every model call, chat and embedding alike, runs inside a Langfuse trace and nev
 - **Scores on the trace,** sortable and filterable: Pointer coverage, counts per Support, exact and not-exact Quotes, tool calls, model requests, latency. Eval runs add `judge.grounded` and `judge.correct`.
 - **Stages:** `embed` traces as `stage.embed`, tagged `pipeline` and `work:<key>`, with one embedding observation per batch.
 - **Environment** is `development` (Mac), `tower` or `eval`; eval runs keep the name `question`, so live and eval traces compare directly. The release is the git SHA.
+- `tracing` builds its own OpenTelemetry tracer provider, never the global one, with environment and release on its resource; instrumentation reaches Langfuse only when handed that provider.
 
 ## Testing
 

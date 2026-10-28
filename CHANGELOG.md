@@ -5,6 +5,9 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 ## [Unreleased]
 
 ### Added
+- Tracing: `tracing.configure_tracing` sends traces to the tower's Langfuse, or to Langfuse Cloud when the tower does not answer; `Tracing.trace` opens a trace whose name, session, tags and metadata reach every model call inside it. `paperexplorer trace-check` sends one and says where it went.
+- `compose.langfuse.yaml`: Langfuse v4.71.0 on the tower, about 6 GB of RAM, its project initialised with the `PE_LANGFUSE_*` keys; the tower wizard sets it up as stage 8.
+- `scripts/langfuse_prune.py` keeps the tower's traces under 6 GB on disk, oldest first; `scripts/sync_langfuse.py` copies a time window of traces and scores from Langfuse Cloud to the tower.
 - Design for asking the Seed Questions: `docs/design-asking.md`, ADR 0008 (a model may answer; words count as the authors' only when they match exactly), ADR 0009 (pydantic-ai), the Conversation terms in `CONTEXT.md`, and point 6 of v1's definition of done.
 - Repo skeleton: uv workspace with `core`, `api` and `web` packages; ruff, pyright strict, pytest, pre-commit.
 - Settings (`PE_*` env), logging setup (text/JSON), `paperexplorer` CLI with `version`.

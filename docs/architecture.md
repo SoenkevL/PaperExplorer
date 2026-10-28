@@ -20,14 +20,14 @@ Each row is one module with a small interface. Internals (caches, tokenizer, reg
 
 | Module | Interface (sketch) | Dependency kind | Test through |
 |---|---|---|---|
-| `domain` | pydantic models: Work, WorkId, CitationId, LibraryItem, Attachment (later: Chunk, Evidence, Scope, RetrievalRun, TextAvailability, Conversation, Question, Answer, Pointer, Quote); Reference stays in `parsing`, Citation in `citations` | in-process | — |
+| `domain` | pydantic models: Work, WorkId, CitationId, ChunkId, LibraryItem, Attachment, Chunk, ChunkFlag (later: Evidence, Scope, RetrievalRun, TextAvailability, Conversation, Question, Answer, Pointer, Quote); Reference stays in `parsing`, Citation in `citations` | in-process | — |
 | `parsing` | `parse(pdf, settings) -> ParsedWork`: GROBID finds the structure, pdfium reads the printed text and PDF link targets, LiteParse OCR reads scans (ADR 0006) | GROBID (external service, output cached by PDF hash) + local libs | fixture PDFs + recorded GROBID output; one live GROBID check |
 | `citations` | `extract(doc: ParsedWork) -> CitationGraph`: Citation Links weighed from PDF link, GROBID and rules; Citing Sentences | in-process | parsed fixtures and hand-built `ParsedWork`s |
-| `chunking` | `chunk(doc: ParsedWork) -> list[Chunk]` | in-process (tokenizer internal) | fixture `ParsedWork`s |
+| `chunking` | `chunk(doc: ParsedWork) -> list[Chunk]`: paragraphs and footnotes into Chunks of at most 400 bge-m3 tokens, split at sentence borders (`parsing.sentence_spans`); a Chunk's span and sentences are code-point offsets into its block's text | in-process (bge-m3 tokenizer internal, shipped xz-compressed in the package) | fixture `ParsedWork`s and hand-built blocks |
 | `resolution` | `resolve(ref: Reference) -> Resolution` | true external (Crossref, OpenAlex, arXiv, GROBID) | hand-written cases + regression cassettes (see Testing) |
 | `library` | port `Library`: `item(key)`, `pdf(attachment)` so far (later: find, ensure collection, create, tag, attach); `ZoteroLibrary` reads the Web API with httpx | true external (Zotero) | `InMemoryLibrary` adapter; Zotero adapter over hand-written Web API JSON |
 | `embedding` | port `Embedder.embed(texts) -> list[Vector]` | true external (OpenAI-compatible) | `FakeEmbedder` adapter |
-| `store` | repositories per aggregate (`Works`, `WorkTexts`, `CitationGraphs`, `StageStatuses`) + `migrate()` | Postgres + pgvector (local-substitutable) | real pgvector via testcontainers |
+| `store` | repositories per aggregate (`Works`, `WorkTexts`, `Chunks`, `CitationGraphs`, `StageStatuses`) + `migrate()`; `Chunks` reads a Work's Chunks in reading order, by id, `around` one (its neighbours) and `under` a Heading Path | Postgres + pgvector (local-substitutable) | real pgvector via testcontainers |
 | `retrieval` | `search(text, scope, k) -> list[ScoredChunk]` (hybrid RRF); `find_evidence(citation, scope) -> RetrievalRun` on top of it | store + embedder | store + `FakeEmbedder` |
 | `asking` | `ask(conversation, question) -> AsyncIterator[AnswerEvent]`: a pydantic-ai agent over the Seed's map and retrieval tools, then Pointer and Quote resolution (ADR 0008, 0009, `design-asking.md`) | chat model (OpenAI-compatible) + store + embedder | `FunctionModel` + real Postgres + `FakeEmbedder` |
 | `tracing` | `configure_tracing(settings) -> Tracing`: the tower's Langfuse, else the cloud; `Tracing.trace(name, tags, session_id, metadata)` opens the trace every model call runs inside, `Tracing.tracer_provider` goes to pydantic-ai; `retention.prune` keeps the tower's store under its disk cap (see Tracing) | Langfuse (tower, cloud fallback) | in-memory span exporter; Public API over `httpx.MockTransport` |
@@ -62,8 +62,8 @@ PaperExplorer/
 
 - `StageContext` holds the store connection, the settings and the `Library`; `StageResult` holds counts.
 - `run_stage` records `running`, runs the Stage in one transaction, then records `done` with its counts, or `failed` with its error and none of its writes kept.
-- A Stage that succeeds makes every later Stage pending for that Work, since what they read has changed (a re-parse cascades the old Citations away).
-- Built so far: `fetch → parse → extract_citations`. The CLI names a Work by its Zotero key (ADR 0007).
+- A Stage that succeeds makes every later Stage pending for that Work, since what they read has changed (a re-parse cascades the old Chunks and Citations away).
+- Built so far: `fetch → parse → chunk → extract_citations`. The CLI names a Work by its Zotero key (ADR 0007).
 
 ```
 Seed:    fetch → parse → chunk → embed → extract_citations → resolve → catalog

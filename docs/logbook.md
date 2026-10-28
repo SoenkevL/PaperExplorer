@@ -51,3 +51,9 @@ Key decisions, newest last. Hard-to-reverse ones link to an ADR.
 - 2026-10-28 — One Langfuse key pair for tower and cloud: the tower's project is initialised with the cloud project's keys, so the fallback is only a URL
 - 2026-10-28 — Trace pruning: every six hours, over 6 GB of ClickHouse and MinIO on disk, delete the oldest tenth of traces; ClickHouse's diagnostic logs off, `query_log` 7 days
 - 2026-10-28 — Langfuse Python SDK v5 on its own tracer provider (never the global one); scripts use only v4's APIs, since Langfuse Cloud drops the v3 endpoints on 2026-11-16
+- 2026-10-28 — Footnotes are chunked like paragraphs: they are the authors' words and the reader shows them. Headings are not Chunks; they give the Heading Path. A page footer GROBID files as a note becomes a `short` Chunk
+- 2026-10-28 — Chunks split at GROBID's sentence spans; pysbd is not needed: a scan falls back to the end-punctuation rule its Citing Sentences already use (`parsing.sentence_spans`). Where GROBID's spans overlap (accents set apart from their letters), a sentence starts where the one before it ends
+- 2026-10-28 — The bge-m3 tokenizer (`tokenizer.json`, MIT, pinned revision) ships xz-compressed inside `chunking` (2.4 MB), so tests, the Mac and the containers count tokens offline with no download step
+- 2026-10-28 — `tokenizers` stays below 0.23: its huggingface-hub 2 brings httpx2, which turns Starlette's TestClient into an httpx2 client that the API's typed client (httpx) does not accept
+- 2026-10-28 — A Chunk's span and sentences are code-point offsets into its block's text, so a Pointer's place is a Chunk sentence as stored. Its page and boxes are the block's: parse keeps no boxes per sentence
+- 2026-10-28 — `short` marks every Chunk under 30 tokens, including a piece beside an oversized sentence; windows are balanced by the smallest sum of squared sizes; `chunk(doc)` stays pure, so a Chunk's Work comes with `StoredChunk`

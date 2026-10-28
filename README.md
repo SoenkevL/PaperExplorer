@@ -32,7 +32,7 @@ cp .env.example .env        # fill in secrets
 ollama pull bge-m3          # Ollama runs natively on the tower
 docker compose up -d        # db, grobid :8070, api :8000, web :8080
 docker compose run --rm pipeline migrate
-for stage in fetch parse extract_citations; do
+for stage in fetch parse chunk extract_citations; do
   docker compose run --rm pipeline run "$stage" YAAC9XCX   # the Seed's Zotero item key
 done
 ```

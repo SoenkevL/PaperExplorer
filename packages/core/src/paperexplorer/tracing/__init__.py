@@ -8,10 +8,10 @@ import logging
 import subprocess
 from collections.abc import Generator, Mapping, Sequence
 from contextlib import contextmanager
-from typing import Self
+from typing import Literal, Self
 
 import httpx
-from langfuse import Langfuse, LangfuseEmbedding, propagate_attributes
+from langfuse import Langfuse, LangfuseEmbedding, LangfuseSpan, LangfuseTool, propagate_attributes
 from opentelemetry import trace as otel_trace
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
@@ -30,7 +30,9 @@ HEALTH_TIMEOUT_S = 2.0
 class Observation:
     """An observation being recorded; `update` adds what it produced. Without one, a no-op."""
 
-    def __init__(self, observation: LangfuseEmbedding | None = None) -> None:
+    def __init__(
+        self, observation: LangfuseEmbedding | LangfuseSpan | LangfuseTool | None = None
+    ) -> None:
         self._observation = observation
 
     def update(self, *, output: object = None, usage: Mapping[str, int] | None = None) -> None:
@@ -98,7 +100,7 @@ class Tracing:
         An embedding call never opens a trace of its own: its caller's trace (`question`,
         `stage.embed`) is how it is found.
         """
-        if self._langfuse is None or not otel_trace.get_current_span().get_span_context().is_valid:
+        if self._langfuse is None or not _in_trace():
             yield _NOT_RECORDED
             return
         with self._langfuse.start_as_current_observation(
@@ -106,10 +108,39 @@ class Tracing:
         ) as observation:
             yield Observation(observation)
 
+    @contextmanager
+    def span(
+        self, name: str, *, as_type: Literal["span", "tool"] = "span", input: object = None
+    ) -> Generator[Observation]:
+        """Record a step of our own (a tool run, the Answer's resolution) under the current trace.
+
+        Like an embedding call, it records nothing outside a trace or with tracing off.
+        """
+        if self._langfuse is None or not _in_trace():
+            yield _NOT_RECORDED
+            return
+        with self._langfuse.start_as_current_observation(
+            name=name, as_type=as_type, input=input
+        ) as observation:
+            yield Observation(observation)
+
+    def score(self, name: str, value: float) -> None:
+        """Score the current trace; outside a trace, or off, nothing. A failure is only logged."""
+        if self._langfuse is None or not _in_trace():
+            return
+        try:
+            self._langfuse.score_current_trace(name=name, value=value)
+        except Exception:
+            logger.warning("Could not score the trace with %s", name, exc_info=True)
+
     def flush(self) -> None:
         """Send every finished observation now; short-lived processes call this before exit."""
         if self._langfuse is not None:
             self._langfuse.flush()
+
+
+def _in_trace() -> bool:
+    return otel_trace.get_current_span().get_span_context().is_valid
 
 
 def configure_tracing(
@@ -118,7 +149,11 @@ def configure_tracing(
     http: httpx.Client | None = None,
     span_exporter: SpanExporter | None = None,
 ) -> Tracing:
-    """Pick the tower's Langfuse, or the cloud when the tower does not answer; once per process."""
+    """Pick the tower's Langfuse, or the cloud when the tower does not answer; once per process.
+
+    `http`, when given, also carries Langfuse's own requests (scores); spans go to
+    `span_exporter`, when given, instead of Langfuse's OTLP endpoint.
+    """
     public_key, secret_key = settings.langfuse_public_key, settings.langfuse_secret_key
     if public_key is None or secret_key is None:
         logger.info("Tracing is off: PE_LANGFUSE_PUBLIC_KEY and PE_LANGFUSE_SECRET_KEY are unset")
@@ -143,6 +178,7 @@ def configure_tracing(
         release=release,
         tracer_provider=tracer_provider,
         span_exporter=span_exporter,
+        httpx_client=http,
     )
     logger.info("Tracing to %s as %s", base_url, environment)
     return Tracing(langfuse, tracer_provider, base_url)

@@ -332,6 +332,7 @@ def test_a_quote_counts_as_exact_in_any_chunk_read_this_turn_whatever_its_handle
         "They write “entropy was computed from each EEG recording” [#1].",  # not as printed
         "They write “Entropy was compute” [#1].",  # inside a longer word
         "They write “Psilocybin was given at noon” [#3].",  # a Chunk not read this turn
+        "They write “\u00ad” [#1].",  # nothing left to match once folded
     ],
 )
 def test_a_quote_without_the_authors_exact_words_in_a_chunk_read_this_turn_is_not_exact(

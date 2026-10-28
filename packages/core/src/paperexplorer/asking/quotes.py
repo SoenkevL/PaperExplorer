@@ -59,7 +59,10 @@ def _exact(
     folded: Mapping[ChunkId, tuple[str, list[int]]],
 ) -> Quote | None:
     """The exact Quote of `text[start:end]` at its first place in the Chunks, if any has it."""
-    pattern = _bounded(_fold(text[start:end])[0])
+    words, _ = _fold(text[start:end])
+    if not words:
+        return None
+    pattern = _bounded(words)
     for chunk in read:
         chunk_text, where = folded[chunk.id]
         m = re.search(pattern, chunk_text)

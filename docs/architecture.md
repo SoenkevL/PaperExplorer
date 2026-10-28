@@ -20,15 +20,15 @@ Each row is one module with a small interface. Internals (caches, tokenizer, reg
 
 | Module | Interface (sketch) | Dependency kind | Test through |
 |---|---|---|---|
-| `domain` | pydantic models: Work, WorkId, CitationId, ChunkId, LibraryItem, Attachment, Chunk, ChunkFlag, Vector (later: Evidence, Scope, RetrievalRun, TextAvailability, Conversation, Question, Answer, Pointer, Quote); Reference stays in `parsing`, Citation in `citations` | in-process | — |
+| `domain` | pydantic models: Work, WorkId, CitationId, ChunkId, LibraryItem, Attachment, Chunk, ChunkFlag, Vector, Scope (later: Evidence, RetrievalRun, TextAvailability, Conversation, Question, Answer, Pointer, Quote); Reference stays in `parsing`, Citation in `citations` | in-process | — |
 | `parsing` | `parse(pdf, settings) -> ParsedWork`: GROBID finds the structure, pdfium reads the printed text and PDF link targets, LiteParse OCR reads scans (ADR 0006) | GROBID (external service, output cached by PDF hash) + local libs | fixture PDFs + recorded GROBID output; one live GROBID check |
 | `citations` | `extract(doc: ParsedWork) -> CitationGraph`: Citation Links weighed from PDF link, GROBID and rules; Citing Sentences | in-process | parsed fixtures and hand-built `ParsedWork`s |
 | `chunking` | `chunk(doc: ParsedWork) -> list[Chunk]`: paragraphs and footnotes into Chunks of at most 400 bge-m3 tokens, split at sentence borders (`parsing.sentence_spans`); a Chunk's span and sentences are code-point offsets into its block's text | in-process (bge-m3 tokenizer internal, shipped xz-compressed in the package) | fixture `ParsedWork`s and hand-built blocks |
 | `resolution` | `resolve(ref: Reference) -> Resolution` | true external (Crossref, OpenAlex, arXiv, GROBID) | hand-written cases + regression cassettes (see Testing) |
 | `library` | port `Library`: `item(key)`, `pdf(attachment)` so far (later: find, ensure collection, create, tag, attach); `ZoteroLibrary` reads the Web API with httpx | true external (Zotero) | `InMemoryLibrary` adapter; Zotero adapter over hand-written Web API JSON |
 | `embedding` | port `Embedder`: `model` (its name, stored with each Vector) and `embed(texts) -> list[Vector]`, one per text in order; `OpenAICompatibleEmbedder` POSTs batches of `PE_EMBEDDING_BATCH_SIZE` to `<PE_EMBEDDING_BASE_URL>/embeddings`, each batch one embedding observation in the current trace; `FakeEmbedder` hashes a text's content words into 1024 dimensions, so texts that share words come out closer | true external (OpenAI-compatible) | `FakeEmbedder` adapter; the OpenAI-compatible one over `httpx.MockTransport`; one live bge-m3 check |
-| `store` | repositories per aggregate (`Works`, `WorkTexts`, `Chunks`, `CitationGraphs`, `StageStatuses`) + `migrate()`; `Chunks` reads a Work's Chunks in reading order, by id, `around` one (its neighbours) and `under` a Heading Path, and records and reads their embeddings (`record_embeddings`, `embeddings`, `without_embedding` a model) | Postgres + pgvector (local-substitutable) | real pgvector via testcontainers |
-| `retrieval` | `search(text, scope, k) -> list[ScoredChunk]` (hybrid RRF); `find_evidence(citation, scope) -> RetrievalRun` on top of it | store + embedder | store + `FakeEmbedder` |
+| `store` | repositories per aggregate (`Works`, `WorkTexts`, `Chunks`, `CitationGraphs`, `StageStatuses`) + `migrate()`; `Works.find` a Work by Zotero key; `Chunks` reads a Work's Chunks in reading order, by id, `around` one (its neighbours) and `under` a Heading Path, records and reads their embeddings (`record_embeddings`, `embeddings`, `without_embedding` a model), and runs the hybrid query (`search`, see Retrieval) | Postgres + pgvector (local-substitutable) | real pgvector via testcontainers |
+| `retrieval` | `search(conn, embedder, text, scope, k=8) -> list[ScoredChunk]`: the Scope's Chunks best first by RRF of a vector and a full-text ranking, each result a `StoredChunk` with both rankings' `Placing` (rank, score; empty when that ranking missed it) and its `rrf` (see Retrieval); later `find_evidence(citation, scope) -> RetrievalRun` on top of it | store + embedder | store + `FakeEmbedder`; one live bge-m3 check on the Seed |
 | `asking` | `ask(conversation, question) -> AsyncIterator[AnswerEvent]`: a pydantic-ai agent over the Seed's map and retrieval tools, then Pointer and Quote resolution (ADR 0008, 0009, `design-asking.md`) | chat model (OpenAI-compatible) + store + embedder | `FunctionModel` + real Postgres + `FakeEmbedder` |
 | `tracing` | `configure_tracing(settings) -> Tracing`: the tower's Langfuse, else the cloud; `Tracing.trace(name, tags, session_id, metadata)` opens the trace every model call runs inside, `Tracing.embedding(model, texts)` records one embedding call under the current trace (nothing outside one), `Tracing.tracer_provider` goes to pydantic-ai; `retention.prune` keeps the tower's store under its disk cap (see Tracing) | Langfuse (tower, cloud fallback) | in-memory span exporter; Public API over `httpx.MockTransport` |
 | `catalog` | `ensure_work(resolution, exploration) -> LibraryItemRef` (dedupe: works table → Library search → create) | store + library | store + `InMemoryLibrary` |
@@ -74,6 +74,17 @@ Then:    embed_citing_sentences → report
 
 Sources reuse the Seed's stage functions; going one level deeper later is the same chain on another Work.
 
+## Retrieval
+
+`retrieval.search` embeds the text once and hands the Vector to `Chunks.search`, one hand-written query of CTEs (ADR 0003):
+
+- **Scope** is a set of Works; for now it is built for one Work alone, the Seed (`Scope.of(work)`). Explorations widen it later.
+- **Vector ranking:** the nearest `depth` Vectors of the Embedder's model among the Scope's Works, by cosine distance (`<=>`, the HNSW index's operator). `hnsw.iterative_scan = relaxed_order` keeps the index scanning until `depth` of them pass the Scope filter; the ranking then orders them strictly. Score: cosine similarity.
+- **Full-text ranking:** the Scope's Chunks whose `text_search` holds any English stem of the text (`plainto_tsquery`, its ANDs turned into ORs), by `ts_rank`. A question's stop words drop out; a text of stop words only matches nothing.
+- **Fusion:** RRF with k=60 over both rankings, each `max(k, 50)` deep, so the first Chunks of a search for fewer are those of a search for more. A Chunk without a Vector from the model can still be found by its words. Ties, in either ranking and in the fusion, go in reading order (Work, then position).
+- An empty text finds nothing and embeds nothing.
+- `paperexplorer search <zotero_key> "<text>" [-k N] [--no-text]` prints the ranking.
+
 ## API contract
 
 The API returns structured JSON only, never HTML: a Work as an ordered list of blocks (heading path, page, bbox, text) with Citation spans as character offsets into the block text, plus endpoints for Evidence by Citation and Scope. Any frontend renders from this; the HTMX web app is the first consumer.
@@ -94,6 +105,7 @@ Every model call, chat and embedding alike, runs inside a Langfuse trace and nev
 - **Inside it:** the forced first search, each model request (a generation with token usage), each tool call, every embedding call and the Pointer and Quote resolution.
 - **Scores on the trace,** sortable and filterable: Pointer coverage, counts per Support, exact and not-exact Quotes, tool calls, model requests, latency. Eval runs add `judge.grounded` and `judge.correct`.
 - **Stages:** `embed` traces as `stage.embed`, tagged `pipeline` and `work:<key>`, with one embedding observation per batch (named `embeddings <model>`: the batch's texts, its token usage, the count and length of its Vectors).
+- **CLI search:** `paperexplorer search` traces as `search`, tagged `cli` and `work:<key>`, holding the query's embedding observation.
 - An embedding call made outside any trace records nothing; with tracing off, `Tracing.embedding` returns at once.
 - **Environment** is `development` (Mac), `tower` or `eval`; eval runs keep the name `question`, so live and eval traces compare directly. The release is the git SHA.
 - `tracing` builds its own OpenTelemetry tracer provider, never the global one, with environment and release on its resource; instrumentation reaches Langfuse only when handed that provider.

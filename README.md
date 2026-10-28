@@ -39,5 +39,11 @@ done
 
 Then open `http://tower:8080`: the Seed's page links every Citation to a panel with its Reference.
 
+Search the Seed's Chunks (hybrid: bge-m3 Vectors and English full text, fused by RRF):
+
+```sh
+docker compose run --rm pipeline search YAAC9XCX "How was brain entropy measured?" -k 8
+```
+
 Tower-only tests (real Zotero storage, GROBID, the Seed) run there with `uv run pytest -m tower`.
 `scripts/tower-check.sh` runs those, the gate, the Seed and the pipeline image in one go and writes `tower-check.log` to commit back to the branch.

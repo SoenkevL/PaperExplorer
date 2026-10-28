@@ -13,8 +13,9 @@ from paperexplorer_api.schemas import Answer, Pointer, Quote
 
 # The handle syntax `asking` reads: `[#3]`, and groups such as `[#3, #5]` or `[#3; #5]`.
 _HANDLE = re.compile(r"\[#\d+(?:\s*[,;]\s*#\d+)*\]")
-# The start of a handle the next delta may finish: `[`, `[#`, `[#1`, `[#1, #`, ...
-_OPEN_HANDLE = re.compile(r"\[(?:#\d*(?:\s*[,;]\s*#?\d*)*\s*)?\Z")
+# The start of a handle the next delta may finish: `[`, `[#`, `[#1`, `[#1, #`, ... Each run of
+# whitespace has one place in the pattern, so a near miss cannot backtrack for long.
+_OPEN_HANDLE = re.compile(r"\[(?:#(?:\d+(?:\s*[,;]\s*#\d+)*(?:\s*(?:[,;]\s*#?)?)?)?)?")
 
 
 class DraftPiece(BaseModel):
@@ -37,8 +38,9 @@ class Draft:
     def add(self, delta: str) -> list[DraftPiece]:
         """The pieces of `delta` that can be shown now, after any text held from before."""
         text = self._held + delta
-        open_handle = _OPEN_HANDLE.search(text)
-        cut = open_handle.start() if open_handle else len(text)
+        # An unfinished handle at the end starts at the last `[`, since a handle holds no other.
+        last = text.rfind("[")
+        cut = last if last >= 0 and _OPEN_HANDLE.fullmatch(text, last) else len(text)
         text, self._held = text[:cut], text[cut:]
         pieces: list[DraftPiece] = []
         at = 0

@@ -1,3 +1,5 @@
+import time
+
 from paperexplorer_api.schemas import Answer, AnswerSentence, Pointer, Quote
 from paperexplorer_web.answers import Draft, DraftPiece, answer_runs
 
@@ -58,6 +60,17 @@ def test_the_seeds_own_markers_stay_text() -> None:
         _plain("As printed [12] and (#3), see ")
     ]
     assert draft.add("1\u20133].") == [_plain("[1\u20133].")]
+
+
+def test_text_that_only_starts_like_a_handle_is_cut_at_once() -> None:
+    # Whatever the model streams, looking for a handle's start must not backtrack for long.
+    text = "[#1" + ", " * 24 + "and so on."
+    started = time.monotonic()
+
+    pieces = Draft().add(text)
+
+    assert time.monotonic() - started < 0.5
+    assert pieces == [_plain(text)]
 
 
 def test_an_answer_is_cut_into_its_sentences_with_their_pointers() -> None:

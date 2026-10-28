@@ -13,7 +13,11 @@
 #      pipeline image, each with its time; chunk logs its counts of Chunks, short and
 #      oversized_sentence, embed how many Chunks it embedded with Ollama's bge-m3 (traced to
 #      Langfuse as stage.embed), and embed run again on the host embeds none;
-#   7. the API and web containers, and the reader: every Citation of the Seed is a link that
+#   7. five searches of the Seed (`paperexplorer search --no-text`): about its measurements, its
+#      methods, its shortcomings, what it proposes next, and one topic it does not cover; each
+#      lists the 8 best Chunks' RRF, vector and full-text ranks and scores, page and Heading Path,
+#      never their text (each is traced to Langfuse as `search`);
+#   8. the API and web containers, and the reader: every Citation of the Seed is a link that
 #      opens a panel with its Reference.
 #
 # Every step runs even when an earlier one fails.
@@ -27,6 +31,15 @@ LOG="tower-check.log"
 SEED_ATTACHMENT="YTS2XCEG"  # the Seed's PDF in Zotero storage
 SEED="YAAC9XCX"             # the Seed's Zotero item
 STAGES=(fetch parse chunk embed extract_citations)
+# What the searches of the Seed ask: its measurements, methods, shortcomings, what it proposes
+# next, and a topic it does not cover, whose scores should stay low.
+SEARCHES=(
+  "How was brain entropy measured?"
+  "Which methods and analyses did the authors use?"
+  "What are the limitations and shortcomings of this work?"
+  "What future research do the authors propose?"
+  "How does caffeine affect sleep in shift workers?"
+)
 RESULTS=()
 
 # step NAME CMD...: runs CMD, logs its output, status and time, and carries on either way.
@@ -59,6 +72,17 @@ reader_check() {
   echo "--- api and web logs"
   docker compose logs --no-color --tail 40 api web
   return 1
+}
+
+# seed_searches: each of SEARCHES on the Seed. The Seed's licence is unknown and this log is
+# public: ranks, scores, pages and Heading Paths only, no Chunk text.
+seed_searches() {
+  local query status=0
+  for query in "${SEARCHES[@]}"; do
+    uv run paperexplorer search --no-text "$SEED" "$query" || status=$?
+    echo
+  done
+  return "$status"
 }
 
 context() {
@@ -116,6 +140,7 @@ main() {
   # Every Chunk has its Vector now, so a second run embeds none (and makes extract_citations
   # pending, which the pipeline image runs again below).
   step "run embed again (host)" uv run paperexplorer run embed "$SEED"
+  step "search the Seed (host)" seed_searches
   for stage in "${STAGES[@]}"; do
     step "pipeline: run $stage" "${run[@]}" pipeline run "$stage" "$SEED"
   done

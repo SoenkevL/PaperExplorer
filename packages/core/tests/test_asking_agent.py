@@ -432,6 +432,8 @@ def test_one_question_is_one_trace_holding_every_model_tool_and_embedding_call(
     ]
     chats = by_name["chat paperexplorer-chat"]
     assert len(chats) == 2
+    assert {parent(c) for c in chats} == {"invoke_agent asking"}
+    assert parent(by_name["invoke_agent asking"][0]) == "question"
     # The model's thinking is traced with its request, though never shown.
     thought = json.loads(str((chats[0].attributes or {})["gen_ai.output.messages"]))
     assert {"type": "thinking", "content": "The recording section says how."} in thought[0]["parts"]

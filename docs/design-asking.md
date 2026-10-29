@@ -83,6 +83,15 @@ As `design-v1.md`: paragraph Chunks of at most 400 bge-m3 tokens, HNSW plus Engl
 - **Bar:** hit@8 ≥ 0.8, Pointer coverage ≥ 0.8, at least 80% of Answers judged grounded and correct, and no Quote marked exact that is not (by construction).
 - One baseline run puts the whole Seed in context, to see what retrieval costs.
 - The Questions, verdicts and metrics are committed. Full reports, which quote the Seed, stay in `data/`: its licence is unknown.
+- **Settled while building the harness** (`architecture.md`, The eval):
+  - 22 Questions in `evals/seed-questions.yaml`, a pydantic-evals dataset written from the Seed as `parse` and `chunk` read it: 4 on its measurements, 4 on methods, 5 on shortcomings, 4 on follow-ups, and 5 it does not answer, on varied topics (dosing, an experiment of its own, heart rate, analysis software, EU regulation). A place is a Heading Path and page exactly as `chunk` gives them; the command refuses places where no Chunk sits.
+  - The eval lives in core (`paperexplorer.evals`, `paperexplorer eval`), since it runs `asking.ask` against the store as `paperexplorer ask` does; `scripts/tower-eval.sh` runs it on the tower. The Question set and the committed summaries live in a top-level `evals/`.
+  - Every Question is asked in a fresh Conversation, one at a time. hit@8 re-runs the forced search, `retrieval.search(question, k=8)`, outside the trace: the same call, so the same Chunks.
+  - The baseline is a mode of `ask`, `AskingContext.whole_seed`, so the trace, scores and resolution are the live code's: the unchanged system prompt, a note that no tools apply, then every Chunk under its handle, all of them read; no forced search, no tools, the trace tagged `whole-seed`. The live mode is the default.
+  - Traces go to the `eval` environment, named `question` and tagged `run:<run id>`; `AnsweredEvent` carries the trace's id, which the eval records for the judges' scores in stage 8b.
+  - Pointer coverage for the bar pools the substantive sentences of the covered Questions' Answers, and hit@8 counts covered Questions: an uncovered Question's "The Seed does not say …" is substantive and rightly unpointed.
+  - "No Quote marked exact that is not" is checked, not assumed: each exact Quote's words are compared with the printed text at its place, folded on their own.
+  - Whether an uncovered Question's Answer says so is a heuristic on its words ("the Seed does not say …" and its kin), reported for every turn and checked for uncovered Questions; stage 8b's reading decides.
 
 ## Order of work
 1. Docs: ADRs 0008 and 0009, `CONTEXT.md`, this design, `design-v1.md`, `architecture.md`, logbook.

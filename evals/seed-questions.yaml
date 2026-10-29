@@ -1,0 +1,203 @@
+# The eval's Questions about the Seed (Zotero item YAAC9XCX), docs/design-asking.md (Eval).
+#
+# Written by Claude from the Seed as `parse` and `chunk` read it (113 blocks, 105 Chunks), in the
+# format of pydantic-evals' datasets. Each case is one Question:
+#   name      its id, `<kind>-<topic>`;
+#   inputs    the Question as the reader asks it;
+#   metadata  its kind (measurement, method, shortcoming, follow-up, uncovered) and the places a
+#             good Answer points at: Heading Path and page exactly as the `chunk` Stage gives
+#             them (`heading_path: []` is the text before the first heading, the abstract).
+# An uncovered Question lists no places: its Answer should say the Seed does not cover it.
+# The Seed's licence is unknown, so nothing here quotes it.
+name: seed-questions
+cases:
+  # Measurements: what the reviewed studies measured and found.
+  - name: measurement-table-1-studies
+    inputs: How many studies does the review's summary table cover, and which psychedelics did they examine?
+    metadata:
+      kind: measurement
+      places:
+        - heading_path: ["2. Serotonergic psychedelics and brain entropy", "2.5. Previous research on psychedelic-induced brain entropy alterations"]
+          page: 5
+        - heading_path: ["2. Serotonergic psychedelics and brain entropy", "Table 1"]
+          page: 6
+  - name: measurement-tagliazucchi-motifs
+    inputs: How did Tagliazucchi et al. (2014) define brain states under psilocybin, and what did they find?
+    metadata:
+      kind: measurement
+      places:
+        - heading_path: ["2. Serotonergic psychedelics and brain entropy", "2.5. Previous research on psychedelic-induced brain entropy alterations"]
+          page: 5
+  - name: measurement-intensity-correlation
+    inputs: Did the increases in entropy under psychedelics correlate with how intense participants rated the drug's effects?
+    metadata:
+      kind: measurement
+      places:
+        - heading_path: ["2. Serotonergic psychedelics and brain entropy", "2.5. Previous research on psychedelic-induced brain entropy alterations"]
+          page: 6
+        - heading_path: ["3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement", "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"]
+          page: 12
+  - name: measurement-mcculloch-replication
+    inputs: What did McCulloch et al. (2024) find when they tried to replicate the earlier entropy findings?
+    metadata:
+      kind: measurement
+      places:
+        - heading_path: ["3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement", "3.3. One entropy to rule them all?"]
+          page: 10
+        - heading_path: ["2. Serotonergic psychedelics and brain entropy", "2.5. Previous research on psychedelic-induced brain entropy alterations"]
+          page: 5
+
+  # Methods: how brain entropy is defined and computed, and how the review chose its studies.
+  - name: method-brain-entropy-definition
+    inputs: How do the authors define brain entropy?
+    metadata:
+      kind: method
+      places:
+        - heading_path: ["2. Serotonergic psychedelics and brain entropy", "2.4. What is brain entropy?"]
+          page: 4
+        - heading_path: ["2. Serotonergic psychedelics and brain entropy", "2.4. What is brain entropy?"]
+          page: 3
+        - heading_path: []
+          page: 1
+  - name: method-lzc-vs-shannon
+    inputs: How does Lempel-Ziv complexity differ from Shannon entropy?
+    metadata:
+      kind: method
+      places:
+        - heading_path: ["2. Serotonergic psychedelics and brain entropy", "2.4. What is brain entropy?"]
+          page: 4
+  - name: method-sample-entropy-parameters
+    inputs: Which parameters have to be chosen to compute sample entropy, and why do they matter?
+    metadata:
+      kind: method
+      places:
+        - heading_path: ["2. Serotonergic psychedelics and brain entropy", "2.4. What is brain entropy?"]
+          page: 4
+  - name: method-study-selection
+    inputs: Which studies did the review select for its summary table, and how were entropy changes compared within them?
+    metadata:
+      kind: method
+      places:
+        - heading_path: ["2. Serotonergic psychedelics and brain entropy", "Table 1"]
+          page: 6
+        - heading_path: ["2. Serotonergic psychedelics and brain entropy", "2.5. Previous research on psychedelic-induced brain entropy alterations"]
+          page: 5
+
+  # Shortcomings: of brain entropy as a biomarker, and of the review itself.
+  - name: shortcoming-main-limitations
+    inputs: What are the main limitations of brain entropy as a biomarker of the psychedelic state?
+    metadata:
+      kind: shortcoming
+      places:
+        - heading_path: []
+          page: 1
+        - heading_path: ["1. Introduction"]
+          page: 2
+        - heading_path: ["3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement", "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"]
+          page: 7
+        - heading_path: ["3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement", "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"]
+          page: 9
+        - heading_path: ["3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement", "3.3. One entropy to rule them all?"]
+          page: 10
+        - heading_path: ["3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement", "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"]
+          page: 12
+        - heading_path: ["4. Conclusions"]
+          page: 13
+  - name: shortcoming-specificity
+    inputs: Are increases in brain entropy specific to psychedelics?
+    metadata:
+      kind: shortcoming
+      places:
+        - heading_path: ["3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement", "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"]
+          page: 7
+        - heading_path: ["3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement", "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"]
+          page: 8
+  - name: shortcoming-scalar-measure
+    inputs: Why do the authors doubt that a single entropy value can describe a state of consciousness?
+    metadata:
+      kind: shortcoming
+      places:
+        - heading_path: ["3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement", "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"]
+          page: 9
+        - heading_path: ["3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement", "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"]
+          page: 10
+  - name: shortcoming-fmri
+    inputs: What problems do the authors see in measuring brain entropy with fMRI?
+    metadata:
+      kind: shortcoming
+      places:
+        - heading_path: ["3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement", "3.3. One entropy to rule them all?"]
+          page: 11
+        - heading_path: ["4. Conclusions"]
+          page: 13
+  - name: shortcoming-own-scope
+    inputs: What does the review itself leave out, by the authors' own account?
+    metadata:
+      kind: shortcoming
+      places:
+        - heading_path: ["4. Conclusions"]
+          page: 13
+
+  # Follow-ups: what the authors propose next.
+  - name: follow-up-study-designs
+    inputs: What kind of studies do the authors call for to move the field forward?
+    metadata:
+      kind: follow-up
+      places:
+        - heading_path: ["4. Conclusions"]
+          page: 13
+        - heading_path: ["3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement", "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"]
+          page: 13
+  - name: follow-up-alertness-controls
+    inputs: How should future studies control for the effect of alertness on brain entropy?
+    metadata:
+      kind: follow-up
+      places:
+        - heading_path: ["3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement", "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"]
+          page: 9
+        - heading_path: ["4. Conclusions"]
+          page: 13
+  - name: follow-up-phenomenal-richness
+    inputs: How do the authors propose to test whether psychedelics really increase phenomenal richness?
+    metadata:
+      kind: follow-up
+      places:
+        - heading_path: ["3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement", "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"]
+          page: 12
+        - heading_path: ["3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement", "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"]
+          page: 10
+        - heading_path: ["3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement", "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"]
+          page: 13
+  - name: follow-up-metric-choice
+    inputs: What do the authors recommend about choosing and reporting entropy metrics in future studies?
+    metadata:
+      kind: follow-up
+      places:
+        - heading_path: ["3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement", "3.3. One entropy to rule them all?"]
+          page: 12
+        - heading_path: ["3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement", "3.3. One entropy to rule them all?"]
+          page: 10
+        - heading_path: ["4. Conclusions"]
+          page: 13
+
+  # Uncovered: Questions the Seed does not answer, on varied topics.
+  - name: uncovered-depression-dose
+    inputs: What dose of psilocybin do the authors recommend for treating depression?
+    metadata:
+      kind: uncovered
+  - name: uncovered-own-experiment
+    inputs: How many participants did the authors recruit for their own experiment, and how did they record their EEG?
+    metadata:
+      kind: uncovered
+  - name: uncovered-heart-rate
+    inputs: How do psychedelics affect heart rate and blood pressure?
+    metadata:
+      kind: uncovered
+  - name: uncovered-analysis-software
+    inputs: Which statistical software did the authors use to analyse their data?
+    metadata:
+      kind: uncovered
+  - name: uncovered-eu-regulation
+    inputs: How is psilocybin therapy regulated in the European Union?
+    metadata:
+      kind: uncovered

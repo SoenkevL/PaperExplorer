@@ -286,7 +286,7 @@ verdicts:
     grounded: false
     correct: true
     note: >-
-      Rightly names what the authors leave out (the rest of the spectrum of conscious states),
+      Rightly names what the authors leave out (conscious states beyond the psychedelic one),
       then adds literature gaps, one of them wrong about psilocybin; handles in parentheses, so
       no Pointers.
   - question: follow-up-study-designs
@@ -409,8 +409,8 @@ verdicts:
     grounded: false
     correct: true
     note: >-
-      Rightly says there is no data analysis of its own, but calls the review a meta-analysis,
-      which it is not; reference-style numbers instead of handles.
+      Rightly says there is no data analysis of its own, but describes the review as a
+      statistical pooling of studies, which it is not; reference-style numbers instead of handles.
   - question: uncovered-analysis-software
     mode: baseline
     trace_id: e7411b5034df8b3ac7da750072b2b965

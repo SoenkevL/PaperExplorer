@@ -24,9 +24,9 @@ class Settings(BaseSettings):
     embedding_model: str = "bge-m3"
     embedding_api_key: SecretStr = SecretStr("ollama")
     embedding_batch_size: int = Field(default=32, ge=1, description="Texts per embedding request.")
-    # Set from eval run 20261029T191529Z-94e980b (docs/eval-2026-10-29.md): none of the 60
-    # Pointers at or above 0.7 was at a place that does not bear its sentence out; above 0.75
-    # would make 15 apt or partly apt ones weak, below 0.65 call an inapt one close.
+    # Set from the eval of 2026-10-29 (docs/eval-2026-10-29.md): of 168 Pointers at or above 0.7,
+    # 2 sat at a place that does not bear their sentence out (both of one invented sentence); of
+    # 20 below it, 7. 0.75 would make 37 apt or partly apt ones weak to catch those 2.
     support_threshold: float = Field(
         default=0.7,
         ge=0,

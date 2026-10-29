@@ -316,7 +316,7 @@ verdicts:
     correct: true
     note: >-
       The designs and controls the Seed calls for, mostly pointed; but it says metric choices
-      should rest on how states encode memory and sensation, which the Seed does not say; typos
+      should rest on two mental functions the Seed never names for it; typos
       and a word in Spanish.
     pointers:
       - {sentence: 1, similarity: 0.8397, apt: apt}

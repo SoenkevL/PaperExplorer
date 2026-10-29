@@ -28,7 +28,12 @@
 #  10. a Conversation on the running API (`scripts/check_conversation.py`): one Question about the
 #      Seed over HTTP, logging its events counted by type, the tools run, the time to the first
 #      delta and to the Answer, and the Answer's counts, never its text (traced as `question`,
-#      with this commit as its release).
+#      with this commit as its release);
+#  11. the Conversation sidebar on the running web app (`scripts/check_sidebar.py`): the Seed's
+#      page has the sidebar, and one Question posted as its form does streams through the web
+#      app's relay into an Answer with at least one Pointer; it logs the events counted by
+#      name, the time to the first delta and to the Answer, and the Answer's Pointer chips and
+#      Quotes counted, never its text.
 #
 # Every step runs even when an earlier one fails. Containers have no git, so the release on
 # their traces is this commit, passed as PE_LANGFUSE_RELEASE.
@@ -142,6 +147,15 @@ conversation_check() {
   return 1
 }
 
+# sidebar_check: one Question asked of the Seed through the web app's sidebar routes, relayed
+# from the API's stream; on failure the api and web containers' last log lines say why.
+sidebar_check() {
+  uv run python scripts/check_sidebar.py "$SEED" "${QUESTIONS[1]}" && return 0
+  echo "--- api and web logs"
+  docker compose logs --no-color --tail 40 api web
+  return 1
+}
+
 context() {
   echo "date:    $(date -Iseconds)"
   echo "host:    $(hostname) · $(uname -srm)"
@@ -208,6 +222,7 @@ main() {
   QUIET=1 step "api + web up (compose)" docker compose up -d --build --wait api web
   step "reader: the Seed" reader_check
   step "conversation (api)" conversation_check
+  step "sidebar (web)" sidebar_check
 
   printf '\n=== summary\n'
   printf '%s\n' "${RESULTS[@]}"

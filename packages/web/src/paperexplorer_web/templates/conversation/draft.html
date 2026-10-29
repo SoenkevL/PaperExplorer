@@ -1,0 +1,8 @@
+{#- Draft text and its handles as placeholder chips; whitespace here would show (pre-wrap). -#}
+{%- for piece in pieces -%}
+{%- if piece.handle is not none -%}
+<span class="chip" title="Handle [#{{ piece.handle }}]: its Pointer comes with the Answer">#{{ piece.handle }}</span>
+{%- else -%}
+{{ piece.text }}
+{%- endif -%}
+{%- endfor -%}

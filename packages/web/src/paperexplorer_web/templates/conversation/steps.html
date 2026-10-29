@@ -1,0 +1,5 @@
+{%- if steps -%}
+<details class="steps"><summary>{{ steps | length }} {{ "step" if steps | length == 1 else "steps" }}</summary><ol>
+{%- for tool, args in steps %}{% include "conversation/step.html" %}{% endfor -%}
+</ol></details>
+{%- endif -%}

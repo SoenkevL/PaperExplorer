@@ -48,7 +48,8 @@ PaperExplorer/
 │   │          library,embedding,store/migrations,retrieval,asking,catalog,pipeline}/  tests/
 │   ├── api/   src/paperexplorer_api/{app.py,routes/,schemas.py,client.py,conversations.py,
 │   │          asking_thread.py}  tests/
-│   └── web/   src/paperexplorer_web/{app.py,templates/,static/}  tests/
+│   └── web/   src/paperexplorer_web/{app.py,segments.py,answers.py,relay.py,templates/,
+│              static/}  tests/
 ├── docker/        Dockerfiles per deployable
 ├── tests/e2e/     cross-package tests
 ├── tests/fixtures/  open-access PDFs + cassettes
@@ -141,6 +142,22 @@ The API returns structured JSON only, never HTML: a Work as an ordered list of b
 - `paperexplorer_api.asking_thread.AskingThread` runs every turn on one thread with an event loop of its own, beside the API's. The tools call the store and the Embedder synchronously and block their loop meanwhile (seconds while Ollama loads a model), so the API's own loop stays free for other requests and streams. All turns share that loop, since the chat model's HTTP client keeps its connections on the loop that opened them. Each turn opens a store connection of its own through `connections()`. One turn per Conversation at a time; events cross to the request's loop through a queue, and closing the stream cancels the turn on its loop.
 - `create_app(connections, asking)`: `Asking(contexts, conversations)` gives each turn its `AskingContext` around the turn's connection, and the store of Conversations. Without `Asking` the app serves Works and Citations only. `app_from_env` builds the Embedder, chat model and tracing once from `Settings`.
 
+## The web app's Conversation sidebar
+
+A Work's page has three columns: the Conversation sidebar left, the reader in the middle, the Citation panel right. Below 92rem the sidebar is a drawer behind a button; below 72rem the panel is a bottom sheet.
+
+- **Routes.** The sidebar's form posts `text` and the page's `conversation_id` (empty at first) to `POST /works/{id}/questions`. The first Question starts the Conversation (`ApiClient.start_conversation`) and sends its id back into the form out of band. The response is the Question with an empty reply whose `sse-connect` (htmx's SSE extension, vendored as `static/sse.min.js`) points at `GET /questions/{question_id}/stream`.
+- **Pending Questions.** EventSource only GETs, and the Question's text stays out of the URL, so the web app holds each posted Question in memory (`relay.PendingQuestions`, the newest 64) under a random id until its stream route takes it, once. A second GET of the same stream (an EventSource reconnecting) gets an `error` saying to ask again. The slot lives in one process: run the web app with one worker.
+- **Relay.** The stream route returns a `StreamingResponse` over `relay.relay`, a sync generator that iterates `ApiClient.ask` inside `contextlib.closing`, so a browser that goes away closes the API's stream and cancels the turn (when the API's next event arrives; the web app's client swallows the API's pings). It re-sends each event as a named server-sent event carrying HTML, one `data:` line per line:
+  - `step`: a line naming the tool and its arguments, appended to the reply's steps;
+  - `delta`: draft text appended to the draft, `[#n]` handles as placeholder chips (`answers.Draft` holds back a handle split across deltas until it is whole);
+  - `conversation`: the API had forgotten the Conversation (404), so the relay started a new one; out-of-band HTML puts the notice above the reply and the new id into the form;
+  - `answer`: the resolved Answer, with the steps folded away; `error`: the turn's message (the API's, or still answering on 409, or a Work not embedded, or a stream that ended or broke off).
+  `answer` and `error` replace the whole reply, which holds the `sse-connect`, so htmx closes the EventSource with it and it never reconnects; every stream ends in one of them.
+- **The Answer** is cut in Python (`answers.answer_runs`) at its sentences' and Quotes' code-point offsets, so no offset crosses into JavaScript; the template autoescapes every piece of model text, and the Answer renders with `white-space: pre-wrap`, so its line breaks show and no Markdown is rendered. Each sentence ends with a chip per Pointer, numbered across the Answer, coloured by Support: close in the reader's link colour (which its certain and high Citations share), weak in its low colour, dashed. An exact Quote is a link in the reader's serif and link colour; any other Quote has a wavy mark and stays the model's.
+- **Clicking a Pointer** (or an exact Quote) runs `static/conversation.js`: it maps the place's code-point offsets onto the block's text nodes, scrolls the reader there, and paints the place strongly and the rest of the Chunk (`chunk_start`–`chunk_end`) faintly with the CSS Custom Highlight API. The block's DOM is left as it is, so its Citations stay links; a browser without the API gets a faint background on the block. Below 92rem the drawer closes first.
+- **Lifecycle:** a 409 when starting the Conversation (a Work not embedded) answers the Question with a refusal and asks nothing; a 404 from `ask` starts a new Conversation and says so; a 409 from `ask` says the Conversation is still answering.
+
 ## Tracing
 
 Every model call, chat and embedding alike, runs inside a Langfuse trace and never opens a top-level trace of its own, so a request's calls are found by nesting, not by time.
@@ -166,6 +183,7 @@ Fake what we don't own, run what we do.
 - **Zotero, Embedder**: in-memory adapters at the `Library` and `Embedder` seams.
 - **Chat model**: pydantic-ai's `FunctionModel` scripts tool calls and text; Pointer and Quote resolution is tested as a pure function over hand-built Chunks and Answers. A bad real Answer becomes a named regression test built from its recorded message history.
 - **Tracing**: an in-memory span exporter checks trace names, `session_id`, tags and nesting. Tracing is off in every other test.
+- **Web app**: its tests fake the API over `httpx.MockTransport` with JSON and event streams built from `paperexplorer_api.schemas`, and check the HTML (the Answer's marks parsed as XML). That closing the relay closes the API's stream is tested on `relay.relay` directly, since Starlette's `TestClient` reads a stream whole. The browser side (`conversation.js`: drawer, highlights by code point) is checked by hand in a browser; `tests/e2e` runs a Question from the sidebar through the real API with a scripted model.
 - **External HTTP** (Crossref, OpenAlex, arXiv): `resolution` keeps the matching logic in a pure internal function tested with hand-written cases for the likely and the harmful scenarios (exact DOI, no DOI, wrong-year near-miss, preprint vs published, garbage string, empty result, 429/5xx). HTTP is never live in tests.
 - **Regression rule**: every real failure seen in use is recorded as a cassette (vcrpy) and kept as a named test before it is fixed.
 - `@pytest.mark.tower`: only tests needing Ollama, a real Zotero account or the GPU.

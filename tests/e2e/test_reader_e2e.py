@@ -1,8 +1,11 @@
-"""From Library Item to clickable Citations: Stages → store → API → web, all in one process."""
+"""From Library Item to clickable Citations and answered Questions: Stages → store → API → web.
+
+All in one process; the chat model is scripted.
+"""
 
 import html
 import re
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from contextlib import nullcontext
 from pathlib import Path
 
@@ -10,7 +13,10 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 from psycopg.rows import TupleRow
+from pydantic_ai.messages import ModelMessage
+from pydantic_ai.models.function import AgentInfo, FunctionModel
 
+from paperexplorer.asking import AskingContext
 from paperexplorer.config import Settings
 from paperexplorer.domain import Attachment, CitationId, LibraryItem, WorkId
 from paperexplorer.embedding import FakeEmbedder
@@ -18,8 +24,10 @@ from paperexplorer.library import InMemoryLibrary
 from paperexplorer.pipeline import STAGES, StageContext, run_stage
 from paperexplorer.store import CitationGraphs, Works
 from paperexplorer.tracing import Tracing
+from paperexplorer_api.app import Asking
 from paperexplorer_api.app import create_app as create_api
 from paperexplorer_api.client import ApiClient
+from paperexplorer_api.conversations import Conversations
 from paperexplorer_web.app import create_app as create_web
 
 Conn = psycopg.Connection[TupleRow]
@@ -106,3 +114,48 @@ def test_a_scanned_work_is_marked_as_ocr_text(
 
     assert "This is OCR Text" in page
     assert _panel_targets(page)
+
+
+async def _answer_from_the_first_chunk_shown(
+    messages: list[ModelMessage], info: AgentInfo
+) -> AsyncIterator[str]:
+    yield "The therapists took part in a training. [#"
+    yield "1]"
+
+
+@pytest.fixture
+def asking_reader(store_db: Conn) -> TestClient:
+    settings = Settings(_env_file=None)  # pyright: ignore[reportCallIssue]
+    model = FunctionModel(
+        stream_function=_answer_from_the_first_chunk_shown, model_name="paperexplorer-chat"
+    )
+    embedder, tracing = FakeEmbedder(), Tracing.off()
+    asking = Asking(
+        contexts=lambda conn: AskingContext(conn, embedder, model, settings, tracing),
+        conversations=Conversations.from_settings(settings),
+    )
+    api = ApiClient(TestClient(create_api(lambda: nullcontext(store_db), asking)))
+    return TestClient(create_web(api))
+
+
+def test_a_question_in_the_sidebar_streams_into_an_answer_pointing_into_the_reader(
+    explored: dict[str, WorkId], asking_reader: TestClient
+) -> None:
+    work = explored["villiger2024-tandf"]
+    page = asking_reader.get(f"/works/{work}").text
+    turn = asking_reader.post(
+        f"/works/{work}/questions",
+        data={"text": "What did the training involve?", "conversation_id": ""},
+    ).text
+    found = re.search(r'sse-connect="([^"]+)"', turn)
+    assert found, "the Question does not stream"
+
+    body = asking_reader.get(html.unescape(found[1])).text
+
+    events = re.findall(r"^event: (\w+)$", body, re.M)
+    assert events[0] == "step"
+    assert "delta" in events
+    assert events[-1] == "answer"
+    chips = re.findall(r'<a class="pointer (close|weak)" href="#b(\d+)"', body)
+    assert len(chips) == 1
+    assert f'id="b{chips[0][1]}"' in page

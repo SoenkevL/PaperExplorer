@@ -56,6 +56,13 @@ Before resolution and Sources, the reader can ask the Seed Questions in a sideba
   - The stream is FastAPI's SSE: event name = `type`, data = the event's JSON, a `: ping` comment after 15 s of silence while the model thinks.
   - The API's Answer carries what the reader shows: Pointers with their place, Support and Chunk span (`chunk_start`, `chunk_end`); Quotes with exactness and place. The cosine, Chunk id, substantive flags and unknown handles stay in the traces and the eval.
   - `ApiClient.ask` is a synchronous generator, for the synchronous web app. EventSource (and so the htmx SSE extension) only GETs, so the web app relays: the browser's EventSource GETs a web route that POSTs the Question through `ApiClient.ask` and re-sends each event as HTML. Closing that generator closes the API's stream and so cancels the turn.
+- **Settled while building the sidebar** (`architecture.md`, The web app's Conversation sidebar):
+  - The sidebar posts its Question to the web app, which holds it in memory under a random id until the page's EventSource GETs that id's stream, once; the Question's text never goes into a URL. A stream asked for twice says to ask again.
+  - The first Question starts the Conversation, and its id lives in the page's form. When the API has forgotten it (404), the relay starts a new one, says so above the reply and puts the new id in the form; when the Work is not embedded (409), the Question is not asked and the sidebar says why; while it still answers (409), the sidebar says to wait.
+  - The relay's events carry HTML: `step`, `delta`, `conversation` (a new Conversation took over), then `answer` or `error`, which replace the reply and with it the EventSource, so the browser never asks again on its own. Handles split across deltas wait until they are whole before they become chips.
+  - The Answer is cut at its code-point offsets in Python and rendered as plain text with its line breaks (`pre-wrap`); every piece of model text is escaped. Close Support and exact Quotes use the reader's link colour, which its certain and high Citations share; weak Support uses its low colour.
+  - A Pointer's place is painted with the CSS Custom Highlight API, so the block's DOM, and its Citation links, stay as they are.
+  - htmx's SSE extension 2.2.4 is vendored beside htmx 2.0.11, from the npm tarball.
 
 ## Retrieval
 As `design-v1.md`: paragraph Chunks of at most 400 bge-m3 tokens, HNSW plus English full-text search, RRF with k=60, both scores kept. No reranker; one may come later as an experiment measured against the eval.

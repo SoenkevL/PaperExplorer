@@ -79,14 +79,7 @@ class SeedTools:
 
     def seed_map(self) -> str:
         """The Seed's title, its heading tree with a § number per section, and its abstract."""
-        work = self._work
-        byline = ", ".join(
-            part
-            for part in (_creators(work.creators), str(work.year) if work.year else None)
-            if part
-        )
-        title = work.title or work.zotero_key or f"Work {work.id}"
-        lines = [f"The Seed: {title} ({byline})" if byline else f"The Seed: {title}", ""]
+        lines = [self._title(), ""]
         if self._sections:
             lines.append("Its sections, for read_section (give the § number or the heading):")
             lines += [
@@ -99,6 +92,10 @@ class SeedTools:
         if abstract:
             lines += ["", "Its text before the first heading, the abstract:", self._show(abstract)]
         return "\n".join(lines)
+
+    def whole_seed(self) -> str:
+        """The Seed's title and every Chunk in reading order, each with its handle: all read."""
+        return f"{self._title()}\n\nIts whole text, in reading order:\n\n{self._show(self._chunks)}"
 
     def search(self, query: str, k: int = 8) -> str:
         """The `k` Chunks of the Seed that best match `query`, best first."""
@@ -206,6 +203,16 @@ class SeedTools:
         return f"Reference {found.id} is cited {len(shown)} {times} in the Seed:\n\n" + "\n\n".join(
             shown
         )
+
+    def _title(self) -> str:
+        work = self._work
+        byline = ", ".join(
+            part
+            for part in (_creators(work.creators), str(work.year) if work.year else None)
+            if part
+        )
+        title = work.title or work.zotero_key or f"Work {work.id}"
+        return f"The Seed: {title} ({byline})" if byline else f"The Seed: {title}"
 
     def _show(self, chunks: Sequence[StoredChunk]) -> str:
         self._read += chunks

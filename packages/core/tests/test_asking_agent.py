@@ -8,15 +8,13 @@ given as a string or as a function of the Conversation (to write a handle shown 
 import asyncio
 import json
 import re
-import uuid
 from collections.abc import AsyncIterator, Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import httpx
 import psycopg
 import pytest
 from opentelemetry.sdk.trace import ReadableSpan
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from psycopg.rows import TupleRow
 from pydantic import JsonValue
 from pydantic_ai.messages import (
@@ -48,9 +46,9 @@ from paperexplorer.config import Settings
 from paperexplorer.domain import Work
 from paperexplorer.embedding import Embedder, FakeEmbedder, OpenAICompatibleEmbedder
 from paperexplorer.store import Chunks, StoredChunk
-from paperexplorer.tracing import Tracing, configure_tracing
+from paperexplorer.tracing import Tracing
 
-from .conftest import DISCUSSION, RECORDING
+from .conftest import DISCUSSION, RECORDING, in_memory_tracing
 
 Conn = psycopg.Connection[TupleRow]
 QUESTION = "How was the entropy computed?"
@@ -358,25 +356,7 @@ def _embedder(tracing: Tracing) -> OpenAICompatibleEmbedder:
 def test_one_question_is_one_trace_holding_every_model_tool_and_embedding_call(
     store_db: Conn, small_seed: Work, conversation: Conversation
 ) -> None:
-    exporter = InMemorySpanExporter()
-    scores: list[dict[str, object]] = []
-
-    def langfuse(request: httpx.Request) -> httpx.Response:
-        if request.url.path == "/api/public/scores":
-            scores.extend(json.loads(request.content))
-            return httpx.Response(200, json={})
-        return httpx.Response(200, json={"status": "OK"})
-
-    tracing = configure_tracing(
-        Settings(
-            _env_file=None,  # pyright: ignore[reportCallIssue]
-            langfuse_public_key=f"pk-lf-test-{uuid.uuid4()}",
-            langfuse_secret_key="sk-lf-test",
-            langfuse_base_url="http://langfuse.test",
-        ),
-        http=httpx.Client(transport=httpx.MockTransport(langfuse)),
-        span_exporter=exporter,
-    )
+    tracing, exporter, scores = in_memory_tracing()
     recording = chunk(store_db, small_seed, RECORDING)
     script = Script(
         [Think("The recording section says how."), Call("read_section", {"heading": "§3"})],
@@ -446,3 +426,97 @@ def test_one_question_is_one_trace_holding_every_model_tool_and_embedding_call(
     assert named["pointer_coverage"] == 1.0
     assert float(str(named["latency_s"])) > 0
     assert {str(s["traceId"]) for s in scores} == {format(root.context.trace_id, "032x")}
+
+
+@pytest.mark.parametrize(
+    ("whole_seed", "tags"),
+    [
+        (False, ("asking", "work:SEED0001", "run:R1")),
+        (True, ("asking", "work:SEED0001", "whole-seed", "run:R1")),
+    ],
+)
+def test_the_answer_names_its_trace_which_carries_the_callers_tags(
+    store_db: Conn, conversation: Conversation, whole_seed: bool, tags: tuple[str, ...]
+) -> None:
+    tracing, exporter, _ = in_memory_tracing()
+    script = Script(["Entropy was computed from each EEG recording."])
+    ctx = replace(
+        context(store_db, script, tracing=tracing), tags=("run:R1",), whole_seed=whole_seed
+    )
+
+    events = turn(ctx, conversation, QUESTION)
+    tracing.flush()
+
+    [root] = [s for s in exporter.get_finished_spans() if s.name == "question"]
+    assert root.context is not None
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent)
+    assert answered.trace_id == format(root.context.trace_id, "032x")
+    assert (root.attributes or {})["langfuse.trace.tags"] == tags
+
+
+def test_a_failed_turn_names_its_trace_too(store_db: Conn, conversation: Conversation) -> None:
+    tracing, exporter, _ = in_memory_tracing()
+    script = Script(then=[Call("search", {"query": "again"})])
+
+    events = turn(context(store_db, script, tracing=tracing), conversation, QUESTION)
+    tracing.flush()
+
+    [root] = [s for s in exporter.get_finished_spans() if s.name == "question"]
+    assert root.context is not None
+    failed = events[-1]
+    assert isinstance(failed, ErrorEvent)
+    assert failed.trace_id == format(root.context.trace_id, "032x")
+
+
+def test_without_tracing_the_answer_names_no_trace(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    events = turn(context(store_db, Script(["Fine."])), conversation, QUESTION)
+
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent) and answered.trace_id is None
+
+
+def test_the_whole_seed_mode_shows_every_chunk_with_its_handle_and_no_tools(
+    store_db: Conn, small_seed: Work, conversation: Conversation
+) -> None:
+    discussion = chunk(store_db, small_seed, DISCUSSION)
+
+    def draft() -> str:
+        handle = conversation.handle(discussion)
+        return f'The authors write that "The sample was small". [#{handle}]'
+
+    script = Script([draft])
+    ctx = replace(context(store_db, script), whole_seed=True)
+
+    events = turn(ctx, conversation, "How large was the sample?")
+
+    assert [type(e) for e in events] == [DeltaEvent, AnsweredEvent]
+    [(messages, info)] = script.requests
+    [question] = messages
+    assert isinstance(question, ModelRequest)
+    assert [p.content for p in question.parts if isinstance(p, UserPromptPart)] == [
+        "How large was the sample?"
+    ]
+    assert info.function_tools == []
+    assert info.instructions is not None
+    assert info.instructions.startswith(SYSTEM_PROMPT.strip())
+    assert "no tools" in info.instructions
+    stored = Chunks(store_db).for_work(small_seed.id)
+    assert handles_shown(info.instructions) == {
+        c.chunk.text: n for n, c in enumerate(stored, start=1)
+    }
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent)
+    [pointer] = answered.answer.sentences[0].pointers
+    assert pointer.chunk_id == discussion.id
+    [quote] = answered.answer.quotes
+    assert quote.exact
+    assert conversation.questions == 1
+
+
+def test_the_live_mode_is_the_default(store_db: Conn) -> None:
+    ctx = context(store_db, Script())
+
+    assert (ctx.tags, ctx.whole_seed) == ((), False)

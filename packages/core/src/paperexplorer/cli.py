@@ -4,6 +4,7 @@ import asyncio
 import json
 import textwrap
 import time
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
@@ -12,14 +13,14 @@ import psycopg
 import typer
 from pydantic_ai.messages import ModelResponse
 
-from paperexplorer import __version__, asking, citations, parsing, pipeline, retrieval, store
+from paperexplorer import __version__, asking, citations, evals, parsing, pipeline, retrieval, store
 from paperexplorer.citations import ConfidenceLevel, confidence_level
 from paperexplorer.config import Settings
 from paperexplorer.domain import Answer, Scope
 from paperexplorer.embedding import OpenAICompatibleEmbedder
 from paperexplorer.library import ZoteroLibrary
 from paperexplorer.logs import configure_logging
-from paperexplorer.tracing import configure_tracing
+from paperexplorer.tracing import configure_tracing, trace_release
 
 app = typer.Typer(no_args_is_help=True, help="Follow a paper's citations into its sources.")
 
@@ -212,6 +213,96 @@ def ask_command(
 
 
 _NO_TEXT = parsing.ParsedWork(text_origin=parsing.TextOrigin.PRINTED, blocks=[], references=[])
+
+
+@app.command("eval")
+def eval_command(
+    work: Annotated[str, typer.Argument(help="The Seed's Zotero item key, e.g. YAAC9XCX.")],
+    questions: Annotated[
+        Path, typer.Option(exists=True, dir_okay=False, help="The Question set to ask.")
+    ] = Path("evals/seed-questions.yaml"),
+    baseline: Annotated[
+        bool, typer.Option("--baseline/--no-baseline", help="Also ask with the whole Seed.")
+    ] = True,
+    only: Annotated[
+        list[str] | None, typer.Option(help="Ask only this Question, by name; repeatable.")
+    ] = None,
+    run_id: Annotated[
+        str | None, typer.Option(help="The run's id; else its start in UTC and the commit.")
+    ] = None,
+    summary_dir: Annotated[Path, typer.Option(help="Where the summary to commit goes.")] = Path(
+        "evals/runs"
+    ),
+) -> None:
+    """Ask the Seed its eval Questions as the reader does, and with the whole Seed; report both.
+
+    Traces go to Langfuse's `eval` environment. The full report, Answers and all, goes to
+    `<PE_DATA_DIR>/eval/<run id>/`; the summary, without the Seed's or the Answers' words, also
+    to `--summary-dir`, to be committed.
+    """
+    settings = evals.eval_settings()
+    dataset = evals.load_questions(questions)
+    if only:
+        missing = sorted(set(only) - {c.name for c in dataset.cases})
+        if missing:
+            typer.echo(f"No such Question in {questions}: {', '.join(missing)}", err=True)
+            raise typer.Exit(1)
+        dataset.cases = [c for c in dataset.cases if c.name in only]
+    modes = [evals.Mode.RETRIEVAL, *([evals.Mode.BASELINE] if baseline else [])]
+    with psycopg.connect(settings.database_url, autocommit=True) as conn:
+        store.migrate(conn)
+        found = store.Works(conn).find(work)
+        if found is None:
+            typer.echo(f"No Work {work}; run fetch, parse, chunk and embed first", err=True)
+            raise typer.Exit(1)
+        chunks = store.Chunks(conn)
+        stored = chunks.for_work(found.id)
+        if not stored or chunks.without_embedding(found.id, settings.embedding_model):
+            typer.echo(f"{work} is not chunked and embedded; run chunk and embed first", err=True)
+            raise typer.Exit(1)
+        unknown = evals.unknown_places(dataset, stored)
+        if unknown:
+            typer.echo(f"No Chunk of {work} sits at these places of {questions}:", err=True)
+            for name, place in unknown:
+                typer.echo(f"  {name}: {place}", err=True)
+            raise typer.Exit(1)
+        tracing = configure_tracing(settings)
+        embedder = OpenAICompatibleEmbedder.from_settings(settings, tracing)
+        info = evals.run_info(
+            settings,
+            found,
+            questions,
+            embedding_model=embedder.model,
+            git_sha=trace_release(settings),
+            tracing_host=tracing.base_url,
+            started=datetime.now(UTC),
+            run_id=run_id,
+        )
+        ctx = asking.AskingContext(
+            conn=conn,
+            embedder=embedder,
+            model=asking.chat_model(settings),
+            settings=settings,
+            tracing=tracing,
+        )
+        asked = len(dataset.cases)
+        typer.echo(
+            f"eval {work}: {asked} Question{'s' if asked != 1 else ''},"
+            f" {' and '.join(m.value for m in modes)}, run {info.run_id}"
+        )
+        try:
+            report = asyncio.run(evals.run_eval(ctx, found, dataset, info, modes))
+        finally:
+            tracing.flush()
+    summary = evals.summarize(report)
+    written = evals.write_run(report, summary, settings.data_dir / "eval", summary_dir)
+    for check in summary.bar:
+        met = {True: "met", False: "NOT met", None: "stage 8b"}[check.met]
+        value = check.value
+        shown = "-" if value is None else f"{value:.2f}" if isinstance(value, float) else value
+        typer.echo(f"{check.name} {shown} ({check.bar}): {met}")
+    typer.echo(f"full report: {written.run_dir}")
+    typer.echo(f"summary to commit: {', '.join(str(p) for p in written.committed)}")
 
 
 async def _stream_answer(

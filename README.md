@@ -64,3 +64,11 @@ curl -N -X POST localhost:8000/conversations/<conversation_id>/questions \
 
 Tower-only tests (real Zotero storage, GROBID, the Seed) run there with `uv run pytest -m tower`.
 `scripts/tower-check.sh` runs those, the gate, the Seed and the pipeline image in one go and writes `tower-check.log` to commit back to the branch.
+
+The eval asks the Seed the Questions of `evals/seed-questions.yaml`, as the reader does and with the whole Seed in context, and measures the Answers against the design's bar (`docs/design-asking.md`, Eval). Run it inside tmux, once the Seed is chunked and embedded:
+
+```sh
+scripts/tower-eval.sh       # or: uv run paperexplorer eval YAAC9XCX [--only <question>] [--no-baseline]
+```
+
+The full report, Answers and all, stays in `data/eval/<run id>/` (the Seed's licence is unknown); the summary without their words goes to `evals/runs/<run id>.{json,md}`, which the script offers to commit.

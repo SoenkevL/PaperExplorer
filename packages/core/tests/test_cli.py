@@ -1,4 +1,6 @@
+import json
 from collections.abc import AsyncIterator, Callable
+from pathlib import Path
 
 import psycopg
 import pytest
@@ -207,6 +209,116 @@ def test_ask_marks_a_quote_that_is_not_the_authors_words(monkeypatch: pytest.Mon
 @pytest.mark.usefixtures("cli_env")
 def test_ask_says_when_the_work_is_unknown_and_fails() -> None:
     result = CliRunner().invoke(app, ["ask", "NOSUCHKY", "Why?"])
+
+    assert result.exit_code == 1
+    assert "No Work NOSUCHKY" in result.output
+
+
+EVAL_QUESTIONS = """
+name: cli-questions
+cases:
+  - name: method-entropy
+    inputs: How was entropy measured?
+    metadata:
+      kind: method
+      places:
+        - heading_path: ["2 Methods", "2.3 EEG"]
+          page: 4
+  - name: uncovered-caffeine
+    inputs: How does caffeine affect sleep?
+    metadata:
+      kind: uncovered
+"""
+
+
+@pytest.fixture
+def eval_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """The Question set in `tmp_path`, which is also the data folder the runs go into."""
+    monkeypatch.setenv("PE_DATA_DIR", str(tmp_path / "data"))
+    questions = tmp_path / "questions.yaml"
+    questions.write_text(EVAL_QUESTIONS)
+    return tmp_path
+
+
+@pytest.mark.usefixtures("embedded_seed")
+def test_eval_asks_every_question_in_both_modes_and_writes_the_run(
+    monkeypatch: pytest.MonkeyPatch, eval_files: Path
+) -> None:
+    measured = "Sample entropy was measured in every participant. [#1]"
+    uncovered = "The Seed does not say how caffeine affects sleep."
+    monkeypatch.setattr(asking, "chat_model", _scripted(measured, uncovered, measured, uncovered))
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "eval",
+            "YAAC9XCX",
+            "--questions",
+            str(eval_files / "questions.yaml"),
+            "--summary-dir",
+            str(eval_files / "evals" / "runs"),
+            "--run-id",
+            "test-run",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    lines = result.stdout.splitlines()
+    assert lines[0] == "eval YAAC9XCX: 2 Questions, retrieval and baseline, run test-run"
+    assert "hit@8 1.00 (≥ 0.80): met" in lines
+    assert "Pointer coverage 1.00 (≥ 0.80): met" in lines
+    assert "Quotes marked exact that are not 0 (0): met" in lines
+    assert f"full report: {eval_files / 'data' / 'eval' / 'test-run'}" in lines
+    run_dir = eval_files / "data" / "eval" / "test-run"
+    assert (run_dir / "report.json").is_file() and (run_dir / "answers.md").is_file()
+    assert (eval_files / "evals" / "runs" / "test-run.md").is_file()
+    summary = json.loads((eval_files / "evals" / "runs" / "test-run.json").read_text())
+    assert summary["run"]["langfuse_environment"] == "eval"
+    assert summary["run"]["seed"] == "YAAC9XCX"
+    assert list(summary["modes"]) == ["retrieval", "baseline"]
+
+
+@pytest.mark.usefixtures("embedded_seed")
+def test_eval_without_the_baseline_asks_only_as_the_reader_does(
+    monkeypatch: pytest.MonkeyPatch, eval_files: Path
+) -> None:
+    monkeypatch.setattr(asking, "chat_model", _scripted("Measured. [#1]"))
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "eval",
+            "YAAC9XCX",
+            "--questions",
+            str(eval_files / "questions.yaml"),
+            "--summary-dir",
+            str(eval_files / "evals" / "runs"),
+            "--no-baseline",
+            "--only",
+            "method-entropy",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert ": 1 Question, retrieval, run " in result.stdout.splitlines()[0]
+
+
+@pytest.mark.usefixtures("embedded_seed")
+def test_eval_refuses_places_the_seed_does_not_have(eval_files: Path) -> None:
+    questions = eval_files / "questions.yaml"
+    questions.write_text(EVAL_QUESTIONS.replace("page: 4", "page: 9"))
+
+    result = CliRunner().invoke(app, ["eval", "YAAC9XCX", "--questions", str(questions)])
+
+    assert result.exit_code == 1
+    assert "method-entropy: p9 2 Methods > 2.3 EEG" in result.output
+
+
+@pytest.mark.usefixtures("cli_env")
+def test_eval_says_when_the_work_is_unknown_and_fails(eval_files: Path) -> None:
+    questions = str(eval_files / "questions.yaml")
+
+    result = CliRunner().invoke(app, ["eval", "NOSUCHKY", "--questions", questions])
 
     assert result.exit_code == 1
     assert "No Work NOSUCHKY" in result.output

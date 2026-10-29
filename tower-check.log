@@ -1,6 +1,6 @@
-date:    2026-10-28T19:54:33+01:00
+date:    2026-10-29T19:54:36+01:00
 host:    pop-os · Linux 7.2.6-76070206-generic x86_64
-branch:  feat/chunk-stage @ 1284a48
+branch:  feat/asking-agent @ 3d88b54
 dirty:   0 files
 uv:      uv 0.13.0 (x86_64-unknown-linux-gnu)
 docker:  29.9.2
@@ -15,7 +15,7 @@ All checks passed!
 
 === ruff format --check
 $ uv run ruff format --check
-98 files already formatted
+121 files already formatted
 
 === pyright
 $ uv run pyright
@@ -23,16 +23,18 @@ $ uv run pyright
 
 === pytest
 $ uv run pytest -q -rs
-........................................................................ [ 45%]
-........................................................................ [ 90%]
-...............                                                          [100%]
+........................................................................ [ 28%]
+........................................................................ [ 57%]
+........................................................................ [ 85%]
+....................................                                     [100%]
 =============================== warnings summary ===============================
-.venv/lib/python3.14/site-packages/fastapi/testclient.py:1
-  /home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
-    from starlette.testclient import TestClient as TestClient  # noqa
+packages/core/tests/test_asking_agent.py::test_one_question_is_one_trace_holding_every_model_tool_and_embedding_call
+packages/core/tests/test_tracing.py::test_spans_and_scores_record_under_the_current_trace_and_nothing_outside_one
+  /home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/backoff/_decorator.py:201: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+    if asyncio.iscoroutinefunction(target):
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-159 passed, 4 deselected, 1 warning in 134.32s (0:02:14)
+252 passed, 9 deselected, 2 warnings in 151.46s (0:02:31)
 
 === GROBID up (compose)
 $ docker compose up -d --quiet-pull grobid
@@ -51,59 +53,173 @@ rootdir: /home/netinc/Projects/PaperExplorer
 configfile: pyproject.toml
 testpaths: packages, tests
 plugins: anyio-4.15.1, platformdirs-4.13.3
-collecting ... collected 163 items / 159 deselected / 4 selected
+collecting ... collected 261 items / 252 deselected / 9 selected
 
-packages/core/tests/test_seed_golden.py::test_the_seed_parses_with_printed_text_and_linked_citations PASSED [ 25%]
-packages/core/tests/test_seed_golden.py::test_every_paragraph_of_the_seed_is_chunked_within_the_token_limit PASSED [ 50%]
-packages/core/tests/test_zotero_live.py::test_the_real_library_has_the_seed_and_its_pdf PASSED [ 75%]
-tests/e2e/test_seed_e2e.py::test_the_seed_reaches_the_api_with_its_citations FAILED [100%]
+packages/core/tests/test_asking_agent_live.py::test_the_chat_model_answers_from_what_it_read_and_its_thinking_stays_in_the_trace FAILED [ 11%]
+packages/core/tests/test_asking_live.py::test_a_paraphrase_of_a_sentence_is_close_to_it_and_an_unrelated_sentence_is_weak PASSED [ 22%]
+packages/core/tests/test_asking_live.py::test_an_unrelated_sentence_is_weak_against_every_chunk_of_the_seed PASSED [ 33%]
+packages/core/tests/test_embedding_live.py::test_bge_m3_gives_1024_dimensions_and_puts_like_meanings_closer PASSED [ 44%]
+packages/core/tests/test_retrieval_live.py::test_searching_the_seed_for_a_headings_words_finds_chunks_under_that_heading PASSED [ 55%]
+packages/core/tests/test_seed_golden.py::test_the_seed_parses_with_printed_text_and_linked_citations PASSED [ 66%]
+packages/core/tests/test_seed_golden.py::test_every_paragraph_of_the_seed_is_chunked_within_the_token_limit PASSED [ 77%]
+packages/core/tests/test_zotero_live.py::test_the_real_library_has_the_seed_and_its_pdf PASSED [ 88%]
+tests/e2e/test_seed_e2e.py::test_the_seed_reaches_the_api_with_its_citations PASSED [100%]
 
 =================================== FAILURES ===================================
-_______________ test_the_seed_reaches_the_api_with_its_citations _______________
+_ test_the_chat_model_answers_from_what_it_read_and_its_thinking_stays_in_the_trace _
 
-store_db = <psycopg.Connection [INTRANS] (host=localhost port=32772 database=test) at 0x732e846c9fd0>
+store_db = <psycopg.Connection [INTRANS] (host=localhost port=32772 database=test) at 0x75cccd30d400>
+parse_fixture = <function parse_fixture.<locals>.<lambda> at 0x75cccd2de610>
 
     @pytest.mark.tower
-    def test_the_seed_reaches_the_api_with_its_citations(
-        store_db: psycopg.Connection[TupleRow],
+    def test_the_chat_model_answers_from_what_it_read_and_its_thinking_stays_in_the_trace(
+        store_db: psycopg.Connection[TupleRow], parse_fixture: Callable[[str], ParsedWork]
     ) -> None:
         settings = Settings()
-        if not settings.zotero_library_id or settings.zotero_api_key is None:
-            pytest.skip("PE_ZOTERO_LIBRARY_ID / PE_ZOTERO_API_KEY are not set")
-        ctx = StageContext(
-            conn=store_db, settings=settings, library=ZoteroLibrary.from_settings(settings)
+        exporter = InMemorySpanExporter()
+        tracing = configure_tracing(
+            Settings(
+                _env_file=None,  # pyright: ignore[reportCallIssue]
+                langfuse_public_key=f"pk-lf-test-{uuid.uuid4()}",
+                langfuse_secret_key="sk-lf-test",
+                langfuse_base_url="http://langfuse.test",
+            ),
+            http=httpx.Client(transport=httpx.MockTransport(lambda _: httpx.Response(200, json={}))),
+            span_exporter=exporter,
         )
-        work = Works(store_db).ensure(SEED)
+        embedder = OpenAICompatibleEmbedder.from_settings(settings, tracing)
+        parsed = parse_fixture("villiger2024-tandf")
+        works, chunks = Works(store_db), Chunks(store_db)
+        work = works.ensure("VILLIGER")
+        WorkTexts(store_db).replace(work, parsed)
+        chunks.replace(work, chunking.chunk(parsed))
+        stored = chunks.for_work(work)
+        vectors = embedder.embed([s.chunk.text for s in stored])
+        chunks.record_embeddings(
+            work, embedder.model, dict(zip((s.id for s in stored), vectors, strict=True))
+        )
+        CitationGraphs(store_db).replace(work, citations.extract(parsed))
+        found = works.get(work)
+        assert found is not None
+        conversation = Conversation(work=found)
+        ctx = AskingContext(
+            conn=store_db,
+            embedder=embedder,
+            model=chat_model(settings),
+            settings=settings,
+            tracing=tracing,
+        )
     
-        for stage in STAGES:
-            run_stage(ctx, stage, work)
+        async def collect() -> list[AnswerEvent]:
+            return [event async for event in ask(ctx, conversation, QUESTION)]
     
-        text = ApiClient(TestClient(create_app(lambda: nullcontext(store_db)))).work(work)
-        spans = [c for b in text.blocks for c in b.citations]
-        assert text.text_origin == "printed"
-        assert len(text.blocks) >= 100
-        assert len(spans) >= 280
->       assert sum(c.confidence_level == "unlinked" for c in spans) <= 10
-E       assert 11 <= 10
-E        +  where 11 = sum(<generator object test_the_seed_reaches_the_api_with_its_citations.<locals>.<genexpr> at 0x732e824901e0>)
+        events = asyncio.run(collect())
+        tracing.flush()
+    
+        answered = events[-1]
+>       assert isinstance(answered, AnsweredEvent), answered
+E       AssertionError: ErrorEvent(type='error', message='The model could not answer: status_code: 404, model_name: paperexplorer-chat, body: {\'message\': "model \'paperexplorer-chat\' not found", \'type\': \'not_found_error\', \'param\': None, \'code\': None}')
+E       assert False
+E        +  where False = isinstance(ErrorEvent(type='error', message='The model could not answer: status_code: 404, model_name: paperexplorer-chat, body: {\'message\': "model \'paperexplorer-chat\' not found", \'type\': \'not_found_error\', \'param\': None, \'code\': None}'), AnsweredEvent)
 
-tests/e2e/test_seed_e2e.py:40: AssertionError
-=============================== warnings summary ===============================
-.venv/lib/python3.14/site-packages/fastapi/testclient.py:1
-  /home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
-    from starlette.testclient import TestClient as TestClient  # noqa
+packages/core/tests/test_asking_agent_live.py:84: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    paperexplorer.asking.agent:agent.py:148 Question 1 of Conversation 82423cb1-9ae1-426e-938d-5a6fa10dd0c5 failed
+Traceback (most recent call last):
+  File "/home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/pydantic_ai/models/openai.py", line 265, in _map_api_errors
+    yield
+  File "/home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/pydantic_ai/models/openai.py", line 1736, in _completions_create
+    return await with_max_retries(self.client, model_settings).chat.completions.create(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<33 lines>...
+    )
+    ^
+  File "/home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/openai/resources/chat/completions/completions.py", line 2982, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+    ...<55 lines>...
+    )
+    ^
+  File "/home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/openai/_base_client.py", line 2093, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/openai/_base_client.py", line 1878, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - model 'paperexplorer-chat' not found
 
--- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/netinc/Projects/PaperExplorer/packages/core/src/paperexplorer/asking/agent.py", line 140, in _turn
+    answer, messages, usage = await _answer(ctx, conversation, question, emit)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/netinc/Projects/PaperExplorer/packages/core/src/paperexplorer/asking/agent.py", line 210, in _answer
+    async for event in stream:
+        if text := _draft(event):
+            emit(DeltaEvent(text=text))
+  File "/home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/pydantic_ai/result.py", line 539, in _pull_shared
+    event = await anext(events_iterator)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/pydantic_ai/capabilities/combined.py", line 710, in wrap_run_event_stream
+    async for event in stream:
+        yield event
+  File "/home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/pydantic_ai/capabilities/abstract.py", line 1048, in wrap_run_event_stream
+    async for event in stream:
+        yield event
+  File "/home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/pydantic_ai/capabilities/abstract.py", line 1048, in wrap_run_event_stream
+    async for event in stream:
+        yield event
+  File "/home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/pydantic_ai/capabilities/abstract.py", line 1048, in wrap_run_event_stream
+    async for event in stream:
+        yield event
+  [Previous line repeated 1 more time]
+  File "/home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/pydantic_ai/_run_context.py", line 140, in dispatch_event_stream
+    async for event in stream:
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<8 lines>...
+        yield ctx._event_stream_replacements.pop(event_id, event)  # pyright: ignore[reportPrivateUsage]
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/pydantic_ai/result.py", line 571, in _events_iter
+    event = await anext(base_iter)
+            ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/pydantic_ai/result.py", line 510, in _model_events
+    event = await anext(events)
+            ^^^^^^^^^^^^^^^^^^^
+  File "/home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/pydantic_ai/models/_continuation.py", line 463, in _iterator_with_cancel_guard
+    async for event in iterator:
+    ...<4 lines>...
+        yield event
+  File "/home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/pydantic_ai/_utils.py", line 695, in __anext__
+    return await anext(self._source_iter)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/pydantic_ai/models/_continuation.py", line 569, in _get_event_iterator
+    async with self.model.request_stream(
+               ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        messages, self.model_settings, self.model_request_parameters, self.run_context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ) as sub:
+    ^
+  File "/home/netinc/.local/share/uv/python/cpython-3.14.8-linux-x86_64-gnu/lib/python3.14/contextlib.py", line 214, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/pydantic_ai/models/openai.py", line 1672, in request_stream
+    response = await self._completions_create(messages, True, model_settings_cast, model_request_parameters)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/pydantic_ai/models/openai.py", line 1727, in _completions_create
+    with _map_api_errors(self.model_name, self._provider.model_id_namespace), map_decode_errors(self.model_name):
+         ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/netinc/.local/share/uv/python/cpython-3.14.8-linux-x86_64-gnu/lib/python3.14/contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "/home/netinc/Projects/PaperExplorer/.venv/lib/python3.14/site-packages/pydantic_ai/models/openai.py", line 268, in _map_api_errors
+    raise _map_status_error(e, model_name, model_id_namespace) from e
+pydantic_ai.exceptions.ModelNotFoundError: status_code: 404, model_name: paperexplorer-chat, body: {'message': "model 'paperexplorer-chat' not found", 'type': 'not_found_error', 'param': None, 'code': None}
+================= 1 failed, 8 passed, 252 deselected in 36.17s =================
 
 === parse the Seed
 $ uv run paperexplorer parse --show 0 /home/soenke/Zotero/storage/YTS2XCEG/Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
-2026-10-28 20:35:15,409 INFO    paperexplorer.parsing: Parsing Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
-2026-10-28 20:35:17,019 INFO    paperexplorer.parsing: Parsed Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: 113 blocks, 185 References, 284 Citation markers
-
-=== parse the Seed
-$ uv run paperexplorer parse --show 0 /home/soenke/Zotero/storage/YTS2XCEG/Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
-2026-10-28 19:57:07,104 INFO    paperexplorer.parsing: Parsing Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
-2026-10-28 19:57:08,733 INFO    paperexplorer.parsing: Parsed Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: 113 blocks, 185 References, 284 Citation markers
+2026-10-29 19:57:56,894 INFO    paperexplorer.parsing: Parsing Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
+2026-10-29 19:57:58,490 INFO    paperexplorer.parsing: Parsed Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: 113 blocks, 185 References, 284 Citation markers
 Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: printed text
 Blocks: 113 (19 headings)
 References: 185
@@ -114,10 +230,10 @@ $ docker compose build pipeline
 
 === pipeline: the Seed
 $ docker compose run --rm --no-deps -T -e PE_DATA_DIR=/tmp/pe pipeline parse --show 0 /zotero/storage/YTS2XCEG/Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
- Container paperexplorer-pipeline-run-ea466c83209f Creating 
- Container paperexplorer-pipeline-run-ea466c83209f Created 
-2026-10-28 18:57:28,417 INFO    paperexplorer.parsing: Parsing Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
-2026-10-28 18:57:55,372 INFO    paperexplorer.parsing: Parsed Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: 113 blocks, 185 References, 284 Citation markers
+ Container paperexplorer-pipeline-run-4ffd2745bcc5 Creating 
+ Container paperexplorer-pipeline-run-4ffd2745bcc5 Created 
+2026-10-29 18:58:25,857 INFO    paperexplorer.parsing: Parsing Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
+2026-10-29 18:58:53,033 INFO    paperexplorer.parsing: Parsed Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: 113 blocks, 185 References, 284 Citation markers
 Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: printed text
 Blocks: 113 (19 headings)
 References: 185
@@ -125,10 +241,10 @@ Citations: 284 (certain 0, high 260, low 13, unlinked 11)
 
 === pipeline: scan via OCR
 $ docker compose run --rm --no-deps -T -e PE_DATA_DIR=/tmp/pe -v /home/netinc/Projects/PaperExplorer/tests/fixtures/pdfs:/fixtures:ro pipeline parse /fixtures/scan-villiger2024.pdf
- Container paperexplorer-pipeline-run-43bc867261fd Creating 
- Container paperexplorer-pipeline-run-43bc867261fd Created 
-2026-10-28 18:57:56,795 INFO    paperexplorer.parsing: Parsing scan-villiger2024.pdf
-2026-10-28 18:57:56,796 WARNING paperexplorer.parsing: scan-villiger2024.pdf has no text layer; reading it by OCR, its text is OCR Text
+ Container paperexplorer-pipeline-run-9cff95ed53d5 Creating 
+ Container paperexplorer-pipeline-run-9cff95ed53d5 Created 
+2026-10-29 18:58:55,757 INFO    paperexplorer.parsing: Parsing scan-villiger2024.pdf
+2026-10-29 18:58:55,759 WARNING paperexplorer.parsing: scan-villiger2024.pdf has no text layer; reading it by OCR, its text is OCR Text
 scan-villiger2024.pdf: OCR Text (a scan)
 Blocks: 37 (6 headings)
 References: 26
@@ -149,76 +265,190 @@ $ docker compose up -d --wait db
 
 === migrate
 $ uv run paperexplorer migrate
-2026-10-28 19:58:08,992 INFO    paperexplorer.store.migrate: Applied migration 0003_chunks.sql
-2026-10-28 19:58:08,992 INFO    paperexplorer.store.migrate: Migrations up to date (1 new)
-Applied 0003_chunks.sql
+2026-10-29 19:59:03,418 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+Schema is up to date
 
 === run fetch (host)
 $ uv run paperexplorer run fetch YAAC9XCX
-2026-10-28 19:58:09,506 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
-2026-10-28 19:58:09,535 INFO    paperexplorer.pipeline: Stage fetch started for Work 1
-2026-10-28 19:58:10,343 INFO    paperexplorer.pipeline: Stage fetch finished for Work 1: {'pdfs': 1}
+2026-10-29 19:59:04,809 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-29 19:59:04,909 INFO    paperexplorer.tracing: Tracing to http://localhost:3000 as tower
+2026-10-29 19:59:04,924 INFO    paperexplorer.pipeline: Stage fetch started for Work 1
+2026-10-29 19:59:05,805 INFO    paperexplorer.pipeline: Stage fetch finished for Work 1: {'pdfs': 1}
 fetch YAAC9XCX: pdfs 1
 
 === run parse (host)
 $ uv run paperexplorer run parse YAAC9XCX
-2026-10-28 19:58:10,889 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
-2026-10-28 19:58:10,916 INFO    paperexplorer.pipeline: Stage parse started for Work 1
-2026-10-28 19:58:10,918 INFO    paperexplorer.parsing: Parsing Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
-2026-10-28 19:58:12,478 INFO    paperexplorer.parsing: Parsed Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: 113 blocks, 185 References, 284 Citation markers
-2026-10-28 19:58:12,546 INFO    paperexplorer.pipeline: Stage parse finished for Work 1: {'blocks': 113, 'references': 185, 'citation_markers': 284}
+2026-10-29 19:59:07,198 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-29 19:59:07,259 INFO    paperexplorer.tracing: Tracing to http://localhost:3000 as tower
+2026-10-29 19:59:07,275 INFO    paperexplorer.pipeline: Stage parse started for Work 1
+2026-10-29 19:59:07,278 INFO    paperexplorer.parsing: Parsing Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
+2026-10-29 19:59:08,821 INFO    paperexplorer.parsing: Parsed Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: 113 blocks, 185 References, 284 Citation markers
+2026-10-29 19:59:08,911 INFO    paperexplorer.pipeline: Stage parse finished for Work 1: {'blocks': 113, 'references': 185, 'citation_markers': 284}
 parse YAAC9XCX: blocks 113, references 185, citation_markers 284
 
 === run chunk (host)
 $ uv run paperexplorer run chunk YAAC9XCX
-2026-10-28 19:58:13,098 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
-2026-10-28 19:58:13,130 INFO    paperexplorer.pipeline: Stage chunk started for Work 1
-2026-10-28 19:58:13,900 INFO    paperexplorer.pipeline: Stage chunk finished for Work 1: {'chunks': 105, 'short': 5, 'oversized_sentence': 2}
+2026-10-29 19:59:10,345 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-29 19:59:10,406 INFO    paperexplorer.tracing: Tracing to http://localhost:3000 as tower
+2026-10-29 19:59:10,423 INFO    paperexplorer.pipeline: Stage chunk started for Work 1
+2026-10-29 19:59:11,232 INFO    paperexplorer.pipeline: Stage chunk finished for Work 1: {'chunks': 105, 'short': 5, 'oversized_sentence': 2}
 chunk YAAC9XCX: chunks 105, short 5, oversized_sentence 2
+
+=== run embed (host)
+$ uv run paperexplorer run embed YAAC9XCX
+2026-10-29 19:59:12,849 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-29 19:59:12,909 INFO    paperexplorer.tracing: Tracing to http://localhost:3000 as tower
+2026-10-29 19:59:12,925 INFO    paperexplorer.pipeline: Stage embed started for Work 1
+2026-10-29 19:59:14,335 INFO    paperexplorer.pipeline: Stage embed finished for Work 1: {'chunks': 105, 'embedded': 105}
+embed YAAC9XCX: chunks 105, embedded 105
 
 === run extract_citations (host)
 $ uv run paperexplorer run extract_citations YAAC9XCX
-2026-10-28 19:58:14,618 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
-2026-10-28 19:58:14,645 INFO    paperexplorer.pipeline: Stage extract_citations started for Work 1
-2026-10-28 19:58:14,719 INFO    paperexplorer.pipeline: Stage extract_citations finished for Work 1: {'citations': 284, 'certain': 0, 'high': 260, 'low': 13, 'unlinked': 11}
+2026-10-29 19:59:15,782 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-29 19:59:15,841 INFO    paperexplorer.tracing: Tracing to http://localhost:3000 as tower
+2026-10-29 19:59:15,857 INFO    paperexplorer.pipeline: Stage extract_citations started for Work 1
+2026-10-29 19:59:15,928 INFO    paperexplorer.pipeline: Stage extract_citations finished for Work 1: {'citations': 284, 'certain': 0, 'high': 260, 'low': 13, 'unlinked': 11}
 extract_citations YAAC9XCX: citations 284, certain 0, high 260, low 13, unlinked 11
+
+=== run embed again (host)
+$ uv run paperexplorer run embed YAAC9XCX
+2026-10-29 19:59:17,326 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-29 19:59:17,394 INFO    paperexplorer.tracing: Tracing to http://localhost:3000 as tower
+2026-10-29 19:59:17,412 INFO    paperexplorer.pipeline: Stage embed started for Work 1
+2026-10-29 19:59:17,430 INFO    paperexplorer.pipeline: Stage embed finished for Work 1: {'chunks': 105, 'embedded': 0}
+embed YAAC9XCX: chunks 105, embedded 0
+
+=== search the Seed (host)
+$ seed_searches
+2026-10-29 19:59:18,811 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-29 19:59:18,871 INFO    paperexplorer.tracing: Tracing to http://localhost:3000 as tower
+YAAC9XCX: 8 Chunks for 'How was brain entropy measured?' (bge-m3)
+ 1  rrf 0.0313  vector  7 0.617  full text  1 0.086  p11  3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement > 3.3. One entropy to rule them all?
+ 2  rrf 0.0311  vector  2 0.639  full text  7 0.075  p4  2. Serotonergic psychedelics and brain entropy > 2.4. What is brain entropy?
+ 3  rrf 0.0302  vector 10 0.609  full text  3 0.081  p3  2. Serotonergic psychedelics and brain entropy > 2.3. The entropic brain hypothesis
+ 4  rrf 0.0300  vector 12 0.603  full text  2 0.084  p10  3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement > 3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness
+ 5  rrf 0.0299  vector  6 0.618  full text  8 0.075  p4  2. Serotonergic psychedelics and brain entropy > 2.4. What is brain entropy?
+ 6  rrf 0.0292  vector 11 0.606  full text  6 0.076  p12  3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement > 3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness
+ 7  rrf 0.0292  vector  8 0.616  full text  9 0.073  p12  3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement > 3.3. One entropy to rule them all?
+ 8  rrf 0.0287  vector 15 0.599  full text  5 0.076  p8  3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement > 3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness
+
+2026-10-29 19:59:20,363 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-29 19:59:20,422 INFO    paperexplorer.tracing: Tracing to http://localhost:3000 as tower
+YAAC9XCX: 8 Chunks for 'Which methods and analyses did the authors use?' (bge-m3)
+ 1  rrf 0.0323  vector  1 0.537  full text  3 0.021  p14  Declaration of Generative AI and AI-assisted technologies in the writing process
+ 2  rrf 0.0309  vector  9 0.482  full text  1 0.049  p10  3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement > 3.3. One entropy to rule them all?
+ 3  rrf 0.0306  vector  3 0.510  full text  8 0.019  p6  2. Serotonergic psychedelics and brain entropy > Table 1
+ 4  rrf 0.0295  vector 15 0.461  full text  2 0.038  p5  2. Serotonergic psychedelics and brain entropy > 2.5. Previous research on psychedelic-induced brain entropy alterations
+ 5  rrf 0.0291  vector  4 0.501  full text 14 0.015  p2  1. Introduction
+ 6  rrf 0.0290  vector  8 0.486  full text 10 0.019  p9  3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement > 3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness
+ 7  rrf 0.0280  vector  2 0.512  full text 24 0.015  p6  2. Serotonergic psychedelics and brain entropy > Table 1
+ 8  rrf 0.0277  vector  6 0.494  full text 20 0.015  p5  2. Serotonergic psychedelics and brain entropy > 2.5. Previous research on psychedelic-induced brain entropy alterations
+
+2026-10-29 19:59:21,788 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-29 19:59:21,856 INFO    paperexplorer.tracing: Tracing to http://localhost:3000 as tower
+YAAC9XCX: 8 Chunks for 'What are the limitations and shortcomings of this work?' (bge-m3)
+ 1  rrf 0.0325  vector  2 0.539  full text  1 0.046  p2  1. Introduction
+ 2  rrf 0.0311  vector  7 0.501  full text  2 0.046  p11  3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement > 3.3. One entropy to rule them all?
+ 3  rrf 0.0308  vector  4 0.510  full text  6 0.020  p2  1. Introduction
+ 4  rrf 0.0307  vector  1 0.558  full text 10 0.020  p7  3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement
+ 5  rrf 0.0291  vector 13 0.472  full text  5 0.025  p13  4. Conclusions
+ 6  rrf 0.0274  vector 10 0.476  full text 16 0.020  p8  3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement > 3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness
+ 7  rrf 0.0273  vector  6 0.502  full text 22 0.020  p13  4. Conclusions
+ 8  rrf 0.0266  vector 31 0.442  full text  4 0.025  p1  (no heading)
+
+2026-10-29 19:59:23,386 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-29 19:59:23,450 INFO    paperexplorer.tracing: Tracing to http://localhost:3000 as tower
+YAAC9XCX: 8 Chunks for 'What future research do the authors propose?' (bge-m3)
+ 1  rrf 0.0325  vector  1 0.558  full text  2 0.036  p13  4. Conclusions
+ 2  rrf 0.0304  vector  2 0.507  full text 10 0.030  p9  3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement > 3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness
+ 3  rrf 0.0303  vector  8 0.490  full text  4 0.034  p12  3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement > 3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness
+ 4  rrf 0.0292  vector  6 0.496  full text 11 0.030  p10  3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement > 3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness
+ 5  rrf 0.0290  vector  9 0.484  full text  9 0.030  p8  3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement > 3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness
+ 6  rrf 0.0284  vector  7 0.491  full text 14 0.019  p1  1. Introduction
+ 7  rrf 0.0276  vector  3 0.505  full text 25 0.015  p8  3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement > 3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness
+ 8  rrf 0.0274  vector 13 0.480  full text 13 0.021  p14  Declaration of Generative AI and AI-assisted technologies in the writing process
+
+2026-10-29 19:59:24,803 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-29 19:59:24,866 INFO    paperexplorer.tracing: Tracing to http://localhost:3000 as tower
+YAAC9XCX: 8 Chunks for 'How does caffeine affect sleep in shift workers?' (bge-m3)
+ 1  rrf 0.0311  vector  2 0.485  full text  7 0.012  p8  3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement > 3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness
+ 2  rrf 0.0310  vector  3 0.483  full text  6 0.012  p7  3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement > 3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness
+ 3  rrf 0.0307  vector 10 0.451  full text  1 0.017  p3  2. Serotonergic psychedelics and brain entropy > 2.2. Psychedelic-induced altered states of consciousness
+ 4  rrf 0.0303  vector  1 0.522  full text 12 0.012  p9  3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement > 3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness
+ 5  rrf 0.0295  vector 12 0.449  full text  4 0.012  p7  2. Serotonergic psychedelics and brain entropy > 2.6. Theoretical merits and practical utility of brain entropy as a biomarker of the psychedelic state
+ 6  rrf 0.0291  vector  4 0.478  full text 14 0.012  p11  3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement > 3.3. One entropy to rule them all?
+ 7  rrf 0.0290  vector  7 0.461  full text 11 0.012  p9  3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement > 3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness
+ 8  rrf 0.0289  vector 18 0.435  full text  2 0.012  p3  2. Serotonergic psychedelics and brain entropy > 2.2. Psychedelic-induced altered states of consciousness
+
+
+=== ask the Seed (host)
+$ seed_questions
+question 1: How was brain entropy measured, and with which tools?
+ask failed (see data/asking/question-1.txt on the tower)
+tools: search
+full output: data/asking/question-1.txt
+
+question 2: What are the shortcomings of this work?
+ask failed (see data/asking/question-2.txt on the tower)
+tools: search
+full output: data/asking/question-2.txt
+
+question 3: How does caffeine affect sleep in shift workers?
+ask failed (see data/asking/question-3.txt on the tower)
+tools: search
+full output: data/asking/question-3.txt
+
 
 === pipeline: run fetch
 $ docker compose run --rm --no-deps -T -e PE_DATA_DIR=/tmp/pe pipeline run fetch YAAC9XCX
- Container paperexplorer-pipeline-run-b6001c99b2af Creating 
- Container paperexplorer-pipeline-run-b6001c99b2af Created 
-2026-10-28 18:58:16,045 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
-2026-10-28 18:58:16,104 INFO    paperexplorer.pipeline: Stage fetch started for Work 1
-2026-10-28 18:58:16,932 INFO    paperexplorer.pipeline: Stage fetch finished for Work 1: {'pdfs': 1}
+ Container paperexplorer-pipeline-run-d256c013ec92 Creating 
+ Container paperexplorer-pipeline-run-d256c013ec92 Created 
+2026-10-29 18:59:32,333 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-29 18:59:32,473 INFO    paperexplorer.tracing: Tracing to http://host.docker.internal:3000 as tower
+2026-10-29 18:59:32,542 INFO    paperexplorer.pipeline: Stage fetch started for Work 1
+2026-10-29 18:59:33,330 INFO    paperexplorer.pipeline: Stage fetch finished for Work 1: {'pdfs': 1}
 fetch YAAC9XCX: pdfs 1
 
 === pipeline: run parse
 $ docker compose run --rm --no-deps -T -e PE_DATA_DIR=/tmp/pe pipeline run parse YAAC9XCX
- Container paperexplorer-pipeline-run-ad362fc45ed3 Creating 
- Container paperexplorer-pipeline-run-ad362fc45ed3 Created 
-2026-10-28 18:58:18,368 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
-2026-10-28 18:58:18,424 INFO    paperexplorer.pipeline: Stage parse started for Work 1
-2026-10-28 18:58:18,426 INFO    paperexplorer.parsing: Parsing Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
-2026-10-28 18:58:25,192 INFO    paperexplorer.parsing: Parsed Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: 113 blocks, 185 References, 284 Citation markers
-2026-10-28 18:58:25,257 INFO    paperexplorer.pipeline: Stage parse finished for Work 1: {'blocks': 113, 'references': 185, 'citation_markers': 284}
+ Container paperexplorer-pipeline-run-53d825d5fdbd Creating 
+ Container paperexplorer-pipeline-run-53d825d5fdbd Created 
+2026-10-29 18:59:35,958 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-29 18:59:36,073 INFO    paperexplorer.tracing: Tracing to http://host.docker.internal:3000 as tower
+2026-10-29 18:59:36,133 INFO    paperexplorer.pipeline: Stage parse started for Work 1
+2026-10-29 18:59:36,135 INFO    paperexplorer.parsing: Parsing Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf
+2026-10-29 18:59:42,848 INFO    paperexplorer.parsing: Parsed Moses et al. - 2026 - A critical review of brain entropy as a biomarker of the psychedelic state.pdf: 113 blocks, 185 References, 284 Citation markers
+2026-10-29 18:59:42,918 INFO    paperexplorer.pipeline: Stage parse finished for Work 1: {'blocks': 113, 'references': 185, 'citation_markers': 284}
 parse YAAC9XCX: blocks 113, references 185, citation_markers 284
 
 === pipeline: run chunk
 $ docker compose run --rm --no-deps -T -e PE_DATA_DIR=/tmp/pe pipeline run chunk YAAC9XCX
- Container paperexplorer-pipeline-run-b2d4724475cd Creating 
- Container paperexplorer-pipeline-run-b2d4724475cd Created 
-2026-10-28 18:58:26,718 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
-2026-10-28 18:58:26,780 INFO    paperexplorer.pipeline: Stage chunk started for Work 1
-2026-10-28 18:58:27,598 INFO    paperexplorer.pipeline: Stage chunk finished for Work 1: {'chunks': 105, 'short': 5, 'oversized_sentence': 2}
+ Container paperexplorer-pipeline-run-3f4c78de1a3b Creating 
+ Container paperexplorer-pipeline-run-3f4c78de1a3b Created 
+2026-10-29 18:59:45,491 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-29 18:59:45,599 INFO    paperexplorer.tracing: Tracing to http://host.docker.internal:3000 as tower
+2026-10-29 18:59:45,658 INFO    paperexplorer.pipeline: Stage chunk started for Work 1
+2026-10-29 18:59:46,453 INFO    paperexplorer.pipeline: Stage chunk finished for Work 1: {'chunks': 105, 'short': 5, 'oversized_sentence': 2}
 chunk YAAC9XCX: chunks 105, short 5, oversized_sentence 2
+
+=== pipeline: run embed
+$ docker compose run --rm --no-deps -T -e PE_DATA_DIR=/tmp/pe pipeline run embed YAAC9XCX
+ Container paperexplorer-pipeline-run-26de98948521 Creating 
+ Container paperexplorer-pipeline-run-26de98948521 Created 
+2026-10-29 18:59:49,454 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-29 18:59:49,573 INFO    paperexplorer.tracing: Tracing to http://host.docker.internal:3000 as tower
+2026-10-29 18:59:49,638 INFO    paperexplorer.pipeline: Stage embed started for Work 1
+2026-10-29 18:59:51,112 INFO    paperexplorer.pipeline: Stage embed finished for Work 1: {'chunks': 105, 'embedded': 105}
+embed YAAC9XCX: chunks 105, embedded 105
 
 === pipeline: run extract_citations
 $ docker compose run --rm --no-deps -T -e PE_DATA_DIR=/tmp/pe pipeline run extract_citations YAAC9XCX
- Container paperexplorer-pipeline-run-46d306b4796b Creating 
- Container paperexplorer-pipeline-run-46d306b4796b Created 
-2026-10-28 18:58:29,257 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
-2026-10-28 18:58:29,317 INFO    paperexplorer.pipeline: Stage extract_citations started for Work 1
-2026-10-28 18:58:29,392 INFO    paperexplorer.pipeline: Stage extract_citations finished for Work 1: {'citations': 284, 'certain': 0, 'high': 260, 'low': 13, 'unlinked': 11}
+ Container paperexplorer-pipeline-run-c75ba5cccefc Creating 
+ Container paperexplorer-pipeline-run-c75ba5cccefc Created 
+2026-10-29 18:59:53,727 INFO    paperexplorer.store.migrate: Migrations up to date (0 new)
+2026-10-29 18:59:53,861 INFO    paperexplorer.tracing: Tracing to http://host.docker.internal:3000 as tower
+2026-10-29 18:59:53,939 INFO    paperexplorer.pipeline: Stage extract_citations started for Work 1
+2026-10-29 18:59:54,024 INFO    paperexplorer.pipeline: Stage extract_citations finished for Work 1: {'citations': 284, 'certain': 0, 'high': 260, 'low': 13, 'unlinked': 11}
 extract_citations YAAC9XCX: citations 284, certain 0, high 260, low 13, unlinked 11
 
 === api + web up (compose)
@@ -227,33 +457,38 @@ $ docker compose up -d --build --wait api web
 === reader: the Seed
 $ reader_check
 YAAC9XCX is Work 1: 113 blocks, 284 Citations
-stages: {'fetch': 'done', 'parse': 'done', 'chunk': 'done', 'extract_citations': 'done'}
+stages: {'fetch': 'done', 'parse': 'done', 'chunk': 'done', 'embed': 'done', 'extract_citations': 'done'}
 confidence levels: {'high': 260, 'unlinked': 11, 'low': 13}
 page: 284 Citation links covering 284 distinct Citations
-panel /works/1/panel?c=2557: shows a Reference
+panel /works/1/panel?c=3693: shows a Reference
 
 === summary
 uv sync                    ok                    1s
 ruff check                 ok                    0s
 ruff format --check        ok                    0s
-pyright                    ok                    5s
-pytest                     ok                  136s
+pyright                    ok                    7s
+pytest                     ok                  153s
 GROBID up (compose)        ok                    0s
-GROBID alive               ok                    0s
-pytest -m tower            FAILED (exit 1)      11s
-parse the Seed             ok                    2s
-build pipeline image       ok                   19s
-pipeline: the Seed         ok                   28s
-pipeline: scan via OCR     ok                    7s
-db up (compose)            ok                    6s
+GROBID alive               ok                    1s
+pytest -m tower            FAILED (exit 1)      37s
+parse the Seed             ok                    3s
+build pipeline image       ok                   25s
+pipeline: the Seed         ok                   30s
+pipeline: scan via OCR     ok                    8s
+db up (compose)            ok                    1s
 migrate                    ok                    1s
-run fetch (host)           ok                    1s
-run parse (host)           ok                    2s
+run fetch (host)           ok                    3s
+run parse (host)           ok                    3s
 run chunk (host)           ok                    2s
-run extract_citations (host) ok                    0s
+run embed (host)           ok                    3s
+run extract_citations (host) ok                    2s
+run embed again (host)     ok                    1s
+search the Seed (host)     ok                    8s
+ask the Seed (host)        FAILED (exit 1)       5s
 pipeline: run fetch        ok                    3s
-pipeline: run parse        ok                    8s
-pipeline: run chunk        ok                    3s
-pipeline: run extract_citations ok                    1s
-api + web up (compose)     ok                   27s
-reader: the Seed           ok                    1s
+pipeline: run parse        ok                   10s
+pipeline: run chunk        ok                    4s
+pipeline: run embed        ok                    4s
+pipeline: run extract_citations ok                    3s
+api + web up (compose)     ok                   37s
+reader: the Seed           ok                    0s

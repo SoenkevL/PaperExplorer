@@ -46,7 +46,8 @@ PaperExplorer/
 ├── packages/
 │   ├── core/  src/paperexplorer/{config,logs,tracing,cli,domain,parsing,citations,chunking,resolution,
 │   │          library,embedding,store/migrations,retrieval,asking,catalog,pipeline}/  tests/
-│   ├── api/   src/paperexplorer_api/{app.py,routes/,schemas.py,client.py}  tests/
+│   ├── api/   src/paperexplorer_api/{app.py,routes/,schemas.py,client.py,conversations.py,
+│   │          asking_thread.py}  tests/
 │   └── web/   src/paperexplorer_web/{app.py,templates/,static/}  tests/
 ├── docker/        Dockerfiles per deployable
 ├── tests/e2e/     cross-package tests
@@ -102,7 +103,7 @@ Sources reuse the Seed's stage functions; going one level deeper later is the sa
 - **Thinking:** Ollama returns it as `reasoning`, which pydantic-ai keeps as a thinking part: it is on the request's span in the trace, never in a `delta`, the Answer or the Conversation's messages.
 - **Draft:** `delta`s carry every text part the model streams; the Answer is the last response's text, resolved with `resolve_answer` against the Chunks read this turn at `PE_SUPPORT_THRESHOLD`.
 - **Model:** `chat_model(settings)` is pydantic-ai's OpenAI chat model with Ollama's provider profile (thinking in `reasoning`, tool schemas without `strict`) at `PE_CHAT_BASE_URL`, model `PE_CHAT_MODEL` (`paperexplorer-chat`, `scripts/paperexplorer-chat.Modelfile`); `PE_CHAT_NUM_CTX` repeats the Modelfile's `num_ctx` for the traces.
-- The tools call the store and the Embedder in the event loop: one connection, and the Chunks read in a fixed order.
+- The tools call the store and the Embedder in the event loop: one connection, and the Chunks read in a fixed order. The API therefore runs each turn on a loop of its own (see The API's Conversations).
 - `paperexplorer ask <zotero_key> "<question>"` streams the steps and draft, then prints the Answer, its Pointers with their places and its Quotes, and a summary line of counts.
 
 ## Answers
@@ -125,8 +126,20 @@ The API returns structured JSON only, never HTML: a Work as an ordered list of b
 - `GET /citations/{id}`: the Citation's marker, Citing Sentence and `text_origin`, its Citation Link (`confidence`, `evidence`, `confidence_level`) and the Reference as printed with the fields read from it; both null for an Unlinked Citation.
 - Offsets count Unicode code points (Python `str` indices), not UTF-16 units. Spans may overlap or coincide: a printed range's dash stands for several Citations.
 - `paperexplorer_api.schemas` imports nothing from core, so the web app depends on the contract alone.
-- `POST /works/{id}/conversations`: starts a Conversation about a Work whose Chunks are embedded; returns `{id}`. Conversations live in the API's memory until Postgres and login replace that store.
-- `POST /conversations/{id}/questions` with `{text}`: a `text/event-stream` of JSON events, `asking`'s `AnswerEvent`s by their `type`. `step` names a tool the model runs, with its `args` (the forced first search comes first); `delta` carries draft text; `answer` carries the resolved Answer: its `text`, the draft without its handles, which every offset of the Answer counts into; its sentences (`start`, `end`) with `pointers[]` of `{block_id, start, end, support}` and its `quotes[]` of `{start, end, exact, block_id, block_start, block_end}`, the place empty when not exact; `error` ends a failed turn with a `message`. Offsets count code points, as above.
+- `POST /works/{id}/conversations`: starts a Conversation about a Work whose Chunks are embedded; 201 with `{id}`. 404 for an unknown Work; 409 while the Work has no Chunks, or any Chunk lacks a Vector from the API's Embedder model (`detail` says to run `chunk` and `embed`, or `embed`). Conversations live in the API's memory until Postgres and login replace that store (see The API's Conversations).
+- `POST /conversations/{id}/questions` with `{text}` (not blank, else 422): 404 for an unknown or evicted Conversation (start a new one); 409 while it is still answering a Question; else 200 and a `text/event-stream` of `asking`'s `AnswerEvent`s. Each SSE event is named by its `type` and carries the event as JSON data (`event: delta` / `data: {"type": "delta", "text": "…"}`); after 15 s without an event the API sends a `: ping` comment, so the stream stays open while the model thinks.
+  - `step` `{tool, args}`: a tool the model runs, with its arguments; the forced first search comes first.
+  - `delta` `{text}`: more draft text, handles and all; the Answer replaces the draft.
+  - `answer` `{answer}`: the resolved Answer, the turn's last event. `text` is the draft without its handles, which every offset of the Answer counts into; `sentences[]` of `{start, end, pointers[]}`, each Pointer `{block_id, start, end, support, chunk_start, chunk_end}`: the place (`close` or `weak`) and its Chunk's span in the same block, for the faint highlight; `quotes[]` of `{start, end, exact, block_id, block_start, block_end}`, the place null when not exact.
+  - `error` `{message}`: the turn failed and ends here; the Conversation stays as it was before the Question.
+  - Closing the stream cancels the turn. Offsets count code points, as above.
+- The typed client (`paperexplorer_api.client.ApiClient`) mirrors the routes: `start_conversation(work_id) -> Conversation` and `ask(conversation_id, text)`, a generator of the events parsed into `schemas.AnswerEvent`; 404 raises `NotFoundError`, 409 `ConflictError`. It takes any HTTP client with `get`, `post` and `stream` (`HttpClient`), so httpx and httpx2 clients both fit.
+
+## The API's Conversations
+
+- `paperexplorer_api.conversations.Conversations` holds `asking.Conversation`s by id in process memory, and evicts the least recently used beyond `PE_CONVERSATIONS_MAX` (50) and any unused for `PE_CONVERSATION_IDLE_MINUTES` (120). A restart clears them; an evicted Conversation is unknown.
+- `paperexplorer_api.asking_thread.AskingThread` runs every turn on one thread with an event loop of its own, beside the API's. The tools call the store and the Embedder synchronously and block their loop meanwhile (seconds while Ollama loads a model), so the API's own loop stays free for other requests and streams. All turns share that loop, since the chat model's HTTP client keeps its connections on the loop that opened them. Each turn opens a store connection of its own through `connections()`. One turn per Conversation at a time; events cross to the request's loop through a queue, and closing the stream cancels the turn on its loop.
+- `create_app(connections, asking)`: `Asking(contexts, conversations)` gives each turn its `AskingContext` around the turn's connection, and the store of Conversations. Without `Asking` the app serves Works and Citations only. `app_from_env` builds the Embedder, chat model and tracing once from `Settings`.
 
 ## Tracing
 
@@ -139,7 +152,8 @@ Every model call, chat and embedding alike, runs inside a Langfuse trace and nev
 - **Stages:** `embed` traces as `stage.embed`, tagged `pipeline` and `work:<key>`, with one embedding observation per batch (named `embeddings <model>`: the batch's texts, its token usage, the count and length of its Vectors).
 - **CLI search:** `paperexplorer search` traces as `search`, tagged `cli` and `work:<key>`, holding the query's embedding observation.
 - An embedding call made outside any trace records nothing; with tracing off, `Tracing.embedding` returns at once.
-- **Environment** is `development` (Mac), `tower` or `eval`; eval runs keep the name `question`, so live and eval traces compare directly. The release is the git SHA.
+- **Environment** is `development` (Mac), `tower` or `eval`; eval runs keep the name `question`, so live and eval traces compare directly. The release is the git SHA. The containers have no git: `compose.yaml` passes `PE_LANGFUSE_RELEASE` from the shell into `api` and `pipeline`, and `tower-check.sh` and `setup-tower.sh` set it with `git rev-parse --short HEAD`.
+- **Conversations over the API:** each Question is a `question` trace as above, whose `session_id` is the API's Conversation id, so a Conversation's Questions group as one Langfuse session.
 - `tracing` builds its own OpenTelemetry tracer provider, never the global one, with environment and release on its resource; instrumentation reaches Langfuse only when handed that provider.
 
 ## Testing

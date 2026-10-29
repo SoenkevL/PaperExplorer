@@ -407,7 +407,8 @@ pause
 # ── 7 ─────────────────────────────────────────────────────────────────────
 stage "Start the stack (db, api, web)"
 say "Building images and starting containers on the tower (first build takes a few minutes)…"
-twt "cd $REMOTE_DIR && docker compose up -d --build db api web"
+# The containers have no git: the release on their traces is the commit they were built from.
+twt "cd $REMOTE_DIR && PE_LANGFUSE_RELEASE=\$(git rev-parse --short HEAD) docker compose up -d --build db api web"
 sleep 5
 tw "curl -fsS --retry 10 --retry-delay 2 --retry-all-errors localhost:8000/health" | sed 's/^/  api: /' \
   && ok "API healthy" || { warn "API not healthy: docker compose logs api"; SKIPPED+=("API health check"); }

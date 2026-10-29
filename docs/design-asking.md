@@ -48,6 +48,14 @@ Before resolution and Sources, the reader can ask the Seed Questions in a sideba
 - Routes and stream events: `architecture.md`.
 - Layout: Conversation sidebar left, reader middle, Citation panel right; the sidebar folds into a drawer below about 92rem.
 - The draft streams with handles as placeholder chips; then the resolved Answer replaces it. The htmx SSE extension is vendored like htmx.
+- **Settled while building the API** (`architecture.md`, API contract and The API's Conversations):
+  - Starting a Conversation about a Work with no Chunks, or with a Chunk lacking a Vector from the API's Embedder model, answers 409 and says which Stage to run. It checks the Chunks, not the `embed` Stage's status, since retrieval only finds Vectors of its own model.
+  - A second Question while the Conversation still answers gets 409 before any stream starts; the reader waits for the Answer, or closes the stream, which cancels the turn.
+  - Conversations are evicted least recently used beyond `PE_CONVERSATIONS_MAX` (50) and when unused for `PE_CONVERSATION_IDLE_MINUTES` (120). An evicted Conversation answers 404, as an unknown one does, and the sidebar starts a new one.
+  - Every turn runs on one asking thread with its own event loop and its own store connection, so the tools' blocking calls never hold up the API's other requests and streams.
+  - The stream is FastAPI's SSE: event name = `type`, data = the event's JSON, a `: ping` comment after 15 s of silence while the model thinks.
+  - The API's Answer carries what the reader shows: Pointers with their place, Support and Chunk span (`chunk_start`, `chunk_end`); Quotes with exactness and place. The cosine, Chunk id, substantive flags and unknown handles stay in the traces and the eval.
+  - `ApiClient.ask` is a synchronous generator, for the synchronous web app. EventSource (and so the htmx SSE extension) only GETs, so the web app relays: the browser's EventSource GETs a web route that POSTs the Question through `ApiClient.ask` and re-sends each event as HTML. Closing that generator closes the API's stream and so cancels the turn.
 
 ## Retrieval
 As `design-v1.md`: paragraph Chunks of at most 400 bge-m3 tokens, HNSW plus English full-text search, RRF with k=60, both scores kept. No reranker; one may come later as an experiment measured against the eval.
@@ -83,4 +91,4 @@ As `design-v1.md`: paragraph Chunks of at most 400 bge-m3 tokens, HNSW plus Engl
 - Langfuse 4.71.0 idles at about 1.4 GB of RAM (web 0.7, worker 0.35, ClickHouse 0.2 GB).
 
 ## Still to check while building
-- The release on traces from the compose containers: they have no git, so `PE_LANGFUSE_RELEASE` must reach them when the API starts tracing.
+- Settled: the release on traces from the compose containers, which have no git. `compose.yaml` passes `PE_LANGFUSE_RELEASE` from the shell into `api` and `pipeline`; `tower-check.sh` and `setup-tower.sh` set it with `git rev-parse --short HEAD`. A build argument would not do: the `.env` every container reads sets it empty, and that overrides an image's own value.

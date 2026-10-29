@@ -1,20 +1,35 @@
-"""An API app over the rolled-back test database, with Works stored through core's repositories."""
+"""An API app over the rolled-back test database, with Works stored through core's repositories.
 
-from collections.abc import Callable
+Its chat model is scripted (`Script`), its Embedder the fake one and its tracing off.
+"""
+
+import json
+from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import nullcontext
+from dataclasses import dataclass
+from typing import Protocol
 
 import psycopg
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from psycopg.rows import TupleRow
+from pydantic import JsonValue
+from pydantic_ai.messages import ModelMessage
+from pydantic_ai.models import Model
+from pydantic_ai.models.function import AgentInfo, DeltaToolCall, FunctionModel
 
+from paperexplorer.asking import AskingContext
 from paperexplorer.chunking import chunk
 from paperexplorer.citations import CitationGraph, extract
+from paperexplorer.config import Settings
 from paperexplorer.domain import Attachment, LibraryItem, WorkId
-from paperexplorer.embedding import FakeEmbedder
+from paperexplorer.embedding import Embedder, FakeEmbedder
 from paperexplorer.parsing import ParsedWork
 from paperexplorer.store import Chunks, CitationGraphs, StageStatuses, Works, WorkTexts
-from paperexplorer_api.app import create_app
+from paperexplorer.tracing import Tracing
+from paperexplorer_api.app import Asking, create_app
+from paperexplorer_api.conversations import Conversations
 
 Conn = psycopg.Connection[TupleRow]
 
@@ -50,9 +65,79 @@ class Stored:
             StageStatuses(conn).done(self.work, stage, {})
 
 
+@dataclass(frozen=True)
+class Call:
+    """A tool call the scripted model makes."""
+
+    tool: str
+    args: dict[str, JsonValue]
+
+
+type Item = Call | str | Callable[[], str]
+
+
+class Script:
+    """A chat model that streams one scripted response per request.
+
+    An item is a tool call, text, or a function giving text at stream time (to write a handle
+    the turn has shown).
+    """
+
+    def __init__(self, *responses: Sequence[Item]) -> None:
+        self._responses = list(responses)
+
+    def model(self) -> FunctionModel:
+        return FunctionModel(stream_function=self._stream, model_name="paperexplorer-chat")
+
+    async def _stream(
+        self, messages: list[ModelMessage], info: AgentInfo
+    ) -> AsyncIterator[str | dict[int, DeltaToolCall]]:
+        assert self._responses, "the model was asked more often than scripted"
+        for i, item in enumerate(self._responses.pop(0)):
+            if isinstance(item, Call):
+                yield {i: DeltaToolCall(item.tool, json.dumps(item.args), tool_call_id=f"c{i}")}
+            else:
+                yield item if isinstance(item, str) else item()
+
+
+class AppFactory(Protocol):
+    def __call__(
+        self,
+        model: Model,
+        *,
+        embedder: Embedder | None = None,
+        conversations: Conversations | None = None,
+    ) -> FastAPI: ...
+
+
 @pytest.fixture
-def api(store_db: Conn) -> TestClient:
-    return TestClient(create_app(lambda: nullcontext(store_db)))
+def make_app(store_db: Conn) -> AppFactory:
+    """An app whose Questions the given chat model answers, over the test database."""
+
+    def build(
+        model: Model,
+        *,
+        embedder: Embedder | None = None,
+        conversations: Conversations | None = None,
+    ) -> FastAPI:
+        settings = Settings(_env_file=None)  # pyright: ignore[reportCallIssue]
+        fake = embedder or FakeEmbedder()
+        return create_app(
+            lambda: nullcontext(store_db),
+            Asking(
+                contexts=lambda conn: AskingContext(
+                    conn=conn, embedder=fake, model=model, settings=settings, tracing=Tracing.off()
+                ),
+                conversations=conversations or Conversations.from_settings(settings),
+            ),
+        )
+
+    return build
+
+
+@pytest.fixture
+def api(make_app: AppFactory) -> TestClient:
+    return TestClient(make_app(Script().model()))
 
 
 @pytest.fixture

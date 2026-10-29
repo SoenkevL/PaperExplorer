@@ -1,10 +1,16 @@
 """A small hand-built Seed for the asking tests: an abstract, three sections, two References."""
 
+import json
+import uuid
+
+import httpx
 import psycopg
 import pytest
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from psycopg.rows import TupleRow
 
 from paperexplorer import chunking, citations
+from paperexplorer.config import Settings
 from paperexplorer.domain import LibraryItem, Work
 from paperexplorer.embedding import FakeEmbedder
 from paperexplorer.parsing import (
@@ -17,6 +23,7 @@ from paperexplorer.parsing import (
     TextOrigin,
 )
 from paperexplorer.store import Chunks, CitationGraphs, Works, WorkTexts
+from paperexplorer.tracing import Tracing, configure_tracing
 
 SEED_KEY = "SEED0001"
 ABSTRACT = "We measured brain entropy in ten volunteers after psilocybin."
@@ -91,6 +98,30 @@ SEED_TEXT = ParsedWork(
     ],
     references=REFERENCES,
 )
+
+
+def in_memory_tracing() -> tuple[Tracing, InMemorySpanExporter, list[dict[str, object]]]:
+    """Tracing into an in-memory exporter, with the scores Langfuse would receive."""
+    exporter = InMemorySpanExporter()
+    scores: list[dict[str, object]] = []
+
+    def langfuse(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/public/scores":
+            scores.extend(json.loads(request.content))
+            return httpx.Response(200, json={})
+        return httpx.Response(200, json={"status": "OK"})
+
+    tracing = configure_tracing(
+        Settings(
+            _env_file=None,  # pyright: ignore[reportCallIssue]
+            langfuse_public_key=f"pk-lf-test-{uuid.uuid4()}",
+            langfuse_secret_key="sk-lf-test",
+            langfuse_base_url="http://langfuse.test",
+        ),
+        http=httpx.Client(transport=httpx.MockTransport(langfuse)),
+        span_exporter=exporter,
+    )
+    return tracing, exporter, scores
 
 
 @pytest.fixture

@@ -163,7 +163,7 @@ def configure_tracing(
             base_url = _pick_base_url(settings, client)
     else:
         base_url = _pick_base_url(settings, http)
-    environment, release = settings.langfuse_environment, settings.langfuse_release or _git_sha()
+    environment, release = settings.langfuse_environment, trace_release(settings)
     # Our own provider, never the global one, so tests and other OpenTelemetry users stay apart.
     # Its resource carries environment and release to every span, as Langfuse's own provider does.
     resource = {"langfuse.environment": environment}
@@ -196,6 +196,11 @@ def _pick_base_url(settings: Settings, http: httpx.Client) -> str:
         logger.warning("Langfuse at %s does not answer (%s); tracing to %s", tower, error, fallback)
         return fallback
     return tower
+
+
+def trace_release(settings: Settings) -> str | None:
+    """The release on every trace: `PE_LANGFUSE_RELEASE`, else the checked-out commit."""
+    return settings.langfuse_release or _git_sha()
 
 
 def _git_sha() -> str | None:

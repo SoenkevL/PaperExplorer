@@ -8,7 +8,6 @@ given as a string or as a function of the Conversation (to write a handle shown 
 import asyncio
 import json
 import re
-import uuid
 from collections.abc import AsyncIterator, Callable, Sequence
 from dataclasses import dataclass, replace
 
@@ -16,7 +15,6 @@ import httpx
 import psycopg
 import pytest
 from opentelemetry.sdk.trace import ReadableSpan
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from psycopg.rows import TupleRow
 from pydantic import JsonValue
 from pydantic_ai.messages import (
@@ -48,9 +46,9 @@ from paperexplorer.config import Settings
 from paperexplorer.domain import Work
 from paperexplorer.embedding import Embedder, FakeEmbedder, OpenAICompatibleEmbedder
 from paperexplorer.store import Chunks, StoredChunk
-from paperexplorer.tracing import Tracing, configure_tracing
+from paperexplorer.tracing import Tracing
 
-from .conftest import DISCUSSION, RECORDING
+from .conftest import DISCUSSION, RECORDING, in_memory_tracing
 
 Conn = psycopg.Connection[TupleRow]
 QUESTION = "How was the entropy computed?"
@@ -355,34 +353,10 @@ def _embedder(tracing: Tracing) -> OpenAICompatibleEmbedder:
     return OpenAICompatibleEmbedder(http, fake.model, batch_size=32, tracing=tracing)
 
 
-def _traced() -> tuple[Tracing, InMemorySpanExporter, list[dict[str, object]]]:
-    """Tracing into an in-memory exporter, with the scores Langfuse would receive."""
-    exporter = InMemorySpanExporter()
-    scores: list[dict[str, object]] = []
-
-    def langfuse(request: httpx.Request) -> httpx.Response:
-        if request.url.path == "/api/public/scores":
-            scores.extend(json.loads(request.content))
-            return httpx.Response(200, json={})
-        return httpx.Response(200, json={"status": "OK"})
-
-    tracing = configure_tracing(
-        Settings(
-            _env_file=None,  # pyright: ignore[reportCallIssue]
-            langfuse_public_key=f"pk-lf-test-{uuid.uuid4()}",
-            langfuse_secret_key="sk-lf-test",
-            langfuse_base_url="http://langfuse.test",
-        ),
-        http=httpx.Client(transport=httpx.MockTransport(langfuse)),
-        span_exporter=exporter,
-    )
-    return tracing, exporter, scores
-
-
 def test_one_question_is_one_trace_holding_every_model_tool_and_embedding_call(
     store_db: Conn, small_seed: Work, conversation: Conversation
 ) -> None:
-    tracing, exporter, scores = _traced()
+    tracing, exporter, scores = in_memory_tracing()
     recording = chunk(store_db, small_seed, RECORDING)
     script = Script(
         [Think("The recording section says how."), Call("read_section", {"heading": "§3"})],
@@ -464,7 +438,7 @@ def test_one_question_is_one_trace_holding_every_model_tool_and_embedding_call(
 def test_the_answer_names_its_trace_which_carries_the_callers_tags(
     store_db: Conn, conversation: Conversation, whole_seed: bool, tags: tuple[str, ...]
 ) -> None:
-    tracing, exporter, _ = _traced()
+    tracing, exporter, _ = in_memory_tracing()
     script = Script(["Entropy was computed from each EEG recording."])
     ctx = replace(
         context(store_db, script, tracing=tracing), tags=("run:R1",), whole_seed=whole_seed
@@ -482,7 +456,7 @@ def test_the_answer_names_its_trace_which_carries_the_callers_tags(
 
 
 def test_a_failed_turn_names_its_trace_too(store_db: Conn, conversation: Conversation) -> None:
-    tracing, exporter, _ = _traced()
+    tracing, exporter, _ = in_memory_tracing()
     script = Script(then=[Call("search", {"query": "again"})])
 
     events = turn(context(store_db, script, tracing=tracing), conversation, QUESTION)

@@ -44,6 +44,13 @@ class Settings(BaseSettings):
         ge=1,
         description="The chat model's context in tokens, as its Modelfile sets it; on every trace.",
     )
+    # Ollama sends nothing while it loads the model and reads the prompt (about 30 s for the
+    # whole Seed, cold); a stream silent much longer has stalled (eval 2026-10-29).
+    chat_timeout_s: float = Field(
+        default=120,
+        gt=0,
+        description="Seconds a chat request may wait for its stream's next bytes.",
+    )
     # The API holds Conversations in memory (a restart clears them) and evicts the least recently
     # used beyond this many, and any left unused for this long.
     conversations_max: int = Field(

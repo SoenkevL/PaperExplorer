@@ -6,6 +6,7 @@ per embed run, every model call nested inside one of them.
 
 import logging
 import subprocess
+import uuid
 from collections.abc import Generator, Mapping, Sequence
 from contextlib import contextmanager
 from typing import Literal, Self
@@ -25,6 +26,8 @@ logger = logging.getLogger(__name__)
 
 # A process waits at most this long at start to learn whether the tower's Langfuse is up.
 HEALTH_TIMEOUT_S = 2.0
+# Score IDs derive from the trace and the score's name, so a verdict given again replaces it.
+_SCORES = uuid.UUID("5c0e7a1d-8b0f-4f43-9d5e-6a1f3b2c4d90")
 
 
 class Observation:
@@ -132,6 +135,24 @@ class Tracing:
             self._langfuse.score_current_trace(name=name, value=value)
         except Exception:
             logger.warning("Could not score the trace with %s", name, exc_info=True)
+
+    def score_trace(
+        self, trace_id: str, name: str, value: bool, *, comment: str | None = None
+    ) -> None:
+        """Score a finished trace by its ID with a verdict: a judge's, given after the turn.
+
+        A trace has one score per name: scoring it again replaces the verdict. Off, nothing.
+        """
+        if self._langfuse is None:
+            return
+        self._langfuse.create_score(
+            trace_id=trace_id,
+            name=name,
+            value=1 if value else 0,
+            data_type="BOOLEAN",
+            comment=comment,
+            score_id=str(uuid.uuid5(_SCORES, f"{trace_id}/{name}")),
+        )
 
     def flush(self) -> None:
         """Send every finished observation now; short-lived processes call this before exit."""

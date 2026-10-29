@@ -1,0 +1,3922 @@
+{
+ "run": {
+  "run_id": "20261029T191529Z-94e980b",
+  "started_at": "2026-10-29T19:15:33.300319Z",
+  "git_sha": "94e980b",
+  "seed": "YAAC9XCX",
+  "work_id": 1,
+  "model": "paperexplorer-chat",
+  "prompt_version": "160ec87b9056",
+  "num_ctx": 73728,
+  "embedding_model": "bge-m3",
+  "support_threshold": 0.7,
+  "questions_file": "seed-questions.yaml",
+  "questions_sha": "e498dca4d79c",
+  "langfuse_environment": "eval",
+  "tracing_host": "http://localhost:3000"
+ },
+ "bar": [
+  {
+   "name": "hit@8",
+   "value": 1.0,
+   "bar": "≥ 0.80",
+   "met": true
+  },
+  {
+   "name": "Pointer coverage",
+   "value": 0.5106382978723404,
+   "bar": "≥ 0.80",
+   "met": false
+  },
+  {
+   "name": "Quotes marked exact that are not",
+   "value": 0,
+   "bar": "0",
+   "met": true
+  },
+  {
+   "name": "Answers judged grounded and correct",
+   "value": null,
+   "bar": "≥ 80%",
+   "met": null
+  }
+ ],
+ "modes": {
+  "retrieval": {
+   "questions": 22,
+   "answered": 14,
+   "failed": 8,
+   "covered": 17,
+   "uncovered": 5,
+   "uncovered_said": 3,
+   "hit_at_8": 1.0,
+   "pointer_coverage": 0.5106382978723404,
+   "pointers_close": 24,
+   "pointers_weak": 2,
+   "pointers_on_expected": 0.84,
+   "quotes_exact": 2,
+   "quotes_not_exact": 1,
+   "quotes_exact_unverified": 0,
+   "model_requests_mean": 2.357142857142857,
+   "tool_calls_mean": 3.3181818181818183,
+   "latency_s_mean": 30.277772727272726,
+   "latency_s_max": 54.52,
+   "similarity": {
+    "count": 26,
+    "quantiles": {
+     "min": 0.4436,
+     "p10": 0.7061,
+     "p25": 0.729,
+     "median": 0.7987,
+     "p75": 0.8643,
+     "p90": 0.9377,
+     "max": 0.9796
+    },
+    "buckets": [
+     {
+      "low": 0.0,
+      "high": 0.5,
+      "close": 0,
+      "weak": 1,
+      "on_expected": 0,
+      "elsewhere": 1,
+      "uncovered": 0
+     },
+     {
+      "low": 0.5,
+      "high": 0.55,
+      "close": 0,
+      "weak": 0,
+      "on_expected": 0,
+      "elsewhere": 0,
+      "uncovered": 0
+     },
+     {
+      "low": 0.55,
+      "high": 0.6,
+      "close": 0,
+      "weak": 0,
+      "on_expected": 0,
+      "elsewhere": 0,
+      "uncovered": 0
+     },
+     {
+      "low": 0.6,
+      "high": 0.65,
+      "close": 0,
+      "weak": 0,
+      "on_expected": 0,
+      "elsewhere": 0,
+      "uncovered": 0
+     },
+     {
+      "low": 0.65,
+      "high": 0.7,
+      "close": 0,
+      "weak": 1,
+      "on_expected": 1,
+      "elsewhere": 0,
+      "uncovered": 0
+     },
+     {
+      "low": 0.7,
+      "high": 0.75,
+      "close": 6,
+      "weak": 0,
+      "on_expected": 5,
+      "elsewhere": 1,
+      "uncovered": 0
+     },
+     {
+      "low": 0.75,
+      "high": 0.8,
+      "close": 6,
+      "weak": 0,
+      "on_expected": 5,
+      "elsewhere": 1,
+      "uncovered": 0
+     },
+     {
+      "low": 0.8,
+      "high": 0.85,
+      "close": 3,
+      "weak": 0,
+      "on_expected": 1,
+      "elsewhere": 1,
+      "uncovered": 1
+     },
+     {
+      "low": 0.85,
+      "high": 0.9,
+      "close": 5,
+      "weak": 0,
+      "on_expected": 5,
+      "elsewhere": 0,
+      "uncovered": 0
+     },
+     {
+      "low": 0.9,
+      "high": 0.95,
+      "close": 1,
+      "weak": 0,
+      "on_expected": 1,
+      "elsewhere": 0,
+      "uncovered": 0
+     },
+     {
+      "low": 0.95,
+      "high": 1.0,
+      "close": 3,
+      "weak": 0,
+      "on_expected": 3,
+      "elsewhere": 0,
+      "uncovered": 0
+     }
+    ]
+   }
+  },
+  "baseline": {
+   "questions": 22,
+   "answered": 19,
+   "failed": 3,
+   "covered": 17,
+   "uncovered": 5,
+   "uncovered_said": 4,
+   "hit_at_8": null,
+   "pointer_coverage": 0.39473684210526316,
+   "pointers_close": 36,
+   "pointers_weak": 10,
+   "pointers_on_expected": 0.6739130434782609,
+   "quotes_exact": 2,
+   "quotes_not_exact": 0,
+   "quotes_exact_unverified": 0,
+   "model_requests_mean": 1.105263157894737,
+   "tool_calls_mean": 0.5454545454545454,
+   "latency_s_mean": 49.16372727272728,
+   "latency_s_max": 620.323,
+   "similarity": {
+    "count": 46,
+    "quantiles": {
+     "min": 0.55,
+     "p10": 0.6253,
+     "p25": 0.7089,
+     "median": 0.7679,
+     "p75": 0.8191,
+     "p90": 0.9131,
+     "max": 0.9623
+    },
+    "buckets": [
+     {
+      "low": 0.0,
+      "high": 0.5,
+      "close": 0,
+      "weak": 0,
+      "on_expected": 0,
+      "elsewhere": 0,
+      "uncovered": 0
+     },
+     {
+      "low": 0.5,
+      "high": 0.55,
+      "close": 0,
+      "weak": 1,
+      "on_expected": 1,
+      "elsewhere": 0,
+      "uncovered": 0
+     },
+     {
+      "low": 0.55,
+      "high": 0.6,
+      "close": 0,
+      "weak": 2,
+      "on_expected": 1,
+      "elsewhere": 1,
+      "uncovered": 0
+     },
+     {
+      "low": 0.6,
+      "high": 0.65,
+      "close": 0,
+      "weak": 4,
+      "on_expected": 0,
+      "elsewhere": 4,
+      "uncovered": 0
+     },
+     {
+      "low": 0.65,
+      "high": 0.7,
+      "close": 0,
+      "weak": 3,
+      "on_expected": 2,
+      "elsewhere": 1,
+      "uncovered": 0
+     },
+     {
+      "low": 0.7,
+      "high": 0.75,
+      "close": 9,
+      "weak": 0,
+      "on_expected": 8,
+      "elsewhere": 1,
+      "uncovered": 0
+     },
+     {
+      "low": 0.75,
+      "high": 0.8,
+      "close": 13,
+      "weak": 0,
+      "on_expected": 6,
+      "elsewhere": 7,
+      "uncovered": 0
+     },
+     {
+      "low": 0.8,
+      "high": 0.85,
+      "close": 6,
+      "weak": 0,
+      "on_expected": 5,
+      "elsewhere": 1,
+      "uncovered": 0
+     },
+     {
+      "low": 0.85,
+      "high": 0.9,
+      "close": 2,
+      "weak": 0,
+      "on_expected": 2,
+      "elsewhere": 0,
+      "uncovered": 0
+     },
+     {
+      "low": 0.9,
+      "high": 0.95,
+      "close": 5,
+      "weak": 0,
+      "on_expected": 5,
+      "elsewhere": 0,
+      "uncovered": 0
+     },
+     {
+      "low": 0.95,
+      "high": 1.0,
+      "close": 1,
+      "weak": 0,
+      "on_expected": 1,
+      "elsewhere": 0,
+      "uncovered": 0
+     }
+    ]
+   }
+  }
+ },
+ "questions": [
+  {
+   "name": "measurement-table-1-studies",
+   "kind": "measurement",
+   "question": "How many studies does the review's summary table cover, and which psychedelics did they examine?",
+   "places": [
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.5. Previous research on psychedelic-induced brain entropy alterations"
+     ],
+     "page": 5
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "Table 1"
+     ],
+     "page": 6
+    }
+   ],
+   "search": [
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.5. Previous research on psychedelic-induced brain entropy alterations"
+     ],
+     "page": 5
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "Table 1"
+     ],
+     "page": 6
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "Table 1"
+     ],
+     "page": 6
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+     ],
+     "page": 12
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 10
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.2. Psychedelic-induced altered states of consciousness"
+     ],
+     "page": 3
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.5. Previous research on psychedelic-induced brain entropy alterations"
+     ],
+     "page": 6
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.5. Previous research on psychedelic-induced brain entropy alterations"
+     ],
+     "page": 5
+    }
+   ],
+   "turns": {
+    "retrieval": {
+     "trace_id": "72771d5e29659261a5fcc89a6a86abda",
+     "conversation_id": "dd29b8fb-e276-44c3-95d6-1d1d83fa0d25",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "hit_at_8": true,
+      "first_hit_rank": 1,
+      "pointer_coverage": 1.0,
+      "pointers_close": 3,
+      "pointers_weak": 0,
+      "pointers_on_expected": 1.0,
+      "places_pointed": 0.5,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 2,
+      "tool_calls": 0,
+      "latency_s": 18.272
+     },
+     "pointers": [
+      {
+       "sentence": 0,
+       "support": "close",
+       "similarity": 0.8625,
+       "place": {
+        "heading_path": [
+         "2. Serotonergic psychedelics and brain entropy",
+         "2.5. Previous research on psychedelic-induced brain entropy alterations"
+        ],
+        "page": 5
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 1,
+       "support": "close",
+       "similarity": 0.9648,
+       "place": {
+        "heading_path": [
+         "2. Serotonergic psychedelics and brain entropy",
+         "2.5. Previous research on psychedelic-induced brain entropy alterations"
+        ],
+        "page": 5
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 2,
+       "support": "close",
+       "similarity": 0.8266,
+       "place": {
+        "heading_path": [
+         "2. Serotonergic psychedelics and brain entropy",
+         "2.5. Previous research on psychedelic-induced brain entropy alterations"
+        ],
+        "page": 5
+       },
+       "on_expected": true
+      }
+     ],
+     "tools": [],
+     "first_delta_s": 13.746
+    },
+    "baseline": {
+     "trace_id": "cc3dec6b4a95bb1236b6b0cc71d23cbc",
+     "conversation_id": "e29dae7c-479c-4c40-b37b-5b5543392473",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "pointer_coverage": 0.0,
+      "pointers_close": 0,
+      "pointers_weak": 0,
+      "places_pointed": 0.0,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 1,
+      "tool_calls": 0,
+      "latency_s": 39.01
+     },
+     "pointers": [],
+     "tools": [],
+     "first_delta_s": 36.71
+    }
+   }
+  },
+  {
+   "name": "measurement-tagliazucchi-motifs",
+   "kind": "measurement",
+   "question": "How did Tagliazucchi et al. (2014) define brain states under psilocybin, and what did they find?",
+   "places": [
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.5. Previous research on psychedelic-induced brain entropy alterations"
+     ],
+     "page": 5
+    }
+   ],
+   "search": [
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.5. Previous research on psychedelic-induced brain entropy alterations"
+     ],
+     "page": 5
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 10
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 11
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.4. What is brain entropy?"
+     ],
+     "page": 4
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+     ],
+     "page": 9
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+     ],
+     "page": 9
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "Table 1"
+     ],
+     "page": 6
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 11
+    }
+   ],
+   "turns": {
+    "retrieval": {
+     "trace_id": "6e5a2d0ba716bc35b2ae185749380879",
+     "conversation_id": "d7cf6a7e-1f5c-428d-a5d8-c337177b4205",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "hit_at_8": true,
+      "first_hit_rank": 1,
+      "pointer_coverage": 0.6666666666666666,
+      "pointers_close": 2,
+      "pointers_weak": 0,
+      "pointers_on_expected": 1.0,
+      "places_pointed": 1.0,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 3,
+      "tool_calls": 2,
+      "latency_s": 29.011
+     },
+     "pointers": [
+      {
+       "sentence": 1,
+       "support": "close",
+       "similarity": 0.7188,
+       "place": {
+        "heading_path": [
+         "2. Serotonergic psychedelics and brain entropy",
+         "2.5. Previous research on psychedelic-induced brain entropy alterations"
+        ],
+        "page": 5
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 2,
+       "support": "close",
+       "similarity": 0.7992,
+       "place": {
+        "heading_path": [
+         "2. Serotonergic psychedelics and brain entropy",
+         "2.5. Previous research on psychedelic-induced brain entropy alterations"
+        ],
+        "page": 5
+       },
+       "on_expected": true
+      }
+     ],
+     "tools": [
+      "read_around",
+      "read_around"
+     ],
+     "first_delta_s": 22.558
+    },
+    "baseline": {
+     "trace_id": "df63a91c73f424dbcf2fb0b2f60a08e1",
+     "conversation_id": "3d90e5d8-4e25-4484-8aa0-4c999d3f3bfd",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "pointer_coverage": 0.5,
+      "pointers_close": 1,
+      "pointers_weak": 0,
+      "pointers_on_expected": 1.0,
+      "places_pointed": 1.0,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 1,
+      "tool_calls": 0,
+      "latency_s": 13.607
+     },
+     "pointers": [
+      {
+       "sentence": 1,
+       "support": "close",
+       "similarity": 0.9623,
+       "place": {
+        "heading_path": [
+         "2. Serotonergic psychedelics and brain entropy",
+         "2.5. Previous research on psychedelic-induced brain entropy alterations"
+        ],
+        "page": 5
+       },
+       "on_expected": true
+      }
+     ],
+     "tools": [],
+     "first_delta_s": 5.846
+    }
+   }
+  },
+  {
+   "name": "measurement-intensity-correlation",
+   "kind": "measurement",
+   "question": "Did the increases in entropy under psychedelics correlate with how intense participants rated the drug's effects?",
+   "places": [
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.5. Previous research on psychedelic-induced brain entropy alterations"
+     ],
+     "page": 6
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+     ],
+     "page": 12
+    }
+   ],
+   "search": [
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+     ],
+     "page": 9
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+     ],
+     "page": 8
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+     ],
+     "page": 12
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.5. Previous research on psychedelic-induced brain entropy alterations"
+     ],
+     "page": 6
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+     ],
+     "page": 13
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "Table 1"
+     ],
+     "page": 7
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+     ],
+     "page": 8
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.5. Previous research on psychedelic-induced brain entropy alterations"
+     ],
+     "page": 5
+    }
+   ],
+   "turns": {
+    "retrieval": {
+     "trace_id": "49f2a82d3fa6f54df59cc780a76aaa08",
+     "conversation_id": "5b14fb4d-de20-4f24-a809-82dd643db10d",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "hit_at_8": true,
+      "first_hit_rank": 3,
+      "pointer_coverage": 0.0,
+      "pointers_close": 0,
+      "pointers_weak": 0,
+      "places_pointed": 0.0,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 2,
+      "tool_calls": 2,
+      "latency_s": 31.588
+     },
+     "pointers": [],
+     "tools": [
+      "read_around",
+      "read_around"
+     ],
+     "first_delta_s": 18.329
+    },
+    "baseline": {
+     "trace_id": "424559bcb4bf6843905f0ba2a316560a",
+     "conversation_id": "4ac091a0-af58-4db0-92ce-ed023a919563",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "pointer_coverage": 1.0,
+      "pointers_close": 5,
+      "pointers_weak": 0,
+      "pointers_on_expected": 1.0,
+      "places_pointed": 1.0,
+      "quotes_exact": 1,
+      "quotes_not_exact": 0,
+      "quotes_verified": true,
+      "unknown_handles": 0,
+      "model_requests": 1,
+      "tool_calls": 0,
+      "latency_s": 27.769
+     },
+     "pointers": [
+      {
+       "sentence": 0,
+       "support": "close",
+       "similarity": 0.9483,
+       "place": {
+        "heading_path": [
+         "2. Serotonergic psychedelics and brain entropy",
+         "2.5. Previous research on psychedelic-induced brain entropy alterations"
+        ],
+        "page": 6
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 1,
+       "support": "close",
+       "similarity": 0.8911,
+       "place": {
+        "heading_path": [
+         "2. Serotonergic psychedelics and brain entropy",
+         "2.5. Previous research on psychedelic-induced brain entropy alterations"
+        ],
+        "page": 6
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 1,
+       "support": "close",
+       "similarity": 0.8265,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+        ],
+        "page": 12
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 2,
+       "support": "close",
+       "similarity": 0.9271,
+       "place": {
+        "heading_path": [
+         "2. Serotonergic psychedelics and brain entropy",
+         "2.5. Previous research on psychedelic-induced brain entropy alterations"
+        ],
+        "page": 6
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 3,
+       "support": "close",
+       "similarity": 0.8701,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+        ],
+        "page": 12
+       },
+       "on_expected": true
+      }
+     ],
+     "tools": [],
+     "first_delta_s": 16.245
+    }
+   }
+  },
+  {
+   "name": "measurement-mcculloch-replication",
+   "kind": "measurement",
+   "question": "What did McCulloch et al. (2024) find when they tried to replicate the earlier entropy findings?",
+   "places": [
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 10
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.5. Previous research on psychedelic-induced brain entropy alterations"
+     ],
+     "page": 5
+    }
+   ],
+   "search": [
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.5. Previous research on psychedelic-induced brain entropy alterations"
+     ],
+     "page": 5
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 10
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 10
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 11
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "Table 1"
+     ],
+     "page": 6
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 11
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "Table 1"
+     ],
+     "page": 6
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+     ],
+     "page": 8
+    }
+   ],
+   "turns": {
+    "retrieval": {
+     "trace_id": "ab7c32bac8f4deba47a732bf333a4358",
+     "conversation_id": "eb17b053-e603-4021-89c7-00082a5f7912",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "hit_at_8": true,
+      "first_hit_rank": 1,
+      "pointer_coverage": 1.0,
+      "pointers_close": 4,
+      "pointers_weak": 1,
+      "pointers_on_expected": 0.4,
+      "places_pointed": 0.5,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 1,
+      "tool_calls": 0,
+      "latency_s": 16.957
+     },
+     "pointers": [
+      {
+       "sentence": 0,
+       "support": "close",
+       "similarity": 0.8829,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.3. One entropy to rule them all?"
+        ],
+        "page": 10
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 1,
+       "support": "close",
+       "similarity": 0.7685,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.3. One entropy to rule them all?"
+        ],
+        "page": 10
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 2,
+       "support": "close",
+       "similarity": 0.7571,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.3. One entropy to rule them all?"
+        ],
+        "page": 11
+       },
+       "on_expected": false
+      },
+      {
+       "sentence": 3,
+       "support": "close",
+       "similarity": 0.844,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.3. One entropy to rule them all?"
+        ],
+        "page": 11
+       },
+       "on_expected": false
+      },
+      {
+       "sentence": 4,
+       "support": "weak",
+       "similarity": 0.4436,
+       "place": {
+        "heading_path": [
+         "2. Serotonergic psychedelics and brain entropy",
+         "Table 1"
+        ],
+        "page": 6
+       },
+       "on_expected": false
+      }
+     ],
+     "tools": [],
+     "first_delta_s": 9.928
+    },
+    "baseline": {
+     "trace_id": "55f63dbdf323b16d0e7d94de03baf112",
+     "conversation_id": "9c47f715-f18c-4a51-b47c-dd014de2017f",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "pointer_coverage": 0.3333333333333333,
+      "pointers_close": 1,
+      "pointers_weak": 0,
+      "pointers_on_expected": 1.0,
+      "places_pointed": 0.5,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 1,
+      "tool_calls": 0,
+      "latency_s": 14.118
+     },
+     "pointers": [
+      {
+       "sentence": 2,
+       "support": "close",
+       "similarity": 0.7874,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.3. One entropy to rule them all?"
+        ],
+        "page": 10
+       },
+       "on_expected": true
+      }
+     ],
+     "tools": [],
+     "first_delta_s": 7.496
+    }
+   }
+  },
+  {
+   "name": "method-brain-entropy-definition",
+   "kind": "method",
+   "question": "How do the authors define brain entropy?",
+   "places": [
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.4. What is brain entropy?"
+     ],
+     "page": 4
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.4. What is brain entropy?"
+     ],
+     "page": 3
+    },
+    {
+     "heading_path": [],
+     "page": 1
+    }
+   ],
+   "search": [
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 11
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.4. What is brain entropy?"
+     ],
+     "page": 4
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 12
+    },
+    {
+     "heading_path": [
+      "4. Conclusions"
+     ],
+     "page": 13
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.4. What is brain entropy?"
+     ],
+     "page": 3
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.5. Previous research on psychedelic-induced brain entropy alterations"
+     ],
+     "page": 5
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.3. The entropic brain hypothesis"
+     ],
+     "page": 3
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.4. What is brain entropy?"
+     ],
+     "page": 4
+    }
+   ],
+   "turns": {
+    "retrieval": {
+     "trace_id": "0ba24102b1727f29db6f883add6e79a3",
+     "conversation_id": "0f2c4f5a-b9ac-4e50-8d1a-ddcd9cf1eadd",
+     "failed": true,
+     "metrics": {
+      "answered": false,
+      "tool_calls": 6,
+      "latency_s": 51.895
+     },
+     "pointers": [],
+     "tools": [
+      "read_around",
+      "read_section",
+      "read_section",
+      "read_around",
+      "read_around",
+      "search"
+     ],
+     "first_delta_s": null
+    },
+    "baseline": {
+     "trace_id": "356df10f4a9dce19597d1ddeddd037aa",
+     "conversation_id": "0ea37f69-5941-4dc3-bba1-060471ec2f66",
+     "failed": true,
+     "metrics": {
+      "answered": false,
+      "tool_calls": 3,
+      "latency_s": 620.323
+     },
+     "pointers": [],
+     "tools": [
+      "read_range",
+      "get_map",
+      "read_all"
+     ],
+     "first_delta_s": null
+    }
+   }
+  },
+  {
+   "name": "method-lzc-vs-shannon",
+   "kind": "method",
+   "question": "How does Lempel-Ziv complexity differ from Shannon entropy?",
+   "places": [
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.4. What is brain entropy?"
+     ],
+     "page": 4
+    }
+   ],
+   "search": [
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.4. What is brain entropy?"
+     ],
+     "page": 4
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "Table 1"
+     ],
+     "page": 7
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "Table 1"
+     ],
+     "page": 6
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.4. What is brain entropy?"
+     ],
+     "page": 4
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.4. What is brain entropy?"
+     ],
+     "page": 4
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "Table 1"
+     ],
+     "page": 6
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "Table 1"
+     ],
+     "page": 6
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.4. What is brain entropy?"
+     ],
+     "page": 4
+    }
+   ],
+   "turns": {
+    "retrieval": {
+     "trace_id": "5360989acf8be6dfafd59ee97e83ff8e",
+     "conversation_id": "a33830b3-caaf-403a-bb84-30cd2e299786",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "hit_at_8": true,
+      "first_hit_rank": 1,
+      "pointer_coverage": 1.0,
+      "pointers_close": 3,
+      "pointers_weak": 0,
+      "pointers_on_expected": 1.0,
+      "places_pointed": 1.0,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 1,
+      "tool_calls": 0,
+      "latency_s": 12.025
+     },
+     "pointers": [
+      {
+       "sentence": 0,
+       "support": "close",
+       "similarity": 0.9207,
+       "place": {
+        "heading_path": [
+         "2. Serotonergic psychedelics and brain entropy",
+         "2.4. What is brain entropy?"
+        ],
+        "page": 4
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 1,
+       "support": "close",
+       "similarity": 0.8649,
+       "place": {
+        "heading_path": [
+         "2. Serotonergic psychedelics and brain entropy",
+         "2.4. What is brain entropy?"
+        ],
+        "page": 4
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 2,
+       "support": "close",
+       "similarity": 0.7643,
+       "place": {
+        "heading_path": [
+         "2. Serotonergic psychedelics and brain entropy",
+         "2.4. What is brain entropy?"
+        ],
+        "page": 4
+       },
+       "on_expected": true
+      }
+     ],
+     "tools": [],
+     "first_delta_s": 6.132
+    },
+    "baseline": {
+     "trace_id": "c424915d193fc9be73521dcfd0e2b217",
+     "conversation_id": "99116a1e-adee-4688-beb7-bad48892f6c9",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "pointer_coverage": 0.0,
+      "pointers_close": 0,
+      "pointers_weak": 0,
+      "places_pointed": 0.0,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 1,
+      "tool_calls": 0,
+      "latency_s": 18.606
+     },
+     "pointers": [],
+     "tools": [],
+     "first_delta_s": 8.283
+    }
+   }
+  },
+  {
+   "name": "method-sample-entropy-parameters",
+   "kind": "method",
+   "question": "Which parameters have to be chosen to compute sample entropy, and why do they matter?",
+   "places": [
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.4. What is brain entropy?"
+     ],
+     "page": 4
+    }
+   ],
+   "search": [
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.4. What is brain entropy?"
+     ],
+     "page": 4
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 10
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 11
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 11
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 12
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "Table 1"
+     ],
+     "page": 6
+    },
+    {
+     "heading_path": [
+      "4. Conclusions"
+     ],
+     "page": 13
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.1. Psychedelics and their subjective effects"
+     ],
+     "page": 2
+    }
+   ],
+   "turns": {
+    "retrieval": {
+     "trace_id": "f7a68d6a38a932347e0e1d390e24dd13",
+     "conversation_id": "4f6b8903-a851-4fd6-8fc1-03d153b24ed9",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "hit_at_8": true,
+      "first_hit_rank": 1,
+      "pointer_coverage": 1.0,
+      "pointers_close": 2,
+      "pointers_weak": 0,
+      "pointers_on_expected": 1.0,
+      "places_pointed": 1.0,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 1,
+      "tool_calls": 0,
+      "latency_s": 11.252
+     },
+     "pointers": [
+      {
+       "sentence": 0,
+       "support": "close",
+       "similarity": 0.9796,
+       "place": {
+        "heading_path": [
+         "2. Serotonergic psychedelics and brain entropy",
+         "2.4. What is brain entropy?"
+        ],
+        "page": 4
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 1,
+       "support": "close",
+       "similarity": 0.7043,
+       "place": {
+        "heading_path": [
+         "2. Serotonergic psychedelics and brain entropy",
+         "2.4. What is brain entropy?"
+        ],
+        "page": 4
+       },
+       "on_expected": true
+      }
+     ],
+     "tools": [],
+     "first_delta_s": 7.092
+    },
+    "baseline": {
+     "trace_id": "8d59b823fb59286e576a5bd324312426",
+     "conversation_id": "04c05ce5-8d78-45e6-a543-7c8c370d25a5",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "pointer_coverage": 0.5,
+      "pointers_close": 1,
+      "pointers_weak": 0,
+      "pointers_on_expected": 1.0,
+      "places_pointed": 1.0,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 1,
+      "tool_calls": 0,
+      "latency_s": 17.887
+     },
+     "pointers": [
+      {
+       "sentence": 1,
+       "support": "close",
+       "similarity": 0.9192,
+       "place": {
+        "heading_path": [
+         "2. Serotonergic psychedelics and brain entropy",
+         "2.4. What is brain entropy?"
+        ],
+        "page": 4
+       },
+       "on_expected": true
+      }
+     ],
+     "tools": [],
+     "first_delta_s": 7.299
+    }
+   }
+  },
+  {
+   "name": "method-study-selection",
+   "kind": "method",
+   "question": "Which studies did the review select for its summary table, and how were entropy changes compared within them?",
+   "places": [
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "Table 1"
+     ],
+     "page": 6
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.5. Previous research on psychedelic-induced brain entropy alterations"
+     ],
+     "page": 5
+    }
+   ],
+   "search": [
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "Table 1"
+     ],
+     "page": 6
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+     ],
+     "page": 13
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 11
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.5. Previous research on psychedelic-induced brain entropy alterations"
+     ],
+     "page": 5
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+     ],
+     "page": 8
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.5. Previous research on psychedelic-induced brain entropy alterations"
+     ],
+     "page": 5
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.5. Previous research on psychedelic-induced brain entropy alterations"
+     ],
+     "page": 6
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+     ],
+     "page": 8
+    }
+   ],
+   "turns": {
+    "retrieval": {
+     "trace_id": "28d3ebb52f7953b5af83089e763d8834",
+     "conversation_id": "c25ecbff-6580-4330-9fc9-9de904e4cf93",
+     "failed": true,
+     "metrics": {
+      "answered": false,
+      "tool_calls": 6,
+      "latency_s": 49.237
+     },
+     "pointers": [],
+     "tools": [
+      "read_section",
+      "read_around",
+      "reference",
+      "reference",
+      "read_around",
+      "read_around"
+     ],
+     "first_delta_s": null
+    },
+    "baseline": {
+     "trace_id": "73a01e9696fc9c1e9e333f5bccae61c8",
+     "conversation_id": "ed7e0c7a-a98b-40a7-b1e6-6e3bee7380fe",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "pointer_coverage": 0.043478260869565216,
+      "pointers_close": 1,
+      "pointers_weak": 0,
+      "pointers_on_expected": 1.0,
+      "places_pointed": 0.5,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 1,
+      "tool_calls": 0,
+      "latency_s": 48.444
+     },
+     "pointers": [
+      {
+       "sentence": 22,
+       "support": "close",
+       "similarity": 0.8439,
+       "place": {
+        "heading_path": [
+         "2. Serotonergic psychedelics and brain entropy",
+         "Table 1"
+        ],
+        "page": 6
+       },
+       "on_expected": true
+      }
+     ],
+     "tools": [],
+     "first_delta_s": 10.002
+    }
+   }
+  },
+  {
+   "name": "shortcoming-main-limitations",
+   "kind": "shortcoming",
+   "question": "What are the main limitations of brain entropy as a biomarker of the psychedelic state?",
+   "places": [
+    {
+     "heading_path": [],
+     "page": 1
+    },
+    {
+     "heading_path": [
+      "1. Introduction"
+     ],
+     "page": 2
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+     ],
+     "page": 7
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+     ],
+     "page": 9
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 10
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+     ],
+     "page": 12
+    },
+    {
+     "heading_path": [
+      "4. Conclusions"
+     ],
+     "page": 13
+    }
+   ],
+   "search": [
+    {
+     "heading_path": [],
+     "page": 1
+    },
+    {
+     "heading_path": [
+      "1. Introduction"
+     ],
+     "page": 2
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+     ],
+     "page": 7
+    },
+    {
+     "heading_path": [
+      "4. Conclusions"
+     ],
+     "page": 13
+    },
+    {
+     "heading_path": [
+      "1. Introduction"
+     ],
+     "page": 2
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement"
+     ],
+     "page": 7
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 10
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.1. Psychedelics and their subjective effects"
+     ],
+     "page": 2
+    }
+   ],
+   "turns": {
+    "retrieval": {
+     "trace_id": "6db73737200381fe360218af04d45075",
+     "conversation_id": "5edbe1af-e367-4146-81cd-927e36c08309",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "hit_at_8": true,
+      "first_hit_rank": 1,
+      "pointer_coverage": 0.0,
+      "pointers_close": 0,
+      "pointers_weak": 0,
+      "places_pointed": 0.0,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 5,
+      "tool_calls": 4,
+      "latency_s": 52.35
+     },
+     "pointers": [],
+     "tools": [
+      "read_section",
+      "read_section",
+      "read_section",
+      "read_section"
+     ],
+     "first_delta_s": 39.562
+    },
+    "baseline": {
+     "trace_id": "0c189ef68f66a5b0f7d55a267b26bead",
+     "conversation_id": "7151bcf0-e419-4a34-8424-153c2d0f29c8",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "pointer_coverage": 0.6666666666666666,
+      "pointers_close": 11,
+      "pointers_weak": 9,
+      "pointers_on_expected": 0.3,
+      "places_pointed": 0.7142857142857143,
+      "quotes_exact": 1,
+      "quotes_not_exact": 0,
+      "quotes_verified": true,
+      "unknown_handles": 0,
+      "model_requests": 1,
+      "tool_calls": 0,
+      "latency_s": 50.882
+     },
+     "pointers": [
+      {
+       "sentence": 1,
+       "support": "close",
+       "similarity": 0.7707,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+        ],
+        "page": 7
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 1,
+       "support": "close",
+       "similarity": 0.7518,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+        ],
+        "page": 8
+       },
+       "on_expected": false
+      },
+      {
+       "sentence": 1,
+       "support": "close",
+       "similarity": 0.7814,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+        ],
+        "page": 8
+       },
+       "on_expected": false
+      },
+      {
+       "sentence": 1,
+       "support": "close",
+       "similarity": 0.7572,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+        ],
+        "page": 8
+       },
+       "on_expected": false
+      },
+      {
+       "sentence": 2,
+       "support": "weak",
+       "similarity": 0.6645,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+        ],
+        "page": 7
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 2,
+       "support": "weak",
+       "similarity": 0.6251,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+        ],
+        "page": 8
+       },
+       "on_expected": false
+      },
+      {
+       "sentence": 2,
+       "support": "weak",
+       "similarity": 0.6405,
+       "place": {
+        "heading_path": [
+         "2. Serotonergic psychedelics and brain entropy",
+         "2.6. Theoretical merits and practical utility of brain entropy as a biomarker of the psychedelic state"
+        ],
+        "page": 7
+       },
+       "on_expected": false
+      },
+      {
+       "sentence": 2,
+       "support": "weak",
+       "similarity": 0.6868,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+        ],
+        "page": 8
+       },
+       "on_expected": false
+      },
+      {
+       "sentence": 2,
+       "support": "weak",
+       "similarity": 0.6112,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+        ],
+        "page": 8
+       },
+       "on_expected": false
+      },
+      {
+       "sentence": 2,
+       "support": "weak",
+       "similarity": 0.6255,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+        ],
+        "page": 9
+       },
+       "on_expected": false
+      },
+      {
+       "sentence": 3,
+       "support": "close",
+       "similarity": 0.7787,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+        ],
+        "page": 8
+       },
+       "on_expected": false
+      },
+      {
+       "sentence": 6,
+       "support": "weak",
+       "similarity": 0.55,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+        ],
+        "page": 9
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 6,
+       "support": "weak",
+       "similarity": 0.5667,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+        ],
+        "page": 10
+       },
+       "on_expected": false
+      },
+      {
+       "sentence": 7,
+       "support": "close",
+       "similarity": 0.8176,
+       "place": {
+        "heading_path": [
+         "4. Conclusions"
+        ],
+        "page": 13
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 8,
+       "support": "close",
+       "similarity": 0.7963,
+       "place": {
+        "heading_path": [
+         "2. Serotonergic psychedelics and brain entropy",
+         "2.4. What is brain entropy?"
+        ],
+        "page": 4
+       },
+       "on_expected": false
+      },
+      {
+       "sentence": 8,
+       "support": "close",
+       "similarity": 0.8395,
+       "place": {
+        "heading_path": [
+         "2. Serotonergic psychedelics and brain entropy",
+         "2.4. What is brain entropy?"
+        ],
+        "page": 4
+       },
+       "on_expected": false
+      },
+      {
+       "sentence": 8,
+       "support": "close",
+       "similarity": 0.7081,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.3. One entropy to rule them all?"
+        ],
+        "page": 10
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 8,
+       "support": "close",
+       "similarity": 0.7731,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.3. One entropy to rule them all?"
+        ],
+        "page": 11
+       },
+       "on_expected": false
+      },
+      {
+       "sentence": 9,
+       "support": "weak",
+       "similarity": 0.689,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+        ],
+        "page": 12
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 10,
+       "support": "close",
+       "similarity": 0.7254,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+        ],
+        "page": 13
+       },
+       "on_expected": false
+      }
+     ],
+     "tools": [],
+     "first_delta_s": 26.954
+    }
+   }
+  },
+  {
+   "name": "shortcoming-specificity",
+   "kind": "shortcoming",
+   "question": "Are increases in brain entropy specific to psychedelics?",
+   "places": [
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+     ],
+     "page": 7
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+     ],
+     "page": 8
+    }
+   ],
+   "search": [
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+     ],
+     "page": 8
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.1. Psychedelics and their subjective effects"
+     ],
+     "page": 2
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+     ],
+     "page": 10
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+     ],
+     "page": 9
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+     ],
+     "page": 7
+    },
+    {
+     "heading_path": [],
+     "page": 1
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+     ],
+     "page": 8
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+     ],
+     "page": 12
+    }
+   ],
+   "turns": {
+    "retrieval": {
+     "trace_id": "94b4ec34a550a419d156bf3befa3dd40",
+     "conversation_id": "c25204ce-70c0-49dd-84c5-e33fc1f97ab9",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "hit_at_8": true,
+      "first_hit_rank": 1,
+      "pointer_coverage": 0.0,
+      "pointers_close": 0,
+      "pointers_weak": 0,
+      "places_pointed": 0.0,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 1,
+      "tool_calls": 0,
+      "latency_s": 13.471
+     },
+     "pointers": [],
+     "tools": [],
+     "first_delta_s": 7.555
+    },
+    "baseline": {
+     "trace_id": "d87f1f36136df123414ad8f4a41a7a2b",
+     "conversation_id": "48bb8a22-8209-4da0-985d-ed3d60ad6649",
+     "failed": true,
+     "metrics": {
+      "answered": false,
+      "tool_calls": 5,
+      "latency_s": 21.875
+     },
+     "pointers": [],
+     "tools": [
+      "Read",
+      "Read",
+      "Read",
+      "Read",
+      "Read"
+     ],
+     "first_delta_s": null
+    }
+   }
+  },
+  {
+   "name": "shortcoming-scalar-measure",
+   "kind": "shortcoming",
+   "question": "Why do the authors doubt that a single entropy value can describe a state of consciousness?",
+   "places": [
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+     ],
+     "page": 9
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+     ],
+     "page": 10
+    }
+   ],
+   "search": [
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+     ],
+     "page": 9
+    },
+    {
+     "heading_path": [
+      "4. Conclusions"
+     ],
+     "page": 13
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.1. Psychedelics and their subjective effects"
+     ],
+     "page": 2
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 10
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+     ],
+     "page": 10
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.3. The entropic brain hypothesis"
+     ],
+     "page": 3
+    },
+    {
+     "heading_path": [
+      "4. Conclusions"
+     ],
+     "page": 13
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+     ],
+     "page": 12
+    }
+   ],
+   "turns": {
+    "retrieval": {
+     "trace_id": "fcb19996a0a8c2aca5129fb9fe75b646",
+     "conversation_id": "b51446b9-f927-4a04-b7d8-0f095212d1cd",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "hit_at_8": true,
+      "first_hit_rank": 1,
+      "pointers_close": 0,
+      "pointers_weak": 0,
+      "places_pointed": 0.0,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 4,
+      "tool_calls": 3,
+      "latency_s": 22.451
+     },
+     "pointers": [],
+     "tools": [
+      "read_around",
+      "read_around",
+      "read_around"
+     ],
+     "first_delta_s": 22.441
+    },
+    "baseline": {
+     "trace_id": "970f226705856e25d3561cee589bed2f",
+     "conversation_id": "e179bd49-44a7-4641-9e67-5d73123fd484",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "pointer_coverage": 0.6666666666666666,
+      "pointers_close": 3,
+      "pointers_weak": 0,
+      "pointers_on_expected": 1.0,
+      "places_pointed": 0.5,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 1,
+      "tool_calls": 0,
+      "latency_s": 23.219
+     },
+     "pointers": [
+      {
+       "sentence": 1,
+       "support": "close",
+       "similarity": 0.7234,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+        ],
+        "page": 9
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 1,
+       "support": "close",
+       "similarity": 0.7282,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+        ],
+        "page": 9
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 2,
+       "support": "close",
+       "similarity": 0.7407,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+        ],
+        "page": 9
+       },
+       "on_expected": true
+      }
+     ],
+     "tools": [],
+     "first_delta_s": 11.013
+    }
+   }
+  },
+  {
+   "name": "shortcoming-fmri",
+   "kind": "shortcoming",
+   "question": "What problems do the authors see in measuring brain entropy with fMRI?",
+   "places": [
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 11
+    },
+    {
+     "heading_path": [
+      "4. Conclusions"
+     ],
+     "page": 13
+    }
+   ],
+   "search": [
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 11
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 10
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+     ],
+     "page": 12
+    },
+    {
+     "heading_path": [
+      "4. Conclusions"
+     ],
+     "page": 13
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+     ],
+     "page": 10
+    },
+    {
+     "heading_path": [
+      "4. Conclusions"
+     ],
+     "page": 13
+    },
+    {
+     "heading_path": [
+      "1. Introduction"
+     ],
+     "page": 1
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 11
+    }
+   ],
+   "turns": {
+    "retrieval": {
+     "trace_id": "ae43a117d5ddd80e62a35b645c276d1d",
+     "conversation_id": "2718974a-4c7a-401b-bb0b-654953e313d4",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "hit_at_8": true,
+      "first_hit_rank": 1,
+      "pointer_coverage": 1.0,
+      "pointers_close": 6,
+      "pointers_weak": 1,
+      "pointers_on_expected": 0.8571428571428571,
+      "places_pointed": 1.0,
+      "quotes_exact": 2,
+      "quotes_not_exact": 1,
+      "quotes_verified": true,
+      "unknown_handles": 0,
+      "model_requests": 1,
+      "tool_calls": 0,
+      "latency_s": 22.666
+     },
+     "pointers": [
+      {
+       "sentence": 0,
+       "support": "close",
+       "similarity": 0.7982,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.3. One entropy to rule them all?"
+        ],
+        "page": 11
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 1,
+       "support": "close",
+       "similarity": 0.7568,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.3. One entropy to rule them all?"
+        ],
+        "page": 11
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 2,
+       "support": "close",
+       "similarity": 0.7373,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.3. One entropy to rule them all?"
+        ],
+        "page": 11
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 3,
+       "support": "close",
+       "similarity": 0.7195,
+       "place": {
+        "heading_path": [
+         "4. Conclusions"
+        ],
+        "page": 13
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 4,
+       "support": "weak",
+       "similarity": 0.6788,
+       "place": {
+        "heading_path": [
+         "4. Conclusions"
+        ],
+        "page": 13
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 5,
+       "support": "close",
+       "similarity": 0.7262,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.3. One entropy to rule them all?"
+        ],
+        "page": 10
+       },
+       "on_expected": false
+      },
+      {
+       "sentence": 5,
+       "support": "close",
+       "similarity": 0.7079,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.3. One entropy to rule them all?"
+        ],
+        "page": 11
+       },
+       "on_expected": true
+      }
+     ],
+     "tools": [],
+     "first_delta_s": 10.317
+    },
+    "baseline": {
+     "trace_id": "18ba564618a1ffce1b5033df85a5712e",
+     "conversation_id": "bf46d788-1c1b-4b51-ae15-14496f73538f",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "pointer_coverage": 0.0,
+      "pointers_close": 0,
+      "pointers_weak": 0,
+      "places_pointed": 0.0,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 2,
+      "tool_calls": 0,
+      "latency_s": 22.066
+     },
+     "pointers": [],
+     "tools": [],
+     "first_delta_s": 16.202
+    }
+   }
+  },
+  {
+   "name": "shortcoming-own-scope",
+   "kind": "shortcoming",
+   "question": "What does the review itself leave out, by the authors' own account?",
+   "places": [
+    {
+     "heading_path": [
+      "4. Conclusions"
+     ],
+     "page": 13
+    }
+   ],
+   "search": [
+    {
+     "heading_path": [
+      "Declaration of Generative AI and AI-assisted technologies in the writing process"
+     ],
+     "page": 14
+    },
+    {
+     "heading_path": [
+      "Declaration of Generative AI and AI-assisted technologies in the writing process"
+     ],
+     "page": 14
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+     ],
+     "page": 9
+    },
+    {
+     "heading_path": [
+      "1. Introduction"
+     ],
+     "page": 2
+    },
+    {
+     "heading_path": [
+      "4. Conclusions"
+     ],
+     "page": 13
+    },
+    {
+     "heading_path": [
+      "4. Conclusions"
+     ],
+     "page": 13
+    },
+    {
+     "heading_path": [
+      "4. Conclusions"
+     ],
+     "page": 13
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+     ],
+     "page": 12
+    }
+   ],
+   "turns": {
+    "retrieval": {
+     "trace_id": "64faeb3281ab0752535be216ae18d0bf",
+     "conversation_id": "4fe0e57c-69a5-4a44-a218-13f25c625769",
+     "failed": true,
+     "metrics": {
+      "answered": false,
+      "tool_calls": 6,
+      "latency_s": 42.19
+     },
+     "pointers": [],
+     "tools": [
+      "read_around",
+      "reference",
+      "read_section",
+      "read_around",
+      "read_section",
+      "read_section"
+     ],
+     "first_delta_s": null
+    },
+    "baseline": {
+     "trace_id": "1598bd4a15cc3a832762d1d25f1e00fb",
+     "conversation_id": "de9e65d9-d621-4a84-addc-938f0d4aa245",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "pointer_coverage": 0.0,
+      "pointers_close": 0,
+      "pointers_weak": 0,
+      "places_pointed": 0.0,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 1,
+      "tool_calls": 0,
+      "latency_s": 16.626
+     },
+     "pointers": [],
+     "tools": [],
+     "first_delta_s": 10.819
+    }
+   }
+  },
+  {
+   "name": "follow-up-study-designs",
+   "kind": "follow-up",
+   "question": "What kind of studies do the authors call for to move the field forward?",
+   "places": [
+    {
+     "heading_path": [
+      "4. Conclusions"
+     ],
+     "page": 13
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+     ],
+     "page": 13
+    }
+   ],
+   "search": [
+    {
+     "heading_path": [
+      "4. Conclusions"
+     ],
+     "page": 13
+    },
+    {
+     "heading_path": [
+      "Declaration of Generative AI and AI-assisted technologies in the writing process"
+     ],
+     "page": 14
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+     ],
+     "page": 10
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+     ],
+     "page": 9
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+     ],
+     "page": 13
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+     ],
+     "page": 9
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.1. Psychedelics and their subjective effects"
+     ],
+     "page": 3
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "Table 1"
+     ],
+     "page": 6
+    }
+   ],
+   "turns": {
+    "retrieval": {
+     "trace_id": "a212d4b779a3aac9b5c224b96b0ff5c7",
+     "conversation_id": "3fa5544e-f153-435c-b2ae-dbd3b4a8daa1",
+     "failed": true,
+     "metrics": {
+      "answered": false,
+      "tool_calls": 9,
+      "latency_s": 39.965
+     },
+     "pointers": [],
+     "tools": [
+      "read_section",
+      "read_section",
+      "read_section",
+      "read_section",
+      "read_section",
+      "read_section",
+      "read_section",
+      "read_section",
+      "read_section"
+     ],
+     "first_delta_s": 7.518
+    },
+    "baseline": {
+     "trace_id": "d124e5b17ba6ad5bc35f9506105ac190",
+     "conversation_id": "f309db80-3e86-4fe9-b2d0-7c8b307ab5a3",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "pointer_coverage": 1.0,
+      "pointers_close": 5,
+      "pointers_weak": 1,
+      "pointers_on_expected": 0.8333333333333334,
+      "places_pointed": 1.0,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 1,
+      "tool_calls": 0,
+      "latency_s": 16.778
+     },
+     "pointers": [
+      {
+       "sentence": 0,
+       "support": "close",
+       "similarity": 0.7002,
+       "place": {
+        "heading_path": [
+         "4. Conclusions"
+        ],
+        "page": 13
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 1,
+       "support": "close",
+       "similarity": 0.7187,
+       "place": {
+        "heading_path": [
+         "4. Conclusions"
+        ],
+        "page": 13
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 2,
+       "support": "close",
+       "similarity": 0.7926,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+        ],
+        "page": 9
+       },
+       "on_expected": false
+      },
+      {
+       "sentence": 3,
+       "support": "weak",
+       "similarity": 0.5705,
+       "place": {
+        "heading_path": [
+         "4. Conclusions"
+        ],
+        "page": 13
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 4,
+       "support": "close",
+       "similarity": 0.7702,
+       "place": {
+        "heading_path": [
+         "4. Conclusions"
+        ],
+        "page": 13
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 5,
+       "support": "close",
+       "similarity": 0.7825,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+        ],
+        "page": 13
+       },
+       "on_expected": true
+      }
+     ],
+     "tools": [],
+     "first_delta_s": 5.349
+    }
+   }
+  },
+  {
+   "name": "follow-up-alertness-controls",
+   "kind": "follow-up",
+   "question": "How should future studies control for the effect of alertness on brain entropy?",
+   "places": [
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+     ],
+     "page": 9
+    },
+    {
+     "heading_path": [
+      "4. Conclusions"
+     ],
+     "page": 13
+    }
+   ],
+   "search": [
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+     ],
+     "page": 9
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+     ],
+     "page": 9
+    },
+    {
+     "heading_path": [
+      "4. Conclusions"
+     ],
+     "page": 13
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+     ],
+     "page": 8
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+     ],
+     "page": 8
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+     ],
+     "page": 12
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+     ],
+     "page": 10
+    },
+    {
+     "heading_path": [],
+     "page": 1
+    }
+   ],
+   "turns": {
+    "retrieval": {
+     "trace_id": "393031fb0726d2a6c051ac7227412337",
+     "conversation_id": "d51e689c-7cee-4382-9b0c-0c7e97b84503",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "hit_at_8": true,
+      "first_hit_rank": 1,
+      "pointer_coverage": 1.0,
+      "pointers_close": 3,
+      "pointers_weak": 0,
+      "pointers_on_expected": 1.0,
+      "places_pointed": 0.5,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 2,
+      "tool_calls": 1,
+      "latency_s": 20.837
+     },
+     "pointers": [
+      {
+       "sentence": 0,
+       "support": "close",
+       "similarity": 0.9548,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+        ],
+        "page": 9
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 1,
+       "support": "close",
+       "similarity": 0.8826,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+        ],
+        "page": 9
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 2,
+       "support": "close",
+       "similarity": 0.851,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+        ],
+        "page": 9
+       },
+       "on_expected": true
+      }
+     ],
+     "tools": [
+      "read_section"
+     ],
+     "first_delta_s": 14.159
+    },
+    "baseline": {
+     "trace_id": "3f29ffee1d551c2c606815f271e0401c",
+     "conversation_id": "b2ca2cf8-7aab-48db-876c-37caac79a0be",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "pointer_coverage": 0.6666666666666666,
+      "pointers_close": 2,
+      "pointers_weak": 0,
+      "pointers_on_expected": 1.0,
+      "places_pointed": 0.5,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 1,
+      "tool_calls": 0,
+      "latency_s": 17.603
+     },
+     "pointers": [
+      {
+       "sentence": 0,
+       "support": "close",
+       "similarity": 0.7115,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+        ],
+        "page": 9
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 1,
+       "support": "close",
+       "similarity": 0.8196,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+        ],
+        "page": 9
+       },
+       "on_expected": true
+      }
+     ],
+     "tools": [],
+     "first_delta_s": 9.496
+    }
+   }
+  },
+  {
+   "name": "follow-up-phenomenal-richness",
+   "kind": "follow-up",
+   "question": "How do the authors propose to test whether psychedelics really increase phenomenal richness?",
+   "places": [
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+     ],
+     "page": 12
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+     ],
+     "page": 10
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+     ],
+     "page": 13
+    }
+   ],
+   "search": [
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+     ],
+     "page": 10
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+     ],
+     "page": 13
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+     ],
+     "page": 12
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+     ],
+     "page": 12
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+     ],
+     "page": 8
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+     ],
+     "page": 9
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+     ],
+     "page": 12
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+     ],
+     "page": 8
+    }
+   ],
+   "turns": {
+    "retrieval": {
+     "trace_id": "1d35e176a2e24c6088b6026406cfc61d",
+     "conversation_id": "be37e461-c093-4152-99e0-6ccde0a5595b",
+     "failed": true,
+     "metrics": {
+      "answered": false,
+      "tool_calls": 6,
+      "latency_s": 32.236
+     },
+     "pointers": [],
+     "tools": [
+      "Gemma2::respond",
+      "read_section",
+      "read_section",
+      "read_section",
+      "read_section",
+      "read_section"
+     ],
+     "first_delta_s": null
+    },
+    "baseline": {
+     "trace_id": "0918fd5fb99c1219ad24ae5573665a7c",
+     "conversation_id": "b1390db6-e73b-439d-95c4-cf8ddf852c72",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "pointer_coverage": 0.5,
+      "pointers_close": 2,
+      "pointers_weak": 0,
+      "pointers_on_expected": 1.0,
+      "places_pointed": 0.6666666666666666,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 1,
+      "tool_calls": 0,
+      "latency_s": 18.043
+     },
+     "pointers": [
+      {
+       "sentence": 1,
+       "support": "close",
+       "similarity": 0.7656,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+        ],
+        "page": 12
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 1,
+       "support": "close",
+       "similarity": 0.8025,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+        ],
+        "page": 13
+       },
+       "on_expected": true
+      }
+     ],
+     "tools": [],
+     "first_delta_s": 7.672
+    }
+   }
+  },
+  {
+   "name": "follow-up-metric-choice",
+   "kind": "follow-up",
+   "question": "What do the authors recommend about choosing and reporting entropy metrics in future studies?",
+   "places": [
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 12
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 10
+    },
+    {
+     "heading_path": [
+      "4. Conclusions"
+     ],
+     "page": 13
+    }
+   ],
+   "search": [
+    {
+     "heading_path": [
+      "4. Conclusions"
+     ],
+     "page": 13
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 10
+    },
+    {
+     "heading_path": [
+      "4. Conclusions"
+     ],
+     "page": 13
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 12
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+     ],
+     "page": 8
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.4. What is brain entropy?"
+     ],
+     "page": 4
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 11
+    },
+    {
+     "heading_path": [
+      "1. Introduction"
+     ],
+     "page": 2
+    }
+   ],
+   "turns": {
+    "retrieval": {
+     "trace_id": "c622d53f92c5277ee84830a0f5ee849b",
+     "conversation_id": "6c5316b9-2a5a-4224-be4b-490659662a57",
+     "failed": true,
+     "metrics": {
+      "answered": false,
+      "tool_calls": 6,
+      "latency_s": 44.717
+     },
+     "pointers": [],
+     "tools": [
+      "reference",
+      "citing_sentences",
+      "search",
+      "search",
+      "search",
+      "reference"
+     ],
+     "first_delta_s": null
+    },
+    "baseline": {
+     "trace_id": "fb04dbc928c736e4bc8826c79cccabe0",
+     "conversation_id": "e3406ffc-bad6-404a-85bd-b50075ef525a",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "pointer_coverage": 1.0,
+      "pointers_close": 4,
+      "pointers_weak": 0,
+      "pointers_on_expected": 1.0,
+      "places_pointed": 0.6666666666666666,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 1,
+      "tool_calls": 0,
+      "latency_s": 21.664
+     },
+     "pointers": [
+      {
+       "sentence": 0,
+       "support": "close",
+       "similarity": 0.9428,
+       "place": {
+        "heading_path": [
+         "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+         "3.3. One entropy to rule them all?"
+        ],
+        "page": 12
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 1,
+       "support": "close",
+       "similarity": 0.9069,
+       "place": {
+        "heading_path": [
+         "4. Conclusions"
+        ],
+        "page": 13
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 2,
+       "support": "close",
+       "similarity": 0.7621,
+       "place": {
+        "heading_path": [
+         "4. Conclusions"
+        ],
+        "page": 13
+       },
+       "on_expected": true
+      },
+      {
+       "sentence": 2,
+       "support": "close",
+       "similarity": 0.7373,
+       "place": {
+        "heading_path": [
+         "4. Conclusions"
+        ],
+        "page": 13
+       },
+       "on_expected": true
+      }
+     ],
+     "tools": [],
+     "first_delta_s": 13.127
+    }
+   }
+  },
+  {
+   "name": "uncovered-depression-dose",
+   "kind": "uncovered",
+   "question": "What dose of psilocybin do the authors recommend for treating depression?",
+   "places": [],
+   "search": [
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+     ],
+     "page": 9
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+     ],
+     "page": 9
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.5. Previous research on psychedelic-induced brain entropy alterations"
+     ],
+     "page": 5
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.5. Previous research on psychedelic-induced brain entropy alterations"
+     ],
+     "page": 5
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.5. Previous research on psychedelic-induced brain entropy alterations"
+     ],
+     "page": 6
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+     ],
+     "page": 9
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 11
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.5. Previous research on psychedelic-induced brain entropy alterations"
+     ],
+     "page": 6
+    }
+   ],
+   "turns": {
+    "retrieval": {
+     "trace_id": "e1af04a491a994d94c14930919eb15c0",
+     "conversation_id": "d0155560-7f28-4d41-8679-feb73f821678",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "pointer_coverage": 0.5,
+      "pointers_close": 1,
+      "pointers_weak": 0,
+      "says_not_covered": true,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 2,
+      "tool_calls": 1,
+      "latency_s": 11.828
+     },
+     "pointers": [
+      {
+       "sentence": 1,
+       "support": "close",
+       "similarity": 0.8141,
+       "place": {
+        "heading_path": [],
+        "page": 1
+       },
+       "on_expected": null
+      }
+     ],
+     "tools": [
+      "search"
+     ],
+     "first_delta_s": 8.733
+    },
+    "baseline": {
+     "trace_id": "a43ff65018b09d7fe60c5f9da154786c",
+     "conversation_id": "c2198678-c1bd-4de4-9d80-5d5639556a98",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "pointer_coverage": 0.0,
+      "pointers_close": 0,
+      "pointers_weak": 0,
+      "says_not_covered": true,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 2,
+      "tool_calls": 0,
+      "latency_s": 20.289
+     },
+     "pointers": [],
+     "tools": [],
+     "first_delta_s": 18.229
+    }
+   }
+  },
+  {
+   "name": "uncovered-own-experiment",
+   "kind": "uncovered",
+   "question": "How many participants did the authors recruit for their own experiment, and how did they record their EEG?",
+   "places": [],
+   "search": [
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+     ],
+     "page": 8
+    },
+    {
+     "heading_path": [
+      "1. Introduction"
+     ],
+     "page": 1
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.5. Previous research on psychedelic-induced brain entropy alterations"
+     ],
+     "page": 5
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "Table 1"
+     ],
+     "page": 6
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.6. Theoretical merits and practical utility of brain entropy as a biomarker of the psychedelic state"
+     ],
+     "page": 7
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.5. Previous research on psychedelic-induced brain entropy alterations"
+     ],
+     "page": 5
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.2. Psychedelic-induced altered states of consciousness"
+     ],
+     "page": 3
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.4. Limits to the neurophenomenological equivalence between brain entropy and phenomenal richness"
+     ],
+     "page": 12
+    }
+   ],
+   "turns": {
+    "retrieval": {
+     "trace_id": "3c35c29301d8576af4eac06ee1002271",
+     "conversation_id": "7e21c131-c8b2-4a3a-a40f-683e8c7479e7",
+     "failed": true,
+     "metrics": {
+      "answered": false,
+      "tool_calls": 7,
+      "latency_s": 54.52
+     },
+     "pointers": [],
+     "tools": [
+      "read_section",
+      "read_section",
+      "search",
+      "read_section",
+      "read_section",
+      "search",
+      "read_section"
+     ],
+     "first_delta_s": null
+    },
+    "baseline": {
+     "trace_id": "d64956097d5d81da58cb418fcf16629b",
+     "conversation_id": "9f56bfe1-21dc-4557-ab2c-dacf0aac91ff",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "pointer_coverage": 0.0,
+      "pointers_close": 0,
+      "pointers_weak": 0,
+      "says_not_covered": true,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 1,
+      "tool_calls": 0,
+      "latency_s": 16.527
+     },
+     "pointers": [],
+     "tools": [],
+     "first_delta_s": 14.545
+    }
+   }
+  },
+  {
+   "name": "uncovered-heart-rate",
+   "kind": "uncovered",
+   "question": "How do psychedelics affect heart rate and blood pressure?",
+   "places": [],
+   "search": [
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.2. Psychedelic-induced altered states of consciousness"
+     ],
+     "page": 3
+    },
+    {
+     "heading_path": [
+      "1. Introduction"
+     ],
+     "page": 1
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+     ],
+     "page": 9
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "Table 1"
+     ],
+     "page": 7
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+     ],
+     "page": 10
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.5. Previous research on psychedelic-induced brain entropy alterations"
+     ],
+     "page": 6
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.1. Entropy increases are not unique to psychedelics or states of heightened phenomenal richness"
+     ],
+     "page": 8
+    },
+    {
+     "heading_path": [],
+     "page": 1
+    }
+   ],
+   "turns": {
+    "retrieval": {
+     "trace_id": "0d1324a9fce7818f75103fcf9948038a",
+     "conversation_id": "dd9d5355-4a8c-4f19-9e55-7a807d7dedd6",
+     "failed": true,
+     "metrics": {
+      "answered": false,
+      "tool_calls": 8,
+      "latency_s": 40.501
+     },
+     "pointers": [],
+     "tools": [
+      "read_section",
+      "read_section",
+      "cite",
+      "citing_sentences",
+      "read_around",
+      "search",
+      "read_section",
+      "read_around"
+     ],
+     "first_delta_s": null
+    },
+    "baseline": {
+     "trace_id": "cbd486a7114fdbc580ab8e9f4b397a75",
+     "conversation_id": "3760a032-5e18-4fd6-a246-18d917dd68ec",
+     "failed": true,
+     "metrics": {
+      "answered": false,
+      "tool_calls": 4,
+      "latency_s": 20.295
+     },
+     "pointers": [],
+     "tools": [
+      "read_section",
+      "search",
+      "read",
+      "read"
+     ],
+     "first_delta_s": null
+    }
+   }
+  },
+  {
+   "name": "uncovered-analysis-software",
+   "kind": "uncovered",
+   "question": "Which statistical software did the authors use to analyse their data?",
+   "places": [],
+   "search": [
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "Table 1"
+     ],
+     "page": 6
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.5. Previous research on psychedelic-induced brain entropy alterations"
+     ],
+     "page": 5
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.6. Theoretical merits and practical utility of brain entropy as a biomarker of the psychedelic state"
+     ],
+     "page": 7
+    },
+    {
+     "heading_path": [
+      "Declaration of Generative AI and AI-assisted technologies in the writing process"
+     ],
+     "page": 14
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.4. What is brain entropy?"
+     ],
+     "page": 4
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.4. What is brain entropy?"
+     ],
+     "page": 4
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 10
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.4. What is brain entropy?"
+     ],
+     "page": 4
+    }
+   ],
+   "turns": {
+    "retrieval": {
+     "trace_id": "75e2430afc1801fbf6ce43fc3122d7f8",
+     "conversation_id": "572758e3-1bf4-4644-acb7-2bc1b8d08d7b",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "pointer_coverage": 0.0,
+      "pointers_close": 0,
+      "pointers_weak": 0,
+      "says_not_covered": true,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 3,
+      "tool_calls": 2,
+      "latency_s": 20.644
+     },
+     "pointers": [],
+     "tools": [
+      "search",
+      "read_around"
+     ],
+     "first_delta_s": 18.647
+    },
+    "baseline": {
+     "trace_id": "e7411b5034df8b3ac7da750072b2b965",
+     "conversation_id": "3961187e-b41d-4242-be6d-451e9234f0c6",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "pointer_coverage": 0.0,
+      "pointers_close": 0,
+      "pointers_weak": 0,
+      "says_not_covered": true,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 1,
+      "tool_calls": 0,
+      "latency_s": 6.638
+     },
+     "pointers": [],
+     "tools": [],
+     "first_delta_s": 4.444
+    }
+   }
+  },
+  {
+   "name": "uncovered-eu-regulation",
+   "kind": "uncovered",
+   "question": "How is psilocybin therapy regulated in the European Union?",
+   "places": [],
+   "search": [
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.5. Previous research on psychedelic-induced brain entropy alterations"
+     ],
+     "page": 5
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "2.5. Previous research on psychedelic-induced brain entropy alterations"
+     ],
+     "page": 5
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+     ],
+     "page": 9
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.3. One entropy to rule them all?"
+     ],
+     "page": 11
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+     ],
+     "page": 9
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+     ],
+     "page": 9
+    },
+    {
+     "heading_path": [
+      "3. Limitations of brain entropy as a biomarker of the psychedelic state and suggestions for refinement",
+      "3.2. Scalar entropy-based biomarkers are limited in describing complex states of consciousness"
+     ],
+     "page": 9
+    },
+    {
+     "heading_path": [
+      "2. Serotonergic psychedelics and brain entropy",
+      "Table 1"
+     ],
+     "page": 6
+    }
+   ],
+   "turns": {
+    "retrieval": {
+     "trace_id": "7d13dbda0b89a95543e84fa59db50e3a",
+     "conversation_id": "82739a65-6eef-47a7-8f7a-aac6b8410e06",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "pointer_coverage": 0.0,
+      "pointers_close": 0,
+      "pointers_weak": 0,
+      "says_not_covered": true,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 5,
+      "tool_calls": 4,
+      "latency_s": 27.498
+     },
+     "pointers": [],
+     "tools": [
+      "search",
+      "read_section",
+      "read_section",
+      "read_around"
+     ],
+     "first_delta_s": 25.304
+    },
+    "baseline": {
+     "trace_id": "d8e056884559de4b9174980412f4e9a9",
+     "conversation_id": "ab9484d1-6eda-4820-9022-d1f494bf33a3",
+     "failed": false,
+     "metrics": {
+      "answered": true,
+      "pointer_coverage": 0.0,
+      "pointers_close": 0,
+      "pointers_weak": 0,
+      "says_not_covered": true,
+      "quotes_exact": 0,
+      "quotes_not_exact": 0,
+      "unknown_handles": 0,
+      "model_requests": 1,
+      "tool_calls": 0,
+      "latency_s": 9.333
+     },
+     "pointers": [],
+     "tools": [],
+     "first_delta_s": 6.745
+    }
+   }
+  }
+ ]
+}

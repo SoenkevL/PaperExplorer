@@ -24,8 +24,9 @@ class Settings(BaseSettings):
     embedding_model: str = "bge-m3"
     embedding_api_key: SecretStr = SecretStr("ollama")
     embedding_batch_size: int = Field(default=32, ge=1, description="Texts per embedding request.")
-    # Provisional until the eval sets it: bge-m3 puts a paraphrase of a sentence well above 0.7
-    # and another sentence on the same topic below it; too low would call weak Support close.
+    # Set from eval run 20261029T191529Z-94e980b (docs/eval-2026-10-29.md): none of the 60
+    # Pointers at or above 0.7 was at a place that does not bear its sentence out; above 0.75
+    # would make 15 apt or partly apt ones weak, below 0.65 call an inapt one close.
     support_threshold: float = Field(
         default=0.7,
         ge=0,

@@ -45,6 +45,7 @@ from paperexplorer.asking import (
     ask,
     chat_model,
 )
+from paperexplorer.asking.agent import LAST_REQUEST, NO_TOOLS
 from paperexplorer.config import Settings
 from paperexplorer.domain import Work
 from paperexplorer.embedding import Embedder, FakeEmbedder, OpenAICompatibleEmbedder
@@ -278,11 +279,13 @@ def test_the_last_request_offers_no_tools_so_the_model_answers(
     events = turn(context(store_db, script), conversation, QUESTION)
 
     assert len(script.requests) == REQUEST_LIMIT
-    *earlier, (_, last) = script.requests
+    *earlier, (last_messages, last) = script.requests
     assert all(len(info.function_tools) == 5 for _, info in earlier)
     assert last.function_tools == []
-    assert last.instructions is not None and "last request" in last.instructions
-    assert all("last request" not in (info.instructions or "") for _, info in earlier)
+    # The note that says so comes after everything the model read, not among the instructions.
+    assert LAST_REQUEST in (trailing_note(last_messages) or "")
+    assert all(trailing_note(messages) is None for messages, _ in earlier)
+    assert all(LAST_REQUEST not in (info.instructions or "") for _, info in script.requests)
     assert isinstance(events[-1], AnsweredEvent)
     assert sum(isinstance(e, StepEvent) for e in events) == REQUEST_LIMIT
 
@@ -329,8 +332,8 @@ def test_regression_eval_last_request_note_comes_after_the_reading(
 
     The model read for five requests. The sixth offered no tools and said so among the
     instructions, before everything it had read; the model called `search` anyway and the turn
-    failed, as in all 8 retrieval turns that reached the limit. Replayed on the tower with the
-    note after the last tool result, the same request was answered.
+    failed, as in all 8 retrieval turns that reached the limit. Replayed on the tower three times
+    each, those 8 requests were answered 1 time in 24 as sent, 23 in 24 with the note last.
     """
 
     def recorded(messages: list[ModelMessage]) -> list[Item]:
@@ -365,8 +368,9 @@ def test_regression_eval_whole_seed_model_calls_a_tool_it_was_never_offered(
     """Eval run 20261029T191529Z-94e980b, trace d87f1f36136df123414ad8f4a41a7a2b (baseline).
 
     Offered no tools, the model called one named `Read` four times, and three more after the
-    retry prompt, so the turn failed; two more baseline turns failed the same way. Replayed on
-    the tower with a note after the Question that it has no tools, the model answered.
+    retry prompt, so the turn failed; two more baseline turns failed the same way. The note that
+    there are no tools stood among the instructions, before the whole Seed; like the live
+    agent's last request, every whole-Seed request now ends with it.
     """
 
     def recorded(messages: list[ModelMessage]) -> list[Item]:
@@ -664,9 +668,11 @@ def test_the_whole_seed_mode_shows_every_chunk_with_its_handle_and_no_tools(
     [(messages, info)] = script.requests
     [question] = messages
     assert isinstance(question, ModelRequest)
-    assert [p.content for p in question.parts if isinstance(p, UserPromptPart)] == [
-        "How large was the sample?"
-    ]
+    # The Question, then the note that there are no tools, last; the Conversation keeps neither
+    # the note nor the Seed's text, only the Question and the Answer.
+    assert user_prompts(messages)[0] == "How large was the sample?"
+    assert NO_TOOLS in (trailing_note(messages) or "")
+    assert user_prompts(conversation.messages) == ["How large was the sample?"]
     assert info.function_tools == []
     assert info.instructions is not None
     assert info.instructions.startswith(SYSTEM_PROMPT.strip())

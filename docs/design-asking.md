@@ -39,8 +39,9 @@ Before resolution and Sources, the reader can ask the Seed Questions in a sideba
   - The map's abstract is the Seed's Chunks before its first heading: GROBID's abstract arrives as paragraphs without a Heading Path (else the Chunks under a first heading "Abstract"), up to 1,500 tokens. They carry handles and count as read every turn, since they are always in context.
   - A section's handle is a § number in the map (`§3 2.1 Data · p. 4`), one per Heading Path prefix the Chunks sit under, apart from the Chunks' `[#n]` so the model cannot cite a section as a Chunk. `read_section` takes the § number or the heading, and reads on in parts of about 3,000 tokens.
   - At the request limit, the sixth request offers no tools and tells the model it is its last, so it answers from what it read. A model that still calls a tool ends the turn with an `error`; the Conversation stays as before the Question.
+  - That note comes last in the request, after everything the model read, never among the instructions (eval of 2026-10-29: among them, the model called a tool on all 8 last requests; replayed with the note last, it answered 23 of 24). The baseline ends every request with its own note that it has no tools. A chat request whose stream stays silent for `PE_CHAT_TIMEOUT_S` (120 s) fails the turn.
   - The model's thinking is traced with its request but left out of the Conversation's messages, so earlier turns' reasoning does not fill the context.
-  - The prompt's version is the first 12 hex digits of its file's SHA-256, so an edit cannot forget it.
+  - The prompt's version is the first 12 hex digits of the SHA-256 of its file and of the notes the agent adds (the last request's, the baseline's), so an edit cannot forget it.
   - `Conversation` lives in `asking`, as it holds pydantic-ai's messages; `ask` takes an `AskingContext` (connection, Embedder, chat model, settings, tracing), as `run_stage` takes a `StageContext`.
 
 ## Conversations, API and web

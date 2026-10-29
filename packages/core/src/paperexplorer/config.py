@@ -24,6 +24,14 @@ class Settings(BaseSettings):
     embedding_model: str = "bge-m3"
     embedding_api_key: SecretStr = SecretStr("ollama")
     embedding_batch_size: int = Field(default=32, ge=1, description="Texts per embedding request.")
+    # Provisional until the eval sets it: bge-m3 puts a paraphrase of a sentence well above 0.7
+    # and another sentence on the same topic below it; too low would call weak Support close.
+    support_threshold: float = Field(
+        default=0.7,
+        ge=0,
+        le=1,
+        description="Cosine an Answer sentence needs with a Chunk sentence for close Support.",
+    )
 
     zotero_library_id: str | None = None
     zotero_library_type: Literal["user", "group"] = "user"

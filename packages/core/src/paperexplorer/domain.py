@@ -1,10 +1,10 @@
-"""Domain records shared across modules: Works, Library Items, Chunks, Scopes and store ids."""
+"""Domain records shared across modules: Works, Library Items, Chunks, Scopes, Answers, ids."""
 
 from datetime import datetime
 from enum import StrEnum
-from typing import NewType
+from typing import NewType, Self
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field, model_validator
 
 from paperexplorer.parsing.models import Box, Span, TextOrigin
 
@@ -95,3 +95,127 @@ class Scope(BaseModel):
     def of(cls, work: WorkId) -> Scope:
         """The Scope of one Work alone."""
         return cls(works=frozenset({work}))
+
+
+class Support(StrEnum):
+    """How well a Pointer's place bears out its sentence."""
+
+    CLOSE = "close"
+    WEAK = "weak"
+
+
+class Pointer(BaseModel):
+    """Ties one sentence of an Answer to the sentence of a Chunk the model read that bears it out.
+
+    The place is `[start, end)` in code points of block `block_id`'s text: one of the sentences
+    of Chunk `chunk_id`, which spans `[chunk_start, chunk_end)` of that block. `similarity` is the
+    cosine of the two sentences' Vectors; Support is close when it clears the Support threshold.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    block_id: int
+    start: int
+    end: int
+    support: Support
+    chunk_id: ChunkId
+    chunk_start: int
+    chunk_end: int
+    similarity: float
+
+
+class AnswerSentence(BaseModel):
+    """One sentence of an Answer, `[start, end)` in code points of its text, with its Pointers.
+
+    A sentence the model tied to no Chunk has none. `substantive` sentences count towards Pointer
+    coverage.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    start: int
+    end: int
+    substantive: bool
+    pointers: list[Pointer] = []
+
+
+class Quote(BaseModel):
+    """Words an Answer puts in quotation marks: `[start, end)` in code points of its text.
+
+    A Quote is exact only where its words match the text of a Chunk the model read in that turn;
+    `block_id`, `block_start` and `block_end` are then that place, in code points of the block's
+    text as printed. `exact` follows from the place, so no Quote is exact without one.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    start: int
+    end: int
+    block_id: int | None = None
+    block_start: int | None = None
+    block_end: int | None = None
+
+    @computed_field
+    @property
+    def exact(self) -> bool:
+        """Whether the words match the authors' text at the Quote's place."""
+        return self.block_id is not None
+
+    @model_validator(mode="after")
+    def _place_is_whole_or_absent(self) -> Self:
+        place = (self.block_id, self.block_start, self.block_end)
+        if any(p is None for p in place) and any(p is not None for p in place):
+            raise ValueError("a Quote's place needs block_id, block_start and block_end")
+        return self
+
+
+class AnswerCounts(BaseModel):
+    """What an Answer's Pointers and Quotes add up to: the scores on its `question` trace.
+
+    `pointer_coverage` is the share of substantive sentences with a Pointer, None when there is
+    no substantive sentence.
+    """
+
+    sentences: int
+    substantive_sentences: int
+    pointer_coverage: float | None
+    pointers_close: int
+    pointers_weak: int
+    quotes_exact: int
+    quotes_not_exact: int
+    unknown_handles: int
+
+
+class Answer(BaseModel):
+    """A model's reply to a Question, resolved: the text the reader sees, its sentences, Quotes.
+
+    `text` is the model's draft without its handles; every offset counts code points of it.
+    `unknown_handles` are the handles the model wrote that tie to no Chunk; they were dropped.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    text: str
+    sentences: list[AnswerSentence]
+    quotes: list[Quote]
+    unknown_handles: list[int] = []
+
+    def counts(self) -> AnswerCounts:
+        """Pointer coverage, Pointers per Support and exact and not-exact Quotes."""
+        substantive = [s for s in self.sentences if s.substantive]
+        pointers = [p for s in self.sentences for p in s.pointers]
+        exact = sum(q.exact for q in self.quotes)
+        return AnswerCounts(
+            sentences=len(self.sentences),
+            substantive_sentences=len(substantive),
+            pointer_coverage=(
+                sum(bool(s.pointers) for s in substantive) / len(substantive)
+                if substantive
+                else None
+            ),
+            pointers_close=sum(p.support is Support.CLOSE for p in pointers),
+            pointers_weak=sum(p.support is Support.WEAK for p in pointers),
+            quotes_exact=exact,
+            quotes_not_exact=len(self.quotes) - exact,
+            unknown_handles=len(self.unknown_handles),
+        )

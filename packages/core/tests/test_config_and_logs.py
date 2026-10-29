@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 from typer.testing import CliRunner
 
 from paperexplorer import __version__
@@ -55,3 +56,14 @@ def test_cli_prints_version() -> None:
 
     assert result.exit_code == 0
     assert result.stdout.strip() == __version__
+
+
+def test_the_support_threshold_is_a_cosine_read_from_the_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PE_SUPPORT_THRESHOLD", "0.62")
+    assert Settings(_env_file=None).support_threshold == 0.62  # pyright: ignore[reportCallIssue]
+
+    monkeypatch.setenv("PE_SUPPORT_THRESHOLD", "1.5")
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)  # pyright: ignore[reportCallIssue]

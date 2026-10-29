@@ -114,3 +114,40 @@ def test_a_model_call_nests_inside_its_trace_and_carries_its_attributes() -> Non
         assert json.loads(str(attributes["langfuse.trace.metadata.position"])) == "1"
         assert span.resource.attributes["langfuse.environment"] == "tower"
         assert span.resource.attributes["langfuse.release"] == "abc1234"
+
+
+def test_spans_and_scores_record_under_the_current_trace_and_nothing_outside_one() -> None:
+    exporter = InMemorySpanExporter()
+    ingested: list[dict[str, object]] = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/public/scores":
+            ingested.extend(json.loads(request.content))
+            return httpx.Response(200, json={"id": "s1"})
+        return healthy(request)
+
+    tracing = configure_tracing(settings(), http=tower(answer), span_exporter=exporter)
+
+    with tracing.span("outside", input="ignored") as outside:
+        outside.update(output="ignored")
+    tracing.score("outside", 1.0)
+    with tracing.trace("question", tags=["asking"], session_id="conversation-1") as trace_id:
+        with tracing.span("forced search", as_type="tool", input={"query": "entropy"}) as search:
+            search.update(output="8 Chunks")
+        with tracing.span("resolve answer"):
+            pass
+        tracing.score("pointer_coverage", 0.75)
+    tracing.flush()
+    spans = {span.name: span for span in exporter.get_finished_spans()}
+
+    assert "outside" not in spans
+    root = spans["question"]
+    assert root.context is not None
+    for name, kind in [("forced search", "tool"), ("resolve answer", "span")]:
+        span = spans[name]
+        assert span.parent is not None and span.parent.span_id == root.context.span_id
+        assert (span.attributes or {})["langfuse.observation.type"] == kind
+    assert json.loads(str((spans["forced search"].attributes or {})["langfuse.observation.input"]))
+    assert [(s["name"], s["value"], s["traceId"]) for s in ingested] == [
+        ("pointer_coverage", 0.75, trace_id)
+    ]

@@ -20,7 +20,7 @@ Each row is one module with a small interface. Internals (caches, tokenizer, reg
 
 | Module | Interface (sketch) | Dependency kind | Test through |
 |---|---|---|---|
-| `domain` | pydantic models: Work, WorkId, CitationId, ChunkId, LibraryItem, Attachment, Chunk, ChunkFlag, Vector, Scope, Answer (its AnswerSentences, Pointers with their Support, Quotes, and AnswerCounts) (later: Evidence, RetrievalRun, TextAvailability, Conversation, Question); Reference stays in `parsing`, Citation in `citations` | in-process | — |
+| `domain` | pydantic models: Work, WorkId, CitationId, ChunkId, LibraryItem, Attachment, Chunk, ChunkFlag, Vector, Scope, Answer (its AnswerSentences, Pointers with their Support, Quotes, and AnswerCounts) (later: Evidence, RetrievalRun, TextAvailability); Reference stays in `parsing`, Citation in `citations`, Conversation in `asking` (it holds pydantic-ai's messages) | in-process | — |
 | `parsing` | `parse(pdf, settings) -> ParsedWork`: GROBID finds the structure, pdfium reads the printed text and PDF link targets, LiteParse OCR reads scans (ADR 0006) | GROBID (external service, output cached by PDF hash) + local libs | fixture PDFs + recorded GROBID output; one live GROBID check |
 | `citations` | `extract(doc: ParsedWork) -> CitationGraph`: Citation Links weighed from PDF link, GROBID and rules; Citing Sentences | in-process | parsed fixtures and hand-built `ParsedWork`s |
 | `chunking` | `chunk(doc: ParsedWork) -> list[Chunk]`: paragraphs and footnotes into Chunks of at most 400 bge-m3 tokens, split at sentence borders (`parsing.sentence_spans`); a Chunk's span and sentences are code-point offsets into its block's text | in-process (bge-m3 tokenizer internal, shipped xz-compressed in the package) | fixture `ParsedWork`s and hand-built blocks |
@@ -29,8 +29,8 @@ Each row is one module with a small interface. Internals (caches, tokenizer, reg
 | `embedding` | port `Embedder`: `model` (its name, stored with each Vector) and `embed(texts) -> list[Vector]`, one per text in order; `OpenAICompatibleEmbedder` POSTs batches of `PE_EMBEDDING_BATCH_SIZE` to `<PE_EMBEDDING_BASE_URL>/embeddings`, each batch one embedding observation in the current trace; `FakeEmbedder` hashes a text's content words into 1024 dimensions, so texts that share words come out closer | true external (OpenAI-compatible) | `FakeEmbedder` adapter; the OpenAI-compatible one over `httpx.MockTransport`; one live bge-m3 check |
 | `store` | repositories per aggregate (`Works`, `WorkTexts`, `Chunks`, `CitationGraphs`, `StageStatuses`) + `migrate()`; `Works.find` a Work by Zotero key; `Chunks` reads a Work's Chunks in reading order, by id, `around` one (its neighbours) and `under` a Heading Path, records and reads their embeddings (`record_embeddings`, `embeddings`, `without_embedding` a model), and runs the hybrid query (`search`, see Retrieval) | Postgres + pgvector (local-substitutable) | real pgvector via testcontainers |
 | `retrieval` | `search(conn, embedder, text, scope, k=8) -> list[ScoredChunk]`: the Scope's Chunks best first by RRF of a vector and a full-text ranking, each result a `StoredChunk` with both rankings' `Placing` (rank, score; empty when that ranking missed it) and its `rrf` (see Retrieval); later `find_evidence(citation, scope) -> RetrievalRun` on top of it | store + embedder | store + `FakeEmbedder`; one live bge-m3 check on the Seed |
-| `asking` | `ask(conversation, question) -> AsyncIterator[AnswerEvent]`: a pydantic-ai agent over the Seed's map and retrieval tools (ADR 0008, 0009, `design-asking.md`); so far `resolve_answer(draft, handles, read, embedder, threshold) -> Answer`, the Pointer and Quote resolution of a complete draft (see Answers) | chat model (OpenAI-compatible) + store + embedder | `FunctionModel` + real Postgres + `FakeEmbedder`; resolution as a pure function over hand-built Chunks; one live bge-m3 check |
-| `tracing` | `configure_tracing(settings) -> Tracing`: the tower's Langfuse, else the cloud; `Tracing.trace(name, tags, session_id, metadata)` opens the trace every model call runs inside, `Tracing.embedding(model, texts)` records one embedding call under the current trace (nothing outside one), `Tracing.tracer_provider` goes to pydantic-ai; `retention.prune` keeps the tower's store under its disk cap (see Tracing) | Langfuse (tower, cloud fallback) | in-memory span exporter; Public API over `httpx.MockTransport` |
+| `asking` | `ask(ctx, conversation, question) -> AsyncIterator[AnswerEvent]`: a pydantic-ai agent over the Seed's map and five tools (`SeedTools`), `ctx` an `AskingContext` (store connection, Embedder, chat model from `chat_model(settings)`, settings, tracing); `Conversation` (id, Work, messages, handles); `resolve_answer(draft, handles, read, embedder, threshold) -> Answer`, the Pointer and Quote resolution of a complete draft (see The agent, Answers) | chat model (OpenAI-compatible) + store + embedder | `FunctionModel` (streaming) + real Postgres + `FakeEmbedder`; resolution as a pure function over hand-built Chunks; live checks of bge-m3 and of the chat model on a CC BY fixture |
+| `tracing` | `configure_tracing(settings) -> Tracing`: the tower's Langfuse, else the cloud; `Tracing.trace(name, tags, session_id, metadata)` opens the trace every model call runs inside, `Tracing.embedding(model, texts)` records one embedding call under the current trace (nothing outside one), `Tracing.span(name, as_type, input)` one step of our own and `Tracing.score(name, value)` one score of the current trace (likewise), `Tracing.tracer_provider` goes to pydantic-ai; `retention.prune` keeps the tower's store under its disk cap (see Tracing) | Langfuse (tower, cloud fallback) | in-memory span exporter; Public API over `httpx.MockTransport` |
 | `catalog` | `ensure_work(resolution, exploration) -> LibraryItemRef` (dedupe: works table → Library search → create) | store + library | store + `InMemoryLibrary` |
 | `pipeline` | `run_stage(ctx, name, work) -> StageResult` over `STAGES`; later `explore(seed_key, …) -> ExplorationReport` | everything, injected via `StageContext` | real Postgres, `InMemoryLibrary`, recorded GROBID |
 | `config`, `logs` | `Settings` (pydantic-settings), `configure_logging(settings)` | in-process | — |
@@ -52,7 +52,7 @@ PaperExplorer/
 ├── tests/e2e/     cross-package tests
 ├── tests/fixtures/  open-access PDFs + cassettes
 ├── data/          gitignored: cache/pdfs, cache/parsed (top-level, never in packages)
-├── scripts/       setup wizards, tower checks, Langfuse pruning and copy
+├── scripts/       setup wizards, tower checks, Langfuse pruning and copy, the chat model's Modelfile
 └── docs/          adr/, logbook.md, design-v1.md, design-asking.md, architecture.md
 ```
 
@@ -85,6 +85,26 @@ Sources reuse the Seed's stage functions; going one level deeper later is the sa
 - An empty text finds nothing and embeds nothing.
 - `paperexplorer search <zotero_key> "<text>" [-k N] [--no-text]` prints the ranking.
 
+## The agent
+
+`asking.ask(ctx, conversation, question)` answers one Question (ADR 0008, 0009, `design-asking.md`) and streams `AnswerEvent`s: `StepEvent` (`tool`, `args`), `DeltaEvent` (`text`), then `AnsweredEvent` (`answer`) or `ErrorEvent` (`message`). Only an answered turn joins the Conversation. The turn runs in a task of its own, so its trace stays inside it; closing the stream cancels it.
+
+- **Conversation:** a plain pydantic object the caller holds: `id`, `work`, `messages` (pydantic-ai's, without the model's thinking), `handles` (`[#n]` → `StoredChunk`, given when a Chunk is first shown and kept for the whole Conversation) and `questions` answered.
+- **Context:** the system prompt (`asking/system-prompt.md`; `PROMPT_VERSION` is the first 12 hex digits of its SHA-256) and the Seed's map, sent as instructions with every request, then the Conversation so far. The map gives the title, every Heading Path prefix the Chunks sit under as a numbered section (`§3`, with its pages) and the Chunks before the first heading, GROBID's abstract (else those under a first heading "Abstract"), up to 1,500 tokens, with their handles. Those Chunks count as read every turn.
+- **Tools** (`SeedTools`; each Chunk shown as `[#n] <Heading Path> · p. <page>` and its text, and remembered in the order shown):
+  - `search(query, k=8)`: `retrieval.search` over `Scope.of(seed)`, at most 20.
+  - `read_section(heading, part=1)`: the Chunks under a § number or a heading (the whole Heading Path, its last heading, or a unique part of that), in parts of about 3,000 tokens; a part that goes on says how to read the next.
+  - `read_around(handle, n=1)`: the Chunk and up to 3 neighbours on either side.
+  - `reference(handle, marker)`: the Citations a Chunk prints whose marker or Reference label is `marker` (else whose marker contains it), each with its Reference as printed, key, and Citation Link confidence and level, or as an Unlinked Citation.
+  - `citing_sentences(reference)`: a Reference by key, printed label or words of its text; every Citing Sentence of it, each under its Chunk's handle; those Chunks count as read.
+- **Forced first search:** before the first request, `search(question)` runs (a `forced search` span) and goes into the history as the model's own tool call and its result, after the Question.
+- **Requests:** at most `REQUEST_LIMIT` (6) per Question. The sixth offers no tools and tells the model it is the last, so it answers from what it read; a model that still calls a tool ends the turn with an error.
+- **Thinking:** Ollama returns it as `reasoning`, which pydantic-ai keeps as a thinking part: it is on the request's span in the trace, never in a `delta`, the Answer or the Conversation's messages.
+- **Draft:** `delta`s carry every text part the model streams; the Answer is the last response's text, resolved with `resolve_answer` against the Chunks read this turn at `PE_SUPPORT_THRESHOLD`.
+- **Model:** `chat_model(settings)` is pydantic-ai's OpenAI chat model with Ollama's provider profile (thinking in `reasoning`, tool schemas without `strict`) at `PE_CHAT_BASE_URL`, model `PE_CHAT_MODEL` (`paperexplorer-chat`, `scripts/paperexplorer-chat.Modelfile`); `PE_CHAT_NUM_CTX` repeats the Modelfile's `num_ctx` for the traces.
+- The tools call the store and the Embedder in the event loop: one connection, and the Chunks read in a fixed order.
+- `paperexplorer ask <zotero_key> "<question>"` streams the steps and draft, then prints the Answer, its Pointers with their places and its Quotes, and a summary line of counts.
+
 ## Answers
 
 `asking.resolve_answer(draft, handles, read, embedder, threshold)` turns the model's complete draft into the Answer the reader sees (ADR 0008, `design-asking.md`). `handles` maps each handle of the Conversation to its `StoredChunk`; `read` are the Chunks the model read in this turn; `threshold` is `PE_SUPPORT_THRESHOLD`.
@@ -106,15 +126,16 @@ The API returns structured JSON only, never HTML: a Work as an ordered list of b
 - Offsets count Unicode code points (Python `str` indices), not UTF-16 units. Spans may overlap or coincide: a printed range's dash stands for several Citations.
 - `paperexplorer_api.schemas` imports nothing from core, so the web app depends on the contract alone.
 - `POST /works/{id}/conversations`: starts a Conversation about a Work whose Chunks are embedded; returns `{id}`. Conversations live in the API's memory until Postgres and login replace that store.
-- `POST /conversations/{id}/questions` with `{text}`: a `text/event-stream` of JSON events. `step` names a tool the model runs; `delta` carries draft text; `answer` carries the resolved Answer: its `text`, the draft without its handles, which every offset of the Answer counts into; its sentences (`start`, `end`) with `pointers[]` of `{block_id, start, end, support}` and its `quotes[]` of `{start, end, exact, block_id, block_start, block_end}`, the place empty when not exact; `error` ends a failed turn. Offsets count code points, as above.
+- `POST /conversations/{id}/questions` with `{text}`: a `text/event-stream` of JSON events, `asking`'s `AnswerEvent`s by their `type`. `step` names a tool the model runs, with its `args` (the forced first search comes first); `delta` carries draft text; `answer` carries the resolved Answer: its `text`, the draft without its handles, which every offset of the Answer counts into; its sentences (`start`, `end`) with `pointers[]` of `{block_id, start, end, support}` and its `quotes[]` of `{start, end, exact, block_id, block_start, block_end}`, the place empty when not exact; `error` ends a failed turn with a `message`. Offsets count code points, as above.
 
 ## Tracing
 
 Every model call, chat and embedding alike, runs inside a Langfuse trace and never opens a top-level trace of its own, so a request's calls are found by nesting, not by time.
 
 - **One trace per Question**, named `question`. `session_id` is the Conversation's id; `user_id` stays empty until login. Tags: `asking`, `work:<zotero_key>`. Metadata: WorkId, Zotero key, the Question's position in the Conversation, prompt version, model, `num_ctx`.
-- **Inside it:** the forced first search, each model request (a generation with token usage), each tool call, every embedding call and the Pointer and Quote resolution.
-- **Scores on the trace,** sortable and filterable: Pointer coverage, counts per Support, exact and not-exact Quotes, tool calls, model requests, latency. Eval runs add `judge.grounded` and `judge.correct`.
+- **Inside it:** `forced search` (a tool observation, its embedding inside), pydantic-ai's `invoke_agent asking` holding each model request as `chat <model>` (a generation with token usage, its thinking among its output) and each tool call as `execute_tool <tool>`, every embedding call (`embeddings <model>`), and `resolve answer` (the draft in, the Answer's counts out).
+- **Metadata:** `work_id`, `zotero_key`, `position` (from 1), `prompt_version`, `model`, `num_ctx`.
+- **Scores on the trace,** sortable and filterable: `Answer.counts()` by field name (`sentences`, `substantive_sentences`, `pointer_coverage` when any sentence is substantive, `pointers_close`, `pointers_weak`, `quotes_exact`, `quotes_not_exact`, `unknown_handles`), `tool_calls` (the model's, without the forced search), `model_requests` and `latency_s`. Eval runs add `judge.grounded` and `judge.correct`.
 - **Stages:** `embed` traces as `stage.embed`, tagged `pipeline` and `work:<key>`, with one embedding observation per batch (named `embeddings <model>`: the batch's texts, its token usage, the count and length of its Vectors).
 - **CLI search:** `paperexplorer search` traces as `search`, tagged `cli` and `work:<key>`, holding the query's embedding observation.
 - An embedding call made outside any trace records nothing; with tracing off, `Tracing.embedding` returns at once.

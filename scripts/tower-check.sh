@@ -17,7 +17,13 @@
 #      methods, its shortcomings, what it proposes next, and one topic it does not cover; each
 #      lists the 8 best Chunks' RRF, vector and full-text ranks and scores, page and Heading Path,
 #      never their text (each is traced to Langfuse as `search`);
-#   8. the API and web containers, and the reader: every Citation of the Seed is a link that
+#   8. three Questions asked of the Seed with the real chat model (`paperexplorer ask`): its
+#      measurements, its shortcomings, and a topic it does not cover. The full output goes to
+#      data/asking/; this log gets only each Answer's counts (sentences, Pointer coverage,
+#      Support levels, exact and not-exact Quotes, unknown handles), the tools it ran, its model
+#      requests and latency, and whether it says the Seed does not cover the Question, never its
+#      text (each is traced to Langfuse as `question`);
+#   9. the API and web containers, and the reader: every Citation of the Seed is a link that
 #      opens a panel with its Reference.
 #
 # Every step runs even when an earlier one fails.
@@ -40,6 +46,14 @@ SEARCHES=(
   "What future research do the authors propose?"
   "How does caffeine affect sleep in shift workers?"
 )
+# What the answering agent is asked of the Seed: its measurements, its shortcomings, and a
+# topic it does not cover, whose Answer should say so.
+QUESTIONS=(
+  "How was brain entropy measured, and with which tools?"
+  "What are the shortcomings of this work?"
+  "How does caffeine affect sleep in shift workers?"
+)
+ASKED="data/asking"
 RESULTS=()
 
 # step NAME CMD...: runs CMD, logs its output, status and time, and carries on either way.
@@ -80,6 +94,35 @@ seed_searches() {
   local query status=0
   for query in "${SEARCHES[@]}"; do
     uv run paperexplorer search --no-text "$SEED" "$query" || status=$?
+    echo
+  done
+  return "$status"
+}
+
+# seed_questions: each of QUESTIONS asked of the Seed with the real chat model. The Seed's
+# licence is unknown and this log is public: the full output goes to $ASKED/question-<n>.txt,
+# and the log gets each Answer's summary line, the tools it ran (not their arguments, which may
+# hold the Seed's words) and whether its Answer says the Seed does not cover the Question.
+seed_questions() {
+  local i=0 question out status=0 uncovered
+  mkdir -p "$ASKED"
+  for question in "${QUESTIONS[@]}"; do
+    i=$((i + 1))
+    out="$ASKED/question-$i.txt"
+    printf 'question %d: %s\n' "$i" "$question"
+    if uv run paperexplorer ask "$SEED" "$question" >"$out" 2>&1; then
+      grep '^summary: ' "$out" || { echo "no summary line"; status=1; }
+      uncovered=no
+      sed -n '/^Answer$/,/^Pointers/p' "$out" \
+        | grep -qiE "does not (say|cover|address|discuss|mention|report)|doesn't|not covered" \
+        && uncovered=yes
+      echo "says the Seed does not cover it: $uncovered"
+    else
+      status=1
+      echo "ask failed (see $out on the tower)"
+    fi
+    echo "tools: $(grep '^→ ' "$out" | awk '{print $2}' | paste -sd ' ' -)"
+    echo "full output: $out"
     echo
   done
   return "$status"
@@ -141,6 +184,7 @@ main() {
   # pending, which the pipeline image runs again below).
   step "run embed again (host)" uv run paperexplorer run embed "$SEED"
   step "search the Seed (host)" seed_searches
+  step "ask the Seed (host)" seed_questions
   for stage in "${STAGES[@]}"; do
     step "pipeline: run $stage" "${run[@]}" pipeline run "$stage" "$SEED"
   done

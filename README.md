@@ -30,6 +30,8 @@ First time: run `scripts/setup-tower.sh` from the Mac. It checks and sets up the
 ```sh
 cp .env.example .env        # fill in secrets
 ollama pull bge-m3          # Ollama runs natively on the tower
+ollama pull hf.co/yuxinlu1/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF:Q6_K
+ollama create paperexplorer-chat -f scripts/paperexplorer-chat.Modelfile   # the chat model
 docker compose up -d        # db, grobid :8070, api :8000, web :8080
 docker compose run --rm pipeline migrate
 for stage in fetch parse chunk embed extract_citations; do
@@ -43,6 +45,12 @@ Search the Seed's Chunks (hybrid: bge-m3 Vectors and English full text, fused by
 
 ```sh
 docker compose run --rm pipeline search YAAC9XCX "How was brain entropy measured?" -k 8
+```
+
+Ask the Seed a Question: the answering agent streams its draft, then lists the Answer's Pointers and Quotes:
+
+```sh
+uv run paperexplorer ask YAAC9XCX "What are the shortcomings of this work?"
 ```
 
 Tower-only tests (real Zotero storage, GROBID, the Seed) run there with `uv run pytest -m tower`.

@@ -1,0 +1,7 @@
+# The answering agent's chat model (docs/design-asking.md, The agent): a community gemma-4 12B
+# fine-tune, Q6_K, digest f87405c6d8ad (9.8 GB), with a 72k context that fits on the tower's GPU
+# beside bge-m3. scripts/setup-tower.sh creates the alias:
+#   ollama create paperexplorer-chat -f scripts/paperexplorer-chat.Modelfile
+# PE_CHAT_NUM_CTX repeats num_ctx for the traces; change both together.
+FROM hf.co/yuxinlu1/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF:Q6_K
+PARAMETER num_ctx 73728

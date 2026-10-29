@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Checks the checked-out branch on the tower and writes everything to tower-check.log, which is
-# committed back to the branch so it can be read from the Mac (Claude Code cannot reach the tower).
+# committed back to the branch so it can be read from the Mac.
 #
 # Steps:
 #   1. the gate (ruff, pyright, pytest);
@@ -38,8 +38,11 @@
 # Every step runs even when an earlier one fails. Containers have no git, so the release on
 # their traces is this commit, passed as PE_LANGFUSE_RELEASE.
 #
-# Run on the tower, from the repo:
+# Run it on the tower, from the repo; never source it:
 #   git fetch && git switch <branch> && git pull --ff-only && scripts/tower-check.sh
+
+# Sourced, its `set` and `exit` would act on the caller's shell, and could close an SSH session.
+(return 0 2>/dev/null) && { echo "Run ${BASH_SOURCE[0]}, don't source it." >&2; return 1; }
 
 set -uo pipefail
 

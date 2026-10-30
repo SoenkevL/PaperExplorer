@@ -43,6 +43,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - API: `create_app(connections, asking)` takes the asking setup (`Asking`: each turn's context and the Conversations); without it the app serves Works and Citations only. `HttpClient` also needs `post` and `stream`. `app_from_env` configures logging from `PE_LOG_LEVEL` and `PE_LOG_FORMAT`.
 
 ### Fixed
+- Scripts: `tower-eval.sh`, `tower-check.sh`, `setup-tower.sh` and `setup-mac.sh` refuse to be sourced. Sourced, their `set -e` and `exit` closed the caller's shell at the first failure, and an SSH session with it. tower-eval says that a missing model is created from the Mac by `setup-tower.sh`, and how to start a full run detached, since the tower has no tmux.
 - An optional folder left empty in `.env` (`PE_ZOTERO_STORAGE_DIR=`, `PE_TESSDATA_DIR=`) read as the current folder; it is now unset.
 - Parsing: a Citation whose author part and year are linked separately in the PDF (LaTeX natbib) became two Citations of one Reference; it is now one (Wegner fixture: 311 → 153 Citations).
 - Parsing: numbers beside an author-year bibliography (margin line numbers, the end of the column to the left) were read as Reference labels; labels are now read only where they number the bibliography.

@@ -368,8 +368,8 @@ def _wants_handles(answer: Answer) -> bool:
     """Whether an Answer gives no handle, yet has a sentence a Pointer should bear out.
 
     A sentence saying what the Seed does not say needs none, nor the one after it on what the
-    Seed covers nearby, as the prompt asks: an Answer that the Seed does not cover the Question
-    is not redrafted.
+    Seed covers nearby, as the prompt asks: an Answer saying the Seed does not cover the
+    Question is not redrafted.
     """
     if answer.unknown_handles or any(s.pointers for s in answer.sentences):
         return False

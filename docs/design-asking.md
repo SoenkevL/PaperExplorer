@@ -1,7 +1,7 @@
 # Asking the Seed: settled design (grilling outcome)
 
 ## Context
-Before resolution and Sources, the reader can ask the Seed Questions in a sidebar beside the reader. A local model answers in its own prose, and every claim it ties to the Seed points back to the sentence that bears it out. Five grilling rounds (2026-10-27/28) settled the design below. ADR 0008 sets what the model may write; ADR 0009 picks the framework.
+Before resolution and Sources, the reader can ask the Seed Questions in a sidebar beside the reader. A local model answers in its own prose, and every claim it ties to the Seed points back to the sentence that bears it out. Five grilling rounds (2026-10-27/28) settled the design below. ADR 0008 sets what the model may write; ADR 0009 picks the framework; ADR 0010 answers from the whole Seed when it fits, after the eval of 2026-10-29.
 
 ## Scope and definition of done
 - Scope is the Seed alone. Sources, their text and Evidence stay a separate concern, built after resolution.
@@ -15,6 +15,15 @@ Before resolution and Sources, the reader can ask the Seed Questions in a sideba
 ## Answers
 - Natural prose from the Seed alone. When the Seed does not cover a Question, the Answer says so (ADR 0008).
 - **Handles.** The model ties a sentence to a Chunk by writing its handle, `[#n]`, shaped unlike the Seed's own `[12]` or `(Smith, 2019)`. A Chunk keeps its handle for the whole Conversation; unknown handles are dropped. A sentence without a handle stays unmarked.
+  - **Every form with a `#` is read** (eval of 2026-10-29: the model also wrote `(#5)`, `{#92}`, `[<#3><#4>]`, `[#59##60]`, `[#5, 6]` and ranges, and those Answers lost their Pointers). A handle is any `[]`, `()`, `{}` or `<>` group, nested one deep, holding only numbers, at least one of them with a `#`; the numbers stand apart by commas, semicolons, spaces or `#`.
+  - A range `#5–#7`, with any dash, reads as its two ends only: in retrieval, handles number Chunks in the order they were first shown, not in reading order.
+  - A group without a `#`, such as `[74]` or `(5)`, stays the Seed's own marker, in the text.
+  - The web app's draft reads the same grammar for its placeholder chips; `tests/fixtures/handle-forms.json` holds the forms both are tested with.
+- **Where the Answer ends.** The draft ends at the chat template's first control token, gemma's `<|name>` or `<name|>` (seen: `<channel|>` followed by the model's monologue, and `<|tool_response>` as the whole Answer). An echoed `<system>…</system>` block is left out and the text around it kept.
+  - While the draft streams, nothing after a token is shown, and a trailing `<…` that could start one waits for the next delta.
+  - The Conversation keeps the cut draft as the model's response, so the junk does not feed later Questions.
+  - A draft with no words left is no Answer: the turn ends with an error ("The model gave no Answer.") and the Conversation stays as it was.
+  - No stop sequence in the Modelfile: gemma-4 ends its thinking channel with `<channel|>`, so a stop there could cut off the Answer itself.
 - **Pointers.** Once the Answer's text is complete, each sentence with a handle is resolved, comparing bge-m3 embeddings of the Answer sentence and each Chunk sentence (GROBID's sentence spans):
   1. the best-matching sentence in the cited Chunk: close Support if it clears the threshold;
   2. otherwise the best match in the other Chunks the model read in this turn: close if it clears the threshold, and the Pointer moves there;
@@ -27,21 +36,26 @@ Before resolution and Sources, the reader can ask the Seed Questions in a sideba
 - pydantic-ai (ADR 0009) in the core module `asking`, against Ollama's OpenAI-compatible endpoint. Settings: `PE_CHAT_BASE_URL`, `PE_CHAT_MODEL`.
 - **Model:** `paperexplorer-chat`, a Modelfile alias created by `scripts/setup-tower.sh`: the community gemma-4 12B fine-tune `hf.co/yuxinlu1/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF:Q6_K` (digest `f87405c6d8ad`, 9.8 GB) with `num_ctx` 73728. Measured: 10 GB and fully on the GPU; with bge-m3 beside it, 13.0 of 16.4 GB. Should it ever spill: `OLLAMA_KV_CACHE_TYPE=q8_0` with flash attention first, then a smaller `num_ctx`.
 - **Thinking:** the model reasons before it answers. Ollama's OpenAI-compatible endpoint returns that as `reasoning`, apart from `content`; it is traced and never shown in the Answer.
-- **Always in context:** the system prompt (kept in git, its version on every trace), the Seed's map (its heading tree with a handle per section, plus its abstract) and the Conversation so far.
-- **Tools:**
+- **How a Question reads the Seed** (ADR 0010, `AskingContext.reading`): `auto`, the default for the API, the CLI and the web, reads the whole Seed when the sum of its Chunks' bge-m3 tokens is at most `PE_WHOLE_SEED_MAX_TOKENS` (40,000, validated to stay below `PE_CHAT_NUM_CTX`), and searches it otherwise. The eval forces one or the other (`whole_seed`, `retrieval`).
+  - **The whole Seed** is the eval's measured baseline, unchanged: the system prompt, then a note that no tools and no search apply, then every Chunk in reading order under its handle, all of them read. No tools are offered and no search runs; every request ends with the note that it has no tools. The trace is tagged `whole-seed`.
+  - **Retrieval**, the fallback for a Seed over the budget and later for Sources, is as below: the Seed's map, the forced search, the tools.
+  - The budget leaves the rest of the 73,728-token context for gemma counting more tokens than bge-m3, the system prompt, the Conversation, and the model's thinking and Answer. The Seed's body is about 18k.
+  - The Seed's References are not in the whole Seed's context: a Question about a numbered Reference is a known gap (ADR 0010); the reader shows each Reference one click away.
+- **Always in context:** the system prompt (kept in git, its version on every trace), the Seed (in retrieval, its map: its heading tree with a handle per section, plus its abstract) and the Conversation so far.
+- **Tools** (retrieval only):
   - `search(query, k=8)`: hybrid RRF over the Seed's Chunks; each result has its handle, Heading Path, page and text.
   - `read_section(heading)`: the Chunks under one heading in reading order, up to about 3k tokens, continuable.
   - `read_around(handle, n=1)`: the neighbouring Chunks.
   - `reference(handle, marker)`: the Reference as printed behind a Citation marker in a Chunk, with its Citation Link's confidence.
   - `citing_sentences(reference)`: every Citing Sentence of that Reference in the Seed.
-- The server runs `search(question)` before the model's first request and adds it to the history as the model's own tool call. A Question gets at most 6 model requests.
+- In retrieval the server runs `search(question)` before the model's first request and adds it to the history as the model's own tool call. A Question gets at most 6 model requests.
 - **Settled while building** (`architecture.md`, The agent):
   - The map's abstract is the Seed's Chunks before its first heading: GROBID's abstract arrives as paragraphs without a Heading Path (else the Chunks under a first heading "Abstract"), up to 1,500 tokens. They carry handles and count as read every turn, since they are always in context.
   - A section's handle is a § number in the map (`§3 2.1 Data · p. 4`), one per Heading Path prefix the Chunks sit under, apart from the Chunks' `[#n]` so the model cannot cite a section as a Chunk. `read_section` takes the § number or the heading, and reads on in parts of about 3,000 tokens.
   - At the request limit, the sixth request offers no tools and tells the model it is its last, so it answers from what it read. A model that still calls a tool ends the turn with an `error`; the Conversation stays as before the Question.
-  - That note comes last in the request, after everything the model read, never among the instructions (eval of 2026-10-29: among them, the model called a tool on all 8 last requests; replayed with the note last, it answered 23 of 24). The baseline ends every request with its own note that it has no tools. A chat request whose stream stays silent for `PE_CHAT_TIMEOUT_S` (120 s) fails the turn.
+  - That note comes last in the request, after everything the model read, never among the instructions (eval of 2026-10-29: among them, the model called a tool on all 8 last requests; replayed with the note last, it answered 23 of 24). The whole Seed ends every request with its own note that it has no tools. A chat request whose stream stays silent for `PE_CHAT_TIMEOUT_S` (120 s) fails the turn.
   - The model's thinking is traced with its request but left out of the Conversation's messages, so earlier turns' reasoning does not fill the context.
-  - The prompt's version is the first 12 hex digits of the SHA-256 of its file and of the notes the agent adds (the last request's, the baseline's), so an edit cannot forget it.
+  - The prompt's version is the first 12 hex digits of the SHA-256 of its file and of the notes the agent adds (the last request's, the whole Seed's), so an edit cannot forget it.
   - `Conversation` lives in `asking`, as it holds pydantic-ai's messages; `ask` takes an `AskingContext` (connection, Embedder, chat model, settings, tracing), as `run_stage` takes a `StageContext`.
 
 ## Conversations, API and web
@@ -82,13 +96,13 @@ As `design-v1.md`: paragraph Chunks of at most 400 bge-m3 tokens, HNSW plus Engl
 - `pydantic-evals` runs on the tower and measures hit@8, Pointer coverage (substantive sentences with a Pointer), Support levels, exact and not-exact Quotes, and latency.
 - Claude reads every Answer against the Seed and records a verdict per Question, also as Langfuse scores; only uncertain cases go to the user.
 - **Bar:** hit@8 ≥ 0.8, Pointer coverage ≥ 0.8, at least 80% of Answers judged grounded and correct, and no Quote marked exact that is not (by construction).
-- One baseline run puts the whole Seed in context, to see what retrieval costs.
+- Each Question is asked in two modes: `live`, as the reader asks it (`auto`: the whole Seed when it fits), and `retrieval`, forced, so the fallback stays measured. The bar is checked on `live`; hit@8 comes from the forced search, a check on the fallback. Runs before ADR 0010 asked `retrieval` (then the live agent) and a `baseline` with the whole Seed; their committed summaries stay as they are, a record.
 - The Questions, verdicts and metrics are committed. Full reports, which quote the Seed, stay in `data/`: its licence is unknown.
 - **Settled while building the harness** (`architecture.md`, The eval):
   - 22 Questions in `evals/seed-questions.yaml`, a pydantic-evals dataset written from the Seed as `parse` and `chunk` read it: 4 on its measurements, 4 on methods, 5 on shortcomings, 4 on follow-ups, and 5 it does not answer, on varied topics (dosing, an experiment of its own, heart rate, analysis software, EU regulation). A place is a Heading Path and page exactly as `chunk` gives them; the command refuses places where no Chunk sits.
   - The eval lives in core (`paperexplorer.evals`, `paperexplorer eval`), since it runs `asking.ask` against the store as `paperexplorer ask` does; `scripts/tower-eval.sh` runs it on the tower. The Question set and the committed summaries live in a top-level `evals/`.
-  - Every Question is asked in a fresh Conversation, one at a time. hit@8 re-runs the forced search, `retrieval.search(question, k=8)`, outside the trace: the same call, so the same Chunks.
-  - The baseline is a mode of `ask`, `AskingContext.whole_seed`, so the trace, scores and resolution are the live code's: the unchanged system prompt, a note that no tools apply, then every Chunk under its handle, all of them read; no forced search, no tools, the trace tagged `whole-seed`. The live mode is the default.
+  - Every Question is asked in a fresh Conversation, one at a time. For a turn that read by retrieval, hit@8 re-runs the forced search, `retrieval.search(question, k=8)`, outside the trace: the same call, so the same Chunks.
+  - A mode is a reading of `ask` (`AskingContext.reading`), so the trace, scores and resolution are the live code's. Each turn records the reading it used.
   - Traces go to the `eval` environment, named `question` and tagged `run:<run id>`; `AnsweredEvent` carries the trace's id, which the eval records for the judges' scores in stage 8b.
   - Pointer coverage for the bar pools the substantive sentences of the covered Questions' Answers, and hit@8 counts covered Questions: an uncovered Question's "The Seed does not say …" is substantive and rightly unpointed.
   - "No Quote marked exact that is not" is checked, not assumed: each exact Quote's words are compared with the printed text at its place, folded on their own.

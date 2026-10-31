@@ -53,7 +53,7 @@ from paperexplorer.embedding import Embedder, FakeEmbedder, OpenAICompatibleEmbe
 from paperexplorer.store import Chunks, StoredChunk
 from paperexplorer.tracing import Tracing
 
-from .conftest import DISCUSSION, RECORDING, in_memory_tracing
+from .conftest import AUTHOR_YEAR_DISCUSSION, DISCUSSION, RECORDING, in_memory_tracing
 
 Conn = psycopg.Connection[TupleRow]
 QUESTION = "How was the entropy computed?"
@@ -926,3 +926,138 @@ def test_angle_brackets_that_start_no_token_stay_in_the_answer(
     assert isinstance(answered, AnsweredEvent)
     assert answered.answer.text == text
     assert "".join(deltas(events)) == text
+
+
+def test_regression_eval_35e1371558966e774f2a2d9466d2bb4f_the_question_closes_the_request(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    """Eval run 20261031T140751Z-a758bbc, trace 35e1371558966e774f2a2d9466d2bb4f (live).
+
+    Reading the whole Seed, the request ended with the note that there are no tools, a user
+    turn of its own after the Question. The model took the note for the reader's message and
+    answered a Question nobody had asked; 7d24a397 did the same. The request now closes with
+    one turn: the note, then the Question, last.
+    """
+    script = Script(["Entropy was computed from each EEG recording. [#3]"])
+
+    events = turn(context(store_db, script, reading=Reading.WHOLE_SEED), conversation, QUESTION)
+
+    assert isinstance(events[-1], AnsweredEvent)
+    [(messages, _)] = script.requests
+    last = messages[-1]
+    assert isinstance(last, ModelRequest)
+    [closing] = last.parts
+    assert isinstance(closing, UserPromptPart) and isinstance(closing.content, str)
+    assert closing.content.startswith(NO_TOOLS)
+    assert closing.content.endswith(f"\n{QUESTION}")
+    # The closing turn is for the request only: the Conversation keeps the bare Question.
+    assert user_prompts(conversation.messages) == [QUESTION]
+
+
+def test_regression_dc485d10c4cd2e5d03a5901b88429045_bare_numbers_are_handles_by_author_and_year(
+    store_db: Conn, unnumbered_seed: Work
+) -> None:
+    """The live app on the tower, trace dc485d10c4cd2e5d03a5901b88429045, the whole Seed read.
+
+    The model ended each sentence with a bare `[13]` or `[14]` instead of `[#13]`. The Seed
+    cites by author and year, so it prints no such marker of its own, yet the numbers stayed
+    in the text and the Answer got no Pointer.
+    """
+    conversation = Conversation(work=unnumbered_seed)
+    script = Script(["Entropy was computed from each EEG recording [3]. The sample was small [5]."])
+
+    events = turn(context(store_db, script, reading=Reading.WHOLE_SEED), conversation, QUESTION)
+
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent)
+    assert answered.answer.text == (
+        "Entropy was computed from each EEG recording. The sample was small."
+    )
+    recording, discussion = (
+        chunk(store_db, unnumbered_seed, text) for text in (RECORDING, AUTHOR_YEAR_DISCUSSION)
+    )
+    assert [[p.chunk_id for p in s.pointers] for s in answered.answer.sentences] == [
+        [recording.id],
+        [discussion.id],
+    ]
+    # The draft had its handles, so the model is not asked for them again.
+    assert [e.type for e in events] == ["delta", "answer"]
+
+
+def test_regression_eval_7f32813a3ef4cd52aca983d0e0ad660e_an_answer_is_asked_for_its_handles(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    """Eval run 20261031T140751Z-a758bbc, trace 7f32813a3ef4cd52aca983d0e0ad660e (live).
+
+    Reading the whole Seed, the model answered in three sentences on the Seed and wrote no
+    handle, so none of them got a Pointer. It is asked once more for its Answer, with handles.
+    """
+    first = "Entropy was computed from each EEG recording. The sample was small."
+    second = "Entropy was computed from each EEG recording. [#3] The sample was small. [#5]"
+    script = Script([first], [second])
+
+    events = turn(context(store_db, script, reading=Reading.WHOLE_SEED), conversation, QUESTION)
+
+    assert [e.type for e in events] == ["delta", "redraft", "delta", "answer"]
+    assert deltas(events) == [first, second]
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent)
+    assert answered.answer.text == first
+    assert [len(s.pointers) for s in answered.answer.sentences] == [1, 1]
+    # The second request reads the first draft as the model's own response, then a note.
+    _, (messages, info) = script.requests
+    *_, response, note = messages
+    assert isinstance(response, ModelResponse) and response.parts == [TextPart(content=first)]
+    assert isinstance(note, ModelRequest)
+    assert info.function_tools == []
+    # The Conversation keeps the Question and the second draft, not the first or the note.
+    assert user_prompts(conversation.messages) == [QUESTION]
+    assert last_response_text(conversation) == [second]
+
+
+def _broken() -> str:
+    raise RuntimeError("the server went away")
+
+
+@pytest.mark.parametrize("redraft", [[_broken], ["<|tool_response>"]], ids=["fails", "no-words"])
+def test_regression_eval_70cf08933dac78bcf79873edbada5a1e_without_a_redraft_the_answer_stands(
+    store_db: Conn, conversation: Conversation, redraft: list[Item]
+) -> None:
+    """Eval run 20261031T140751Z-a758bbc, trace 70cf08933dac78bcf79873edbada5a1e (live).
+
+    Two sentences on the Seed, no handle. Asked again for them, a model that fails, or gives
+    no words, leaves the first Answer standing.
+    """
+    first = "Entropy rose after the drug. Sessions took place in the afternoon."
+    script = Script([first], redraft)
+
+    events = turn(context(store_db, script, reading=Reading.WHOLE_SEED), conversation, QUESTION)
+
+    assert [e.type for e in events][:2] == ["delta", "redraft"]
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent)
+    assert answered.answer.text == first
+    assert all(s.pointers == [] for s in answered.answer.sentences)
+    assert last_response_text(conversation) == [first]
+    assert conversation.questions == 1
+
+
+def test_regression_eval_35e1371558966e774f2a2d9466d2bb4f_a_not_covered_answer_is_not_redrafted(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    """Eval run 20261031T140751Z-a758bbc, trace 35e1371558966e774f2a2d9466d2bb4f (live).
+
+    The Answer said what the Seed leaves out, and next which nearby topics it treats, as the
+    prompt asks, and carried no handle: rightly so. It is not asked again.
+    """
+    script = Script(
+        [
+            "The Seed does not say how caffeine affects sleep or dreaming. It covers how brain"
+            " entropy changed in ten volunteers after psilocybin."
+        ]
+    )
+
+    events = turn(context(store_db, script, reading=Reading.WHOLE_SEED), conversation, QUESTION)
+
+    assert [e.type for e in events] == ["delta", "answer"]
+    assert len(script.requests) == 1

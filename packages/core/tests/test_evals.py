@@ -18,7 +18,7 @@ import pytest
 from psycopg.rows import TupleRow
 from pydantic import ValidationError
 from pydantic_ai.messages import ModelMessage, ModelRequest, ToolReturnPart, UserPromptPart
-from pydantic_ai.models.function import AgentInfo, FunctionModel
+from pydantic_ai.models.function import AgentInfo, DeltaToolCall, FunctionModel
 
 from paperexplorer.asking import AskingContext, Reading
 from paperexplorer.config import Settings
@@ -540,3 +540,41 @@ def test_an_eval_traces_to_the_eval_environment(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setenv("PE_LANGFUSE_ENVIRONMENT", "development")
 
     assert eval_settings().langfuse_environment == "eval"
+
+
+def test_regression_eval_448b0aa1b3b3490eb24f1a310c12392f_a_tool_name_with_answer_text_is_withheld(
+    store_db: Conn, small_seed: Work, questions_file: Path, tmp_path: Path
+) -> None:
+    """Eval run 20261031T140751Z-a758bbc, trace 448b0aa1b3b3490eb24f1a310c12392f (retrieval).
+
+    The model called a tool whose name was a drafted Answer, a control token and its monologue
+    included, and the summary to commit recorded the name as the turn's tool: words of an
+    Answer in git. A name not shaped like a tool's is withheld.
+    """
+    named = "thought\nAnswer: Entropy rose in each volunteer. [#2]\n<channel|>Then the reader"
+    asked = 0
+
+    async def stream(
+        messages: list[ModelMessage], info: AgentInfo
+    ) -> AsyncIterator[str | dict[int, DeltaToolCall]]:
+        nonlocal asked
+        asked += 1
+        if asked == 1:
+            yield {0: DeltaToolCall(named, "{}", tool_call_id="call-1")}
+        else:
+            yield "Entropy was computed from each EEG recording."
+
+    ctx = replace(
+        context(store_db),
+        model=FunctionModel(stream_function=stream, model_name="paperexplorer-chat"),
+    )
+    questions = load_questions(questions_file)
+    questions.cases = questions.cases[:1]
+
+    report = asyncio.run(run_eval(ctx, small_seed, questions, info(small_seed), [Mode.RETRIEVAL]))
+    written = write_run(report, summarize(report), tmp_path / "data", tmp_path / "runs")
+
+    for path in written.committed:
+        text = path.read_text()
+        assert "Entropy rose" not in text and "channel" not in text, path.name
+    assert "(withheld" in written.committed[0].read_text()

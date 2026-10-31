@@ -49,6 +49,13 @@ REFERENCES = [
         year="2019",
     ),
 ]
+# The same Seed citing by author and year: its bibliography is unnumbered, as the eval's Seed's is.
+AUTHOR_YEAR_INTRODUCTION = (
+    "Psychedelics raise brain entropy (Carhart-Harris, 2014). Earlier work used scalp recordings"
+    " (Smith, 2019)."
+)
+AUTHOR_YEAR_DISCUSSION = "The sample was small (Carhart-Harris, 2014)."
+UNNUMBERED_REFERENCES = [r.model_copy(update={"label": None}) for r in REFERENCES]
 
 
 def _marker(text: str, marker: str, reference: str) -> CitationMarker:
@@ -78,25 +85,41 @@ def _heading(path: list[str], page: int, text: str) -> Block:
     return Block(kind=BlockKind.HEADING, heading_path=path, page=page, boxes=[], text=text)
 
 
-SEED_TEXT = ParsedWork(
-    text_origin=TextOrigin.PRINTED,
-    blocks=[
-        _paragraph([], 1, ABSTRACT),
-        _heading([], 1, "1 Introduction"),
-        _paragraph(
-            ["1 Introduction"],
-            1,
-            INTRODUCTION,
-            [_marker(INTRODUCTION, "[1]", "b0"), _marker(INTRODUCTION, "[2]", "b1")],
-        ),
-        _heading([], 2, "2 Methods"),
-        _heading(["2 Methods"], 2, "2.1 Recording"),
-        _paragraph(["2 Methods", "2.1 Recording"], 2, RECORDING),
-        _paragraph(["2 Methods", "2.1 Recording"], 2, SESSIONS),
-        _heading([], 3, "3 Discussion"),
-        _paragraph(["3 Discussion"], 3, DISCUSSION, [_marker(DISCUSSION, "[1]", "b0")]),
-    ],
-    references=REFERENCES,
+def _seed_text(
+    introduction: str,
+    discussion: str,
+    markers: tuple[str, str],
+    references: list[Reference],
+) -> ParsedWork:
+    first, second = markers
+    return ParsedWork(
+        text_origin=TextOrigin.PRINTED,
+        blocks=[
+            _paragraph([], 1, ABSTRACT),
+            _heading([], 1, "1 Introduction"),
+            _paragraph(
+                ["1 Introduction"],
+                1,
+                introduction,
+                [_marker(introduction, first, "b0"), _marker(introduction, second, "b1")],
+            ),
+            _heading([], 2, "2 Methods"),
+            _heading(["2 Methods"], 2, "2.1 Recording"),
+            _paragraph(["2 Methods", "2.1 Recording"], 2, RECORDING),
+            _paragraph(["2 Methods", "2.1 Recording"], 2, SESSIONS),
+            _heading([], 3, "3 Discussion"),
+            _paragraph(["3 Discussion"], 3, discussion, [_marker(discussion, first, "b0")]),
+        ],
+        references=references,
+    )
+
+
+SEED_TEXT = _seed_text(INTRODUCTION, DISCUSSION, ("[1]", "[2]"), REFERENCES)
+AUTHOR_YEAR_SEED_TEXT = _seed_text(
+    AUTHOR_YEAR_INTRODUCTION,
+    AUTHOR_YEAR_DISCUSSION,
+    ("(Carhart-Harris, 2014)", "(Smith, 2019)"),
+    UNNUMBERED_REFERENCES,
 )
 
 
@@ -124,25 +147,34 @@ def in_memory_tracing() -> tuple[Tracing, InMemorySpanExporter, list[dict[str, o
     return tracing, exporter, scores
 
 
-@pytest.fixture
-def small_seed(store_db: psycopg.Connection[TupleRow]) -> Work:
-    """The small Seed stored, chunked, embedded by `FakeEmbedder` and with its Citations."""
-    works = Works(store_db)
-    work = works.ensure(SEED_KEY)
+def _stored_seed(conn: psycopg.Connection[TupleRow], key: str, text: ParsedWork) -> Work:
+    """A Seed stored, chunked, embedded by `FakeEmbedder` and with its Citations."""
+    works = Works(conn)
+    work = works.ensure(key)
     works.record_library_item(
         work,
-        LibraryItem(
-            key=SEED_KEY, title="Entropy after psilocybin", creators=["A. Author"], year=2024
-        ),
+        LibraryItem(key=key, title="Entropy after psilocybin", creators=["A. Author"], year=2024),
     )
-    WorkTexts(store_db).replace(work, SEED_TEXT)
-    chunks = Chunks(store_db)
-    chunks.replace(work, chunking.chunk(SEED_TEXT))
+    WorkTexts(conn).replace(work, text)
+    chunks = Chunks(conn)
+    chunks.replace(work, chunking.chunk(text))
     stored = chunks.for_work(work)
     vectors = FakeEmbedder().embed([s.chunk.text for s in stored])
     vectors_by_chunk = dict(zip((s.id for s in stored), vectors, strict=True))
     chunks.record_embeddings(work, "fake-bag-of-words", vectors_by_chunk)
-    CitationGraphs(store_db).replace(work, citations.extract(SEED_TEXT))
+    CitationGraphs(conn).replace(work, citations.extract(text))
     found = works.get(work)
     assert found is not None
     return found
+
+
+@pytest.fixture
+def small_seed(store_db: psycopg.Connection[TupleRow]) -> Work:
+    """The small Seed stored, chunked, embedded by `FakeEmbedder` and with its Citations."""
+    return _stored_seed(store_db, SEED_KEY, SEED_TEXT)
+
+
+@pytest.fixture
+def unnumbered_seed(store_db: psycopg.Connection[TupleRow]) -> Work:
+    """The small Seed citing by author and year: no Reference of it carries a printed label."""
+    return _stored_seed(store_db, "SEED0002", AUTHOR_YEAR_SEED_TEXT)

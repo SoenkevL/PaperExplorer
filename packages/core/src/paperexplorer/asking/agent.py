@@ -46,6 +46,7 @@ from pydantic_ai.usage import RunUsage, UsageLimits
 
 from paperexplorer.asking.answers import resolve_answer
 from paperexplorer.asking.conversation import Conversation
+from paperexplorer.asking.draft import DraftCut, answer_draft
 from paperexplorer.asking.events import (
     AnsweredEvent,
     AnswerEvent,
@@ -79,6 +80,7 @@ NO_TOOLS = (
     "You have no tools for this Question: the Seed's whole text is in your instructions. Answer"
     " now from it, and where it does not settle the Question, say what the Seed does not say."
 )
+NO_ANSWER = "The model gave no Answer."
 # The prompt's version hashes every text of ours the model reads, so an edit cannot forget it.
 PROMPT_VERSION = hashlib.sha256(
     "\n\n".join([SYSTEM_PROMPT, LAST_REQUEST, WHOLE_SEED, NO_TOOLS]).encode()
@@ -187,6 +189,10 @@ async def _answer_turn(
             answer, messages, usage = await _answer(
                 ctx, tools, reading, conversation, question, emit
             )
+        except _NoAnswerError:
+            logger.warning("The model's draft held no Answer once cut at its control tokens")
+            emit(ErrorEvent(message=NO_ANSWER, trace_id=trace_id, reading=reading))
+            return
         except UsageLimitExceeded:
             logger.warning("No Answer within %d model requests", REQUEST_LIMIT)
             emit(
@@ -263,10 +269,11 @@ async def _answer(
     ) as run:
         async for node in run:
             if Agent.is_model_request_node(node):
+                cut = DraftCut()
                 async with node.stream(run.ctx) as stream:
                     async for event in stream:
-                        if text := _draft(event):
-                            emit(DeltaEvent(text=text))
+                        if (text := _draft(event)) and (shown := cut.add(text)):
+                            emit(DeltaEvent(text=shown))
             elif Agent.is_call_tools_node(node):
                 async with node.stream(run.ctx) as stream:
                     async for event in stream:
@@ -275,16 +282,23 @@ async def _answer(
                             emit(StepEvent(tool=event.part.tool_name, args=args))
     result = run.result
     assert result is not None, "the run ended without a result"
-    with ctx.tracing.span("resolve answer", input=result.output) as span:
+    draft = answer_draft(result.output)
+    with ctx.tracing.span("resolve answer", input=draft) as span:
         answer = resolve_answer(
-            result.output,
+            draft,
             conversation.handles,
             tools.chunks_read(),
             ctx.embedder,
             ctx.settings.support_threshold,
         )
         span.update(output=answer.counts().model_dump())
-    return answer, result.all_messages(), result.usage
+    if not any(c.isalnum() for c in answer.text):
+        raise _NoAnswerError
+    return answer, _with_draft(result.all_messages(), draft), result.usage
+
+
+class _NoAnswerError(Exception):
+    """The draft holds no words once cut at its control tokens and without its handles."""
 
 
 def _forced_search(
@@ -353,6 +367,15 @@ async def _no_tools_on_the_last_request(
     ctx: RunContext[SeedTools], tool_defs: list[ToolDefinition]
 ) -> list[ToolDefinition]:
     return [] if ctx.run_step >= REQUEST_LIMIT else tool_defs
+
+
+def _with_draft(messages: list[ModelMessage], draft: str) -> list[ModelMessage]:
+    """The messages with the last response's text the Answer's draft, as cut, for later turns."""
+    *earlier, last = messages
+    if not isinstance(last, ModelResponse):
+        return messages
+    kept = [p for p in last.parts if not isinstance(p, TextPart)]
+    return [*earlier, replace(last, parts=[*kept, TextPart(draft)])]
 
 
 def _without_thinking(messages: list[ModelMessage]) -> list[ModelMessage]:

@@ -6,6 +6,9 @@
 # Everything above the "STAGES" marker is the wizard library: do not hand-edit
 # it. Author the per-step stages below the marker.
 
+# Sourced, its `set -e` and `exit` would close the caller's shell, and an SSH session with it.
+(return 0 2>/dev/null) && { echo "Run ${BASH_SOURCE[0]}, don't source it." >&2; return 1; }
+
 set -euo pipefail
 
 # ──────────────────────────────────────────────────────────────────────────

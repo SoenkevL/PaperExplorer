@@ -48,6 +48,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 ### Fixed
 - Asking: a request that offers no tools now ends with the note that says so, after everything the model read, instead of stating it among the instructions. The live agent's sixth request called a tool anyway in all 8 eval turns that reached it, so they failed, and the baseline called tools it was never offered in 3 of 22 turns. The note is a system prompt part for that request only (Ollama gets a `<system>` user turn) and never joins the Conversation.
 - Asking: a chat stream that stalls no longer holds a turn for the OpenAI client's 600 s; it fails after `PE_CHAT_TIMEOUT_S`.
+- Scripts: `tower-eval.sh`, `tower-check.sh`, `setup-tower.sh` and `setup-mac.sh` refuse to be sourced. Sourced, their `set -e` and `exit` closed the caller's shell at the first failure, and an SSH session with it. tower-eval says that a missing model is created from the Mac by `setup-tower.sh`, and how to start a full run detached, since the tower has no tmux.
 - An optional folder left empty in `.env` (`PE_ZOTERO_STORAGE_DIR=`, `PE_TESSDATA_DIR=`) read as the current folder; it is now unset.
 - Parsing: a Citation whose author part and year are linked separately in the PDF (LaTeX natbib) became two Citations of one Reference; it is now one (Wegner fixture: 311 → 153 Citations).
 - Parsing: numbers beside an author-year bibliography (margin line numbers, the end of the column to the left) were read as Reference labels; labels are now read only where they number the bibliography.

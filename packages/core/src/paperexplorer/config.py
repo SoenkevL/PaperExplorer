@@ -24,8 +24,9 @@ class Settings(BaseSettings):
     embedding_model: str = "bge-m3"
     embedding_api_key: SecretStr = SecretStr("ollama")
     embedding_batch_size: int = Field(default=32, ge=1, description="Texts per embedding request.")
-    # Provisional until the eval sets it: bge-m3 puts a paraphrase of a sentence well above 0.7
-    # and another sentence on the same topic below it; too low would call weak Support close.
+    # Set from the eval of 2026-10-29 (docs/eval-2026-10-29.md): of 168 Pointers at or above 0.7,
+    # 2 sat at a place that does not bear their sentence out (both of one invented sentence); of
+    # 20 below it, 7. 0.75 would make 37 apt or partly apt ones weak to catch those 2.
     support_threshold: float = Field(
         default=0.7,
         ge=0,
@@ -43,6 +44,13 @@ class Settings(BaseSettings):
         default=73728,
         ge=1,
         description="The chat model's context in tokens, as its Modelfile sets it; on every trace.",
+    )
+    # Ollama sends nothing while it loads the model and reads the prompt (about 30 s for the
+    # whole Seed, cold); a stream silent much longer has stalled (eval 2026-10-29).
+    chat_timeout_s: float = Field(
+        default=120,
+        gt=0,
+        description="Seconds a chat request may wait for its stream's next bytes.",
     )
     # The API holds Conversations in memory (a restart clears them) and evicts the least recently
     # used beyond this many, and any left unused for this long.

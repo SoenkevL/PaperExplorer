@@ -4,6 +4,7 @@
 agent does and as the baseline with the whole Seed in context, and measures each turn: hit@8,
 Pointer coverage and Support, Pointers on expected places, exact Quotes checked, requests,
 tools and latency. `summarize` keeps what may be committed: no words of the Seed or the Answers.
+A judge's `Verdicts` on a run are committed beside its summary and posted as Langfuse scores.
 """
 
 from paperexplorer.evals.models import (
@@ -35,9 +36,19 @@ from paperexplorer.evals.runs import (
     write_run,
 )
 from paperexplorer.evals.turns import HIT_K, AskingMetrics, ask_turn, metrics, says_not_covered
+from paperexplorer.evals.verdicts import (
+    Aptness,
+    PointerReading,
+    Verdict,
+    Verdicts,
+    load_verdicts,
+    post_verdicts,
+    unjudged,
+)
 
 __all__ = [
     "HIT_K",
+    "Aptness",
     "AskingMetrics",
     "BarCheck",
     "EvalReport",
@@ -48,24 +59,30 @@ __all__ = [
     "ModeSummary",
     "Place",
     "PointerCheck",
+    "PointerReading",
     "QuestionMeta",
     "QuestionRun",
     "Questions",
     "QuoteCheck",
     "RunInfo",
     "Turn",
+    "Verdict",
+    "Verdicts",
     "Written",
     "ask_turn",
     "eval_settings",
     "load_questions",
+    "load_verdicts",
     "metrics",
     "new_run_id",
+    "post_verdicts",
     "render_answers",
     "render_summary",
     "run_eval",
     "run_info",
     "says_not_covered",
     "summarize",
+    "unjudged",
     "unknown_places",
     "write_run",
 ]

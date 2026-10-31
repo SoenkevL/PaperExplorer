@@ -16,7 +16,7 @@ from importlib import resources
 import psycopg
 from psycopg.rows import TupleRow
 from pydantic_ai import Agent, RunContext, Tool
-from pydantic_ai.capabilities import Instrumentation, PrepareTools
+from pydantic_ai.capabilities import AbstractCapability, Instrumentation, PrepareTools
 from pydantic_ai.exceptions import UsageLimitExceeded
 from pydantic_ai.messages import (
     AgentStreamEvent,
@@ -26,6 +26,7 @@ from pydantic_ai.messages import (
     ModelResponse,
     PartDeltaEvent,
     PartStartEvent,
+    SystemPromptPart,
     TextPart,
     TextPartDelta,
     ThinkingPart,
@@ -33,10 +34,11 @@ from pydantic_ai.messages import (
     ToolReturnPart,
     UserPromptPart,
 )
-from pydantic_ai.models import Model
+from pydantic_ai.models import Model, ModelRequestContext
 from pydantic_ai.models.instrumented import InstrumentationSettings
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.ollama import OllamaProvider
+from pydantic_ai.settings import ModelSettings
 from pydantic_ai.tools import ToolDefinition
 from pydantic_ai.usage import RunUsage, UsageLimits
 
@@ -58,8 +60,6 @@ from paperexplorer.tracing import Tracing
 logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = (resources.files("paperexplorer.asking") / "system-prompt.md").read_text("utf-8")
-# The prompt's version is its content's hash, so an edit cannot forget to change it.
-PROMPT_VERSION = hashlib.sha256(SYSTEM_PROMPT.encode()).hexdigest()[:12]
 # At most this many model requests per Question; the last one offers no tools.
 REQUEST_LIMIT = 6
 LAST_REQUEST = (
@@ -72,6 +72,14 @@ WHOLE_SEED = (
     " every Chunk under its handle. What is said above about searching and reading with tools"
     " does not apply; read the text below instead. Everything else above does."
 )
+NO_TOOLS = (
+    "You have no tools for this Question: the Seed's whole text is in your instructions. Answer"
+    " now from it, and where it does not settle the Question, say what the Seed does not say."
+)
+# The prompt's version hashes every text of ours the model reads, so an edit cannot forget it.
+PROMPT_VERSION = hashlib.sha256(
+    "\n\n".join([SYSTEM_PROMPT, LAST_REQUEST, WHOLE_SEED, NO_TOOLS]).encode()
+).hexdigest()[:12]
 
 
 @dataclass(frozen=True)
@@ -100,7 +108,12 @@ def chat_model(settings: Settings) -> Model:
     provider = OllamaProvider(
         base_url=settings.chat_base_url, api_key=settings.chat_api_key.get_secret_value()
     )
-    return OpenAIChatModel(settings.chat_model, provider=provider)
+    # A stream silent for `chat_timeout_s` fails the turn, rather than at the client's 600 s.
+    return OpenAIChatModel(
+        settings.chat_model,
+        provider=provider,
+        settings=ModelSettings(timeout=settings.chat_timeout_s),
+    )
 
 
 async def ask(
@@ -198,10 +211,11 @@ async def _answer(
         ctx.model,
         deps_type=SeedTools,
         name="asking",
-        instructions=[instructions, _last_request],
+        instructions=instructions,
         tools=[] if ctx.whole_seed else _TOOLS,
         capabilities=[
             PrepareTools(_no_tools_on_the_last_request),
+            _NoteAfterReading(whole_seed=ctx.whole_seed),
             Instrumentation(
                 settings=InstrumentationSettings(tracer_provider=ctx.tracing.tracer_provider)
             ),
@@ -270,8 +284,35 @@ def _draft(event: AgentStreamEvent) -> str | None:
     return None
 
 
-def _last_request(ctx: RunContext[SeedTools]) -> str | None:
-    return LAST_REQUEST if ctx.run_step >= REQUEST_LIMIT else None
+@dataclass
+class _NoteAfterReading(AbstractCapability[SeedTools]):
+    """A request that offers no tools ends with a note saying so, after all the model has read.
+
+    The note is a system prompt part at the end of the request, which reaches Ollama as a user
+    turn in `<system>` tags; it is for that request only and never joins the Conversation. Among
+    the instructions, before the reading, the model ignored it (docs/eval-2026-10-29.md): in eval
+    run 20261029T191529Z-94e980b it called a tool on all 8 last requests; replayed with the note
+    last, 23 of 24 were answered.
+    """
+
+    whole_seed: bool
+
+    async def before_model_request(
+        self, ctx: RunContext[SeedTools], request_context: ModelRequestContext
+    ) -> ModelRequestContext:
+        """Add the note to this request's last message, the Question or the tools' results."""
+        if self.whole_seed:
+            note = NO_TOOLS
+        elif ctx.run_step >= REQUEST_LIMIT:
+            note = LAST_REQUEST
+        else:
+            return request_context
+        *earlier, last = request_context.messages
+        if not isinstance(last, ModelRequest):
+            return request_context
+        # A new message, not the history's own: the note stays out of the Conversation.
+        noted = replace(last, parts=[*last.parts, SystemPromptPart(note)])
+        return replace(request_context, messages=[*earlier, noted])
 
 
 async def _no_tools_on_the_last_request(

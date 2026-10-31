@@ -151,3 +151,38 @@ def test_spans_and_scores_record_under_the_current_trace_and_nothing_outside_one
     assert [(s["name"], s["value"], s["traceId"]) for s in ingested] == [
         ("pointer_coverage", 0.75, trace_id)
     ]
+
+
+def test_a_trace_is_scored_by_its_id_from_outside_it() -> None:
+    ingested: list[dict[str, object]] = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/public/scores":
+            ingested.extend(json.loads(request.content))
+            return httpx.Response(200, json={"id": "s1"})
+        return healthy(request)
+
+    tracing = configure_tracing(settings(langfuse_environment="eval"), http=tower(answer))
+    trace_id = "0ba24102b1727f29db6f883add6e79a3"
+
+    tracing.score_trace(trace_id, "judge.grounded", True, comment="Every claim is in the Seed.")
+    tracing.score_trace(trace_id, "judge.correct", False, comment="It misses the second part.")
+    tracing.score_trace(trace_id, "judge.correct", True, comment="Judged again.")
+    tracing.flush()
+
+    by_comment = {s["comment"]: s for s in ingested}
+    grounded = by_comment["Every claim is in the Seed."]
+    first, again = by_comment["It misses the second part."], by_comment["Judged again."]
+    assert [(s["name"], s["traceId"], s["value"]) for s in (grounded, first, again)] == [
+        ("judge.grounded", trace_id, 1),
+        ("judge.correct", trace_id, 0),
+        ("judge.correct", trace_id, 1),
+    ]
+    assert {s["dataType"] for s in ingested} == {"BOOLEAN"}
+    assert {s["environment"] for s in ingested} == {"eval"}
+    # One score per trace and name: judging again replaces the verdict instead of adding one.
+    assert first["id"] == again["id"] != grounded["id"]
+
+
+def test_scoring_a_trace_by_id_with_tracing_off_does_nothing() -> None:
+    Tracing.off().score_trace("0ba24102b1727f29db6f883add6e79a3", "judge.correct", True)

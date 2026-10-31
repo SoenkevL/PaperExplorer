@@ -1,0 +1,484 @@
+# Verdicts on eval run 20261029T202214Z-2b41752, the re-run after run 1's fix
+# (docs/eval-2026-10-29.md). No words of the Seed or of the Answers: notes are the judge's own.
+# Each verdict is also posted to Langfuse as judge.grounded and judge.correct on its trace.
+# A Pointer's `apt`: apt (its place says what the sentence says), partly (it bears out part of
+# the sentence, or a nearby sentence would do better), not (it does not bear the sentence out).
+run_id: 20261029T202214Z-2b41752
+judge: Claude (stage 8b), each Answer read against the Seed's 105 Chunks as stored on the tower
+grounded: >-
+  Every claim the Answer makes is borne out by the Seed: by the Chunks its Pointers lead to, and,
+  for sentences without a Pointer, by the Chunks the model read (the whole Seed, in the
+  baseline). One claim the Seed does not make, or contradicts, makes the Answer ungrounded.
+  Unpointed but true sentences are not held against it here: Pointer coverage measures those.
+  For an uncovered Question, saying the Seed does not cover it is grounded when that is so.
+  A failed turn has no Answer and is neither grounded nor correct.
+correct: >-
+  The Answer answers the Question rightly per the Seed: its substance is what the Seed says on
+  the point asked. A wrong detail off the point asked does not make it incorrect (it makes it
+  ungrounded); a wrong or invented statement on the point asked does, and so does an Answer
+  that misses the point asked. An Answer with no content is incorrect. Leaked template tokens
+  or model monologue are noted, not held against correctness.
+verdicts:
+  - question: measurement-table-1-studies
+    mode: retrieval
+    trace_id: 2f9a29f8ab050a6657590e82b713bce3
+    grounded: true
+    correct: true
+    note: Count, time window and studies per compound and modality, all right and pointed.
+    pointers:
+      - {sentence: 0, similarity: 0.8505, apt: apt}
+  - question: measurement-table-1-studies
+    mode: baseline
+    trace_id: ba8396dea644a40b42d1b4f5025e52b5
+    grounded: true
+    correct: true
+    note: Count, criteria and the four compounds, all pointed.
+    pointers:
+      - {sentence: 0, similarity: 0.9231, apt: apt}
+      - {sentence: 1, similarity: 0.8731, apt: apt}
+      - {sentence: 2, similarity: 0.7627, apt: apt}
+      - {sentence: 2, similarity: 0.7562, apt: apt}
+  - question: measurement-tagliazucchi-motifs
+    mode: retrieval
+    trace_id: 23af0e1b5296c4c17f66263107843284
+    grounded: true
+    correct: true
+    note: Right definition and finding, every sentence pointed; answered on its sixth request.
+    pointers:
+      - {sentence: 0, similarity: 0.8544, apt: apt}
+      - {sentence: 1, similarity: 0.8464, apt: apt}
+      - {sentence: 2, similarity: 0.9103, apt: apt}
+  - question: measurement-tagliazucchi-motifs
+    mode: baseline
+    trace_id: 741c9e83df5a5b107d6b59fb73c3a2fc
+    grounded: true
+    correct: true
+    note: >-
+      Right definition and finding; a bracketed Quote stitched from two passages with ellipses,
+      rightly marked not exact.
+    pointers:
+      - {sentence: 0, similarity: 0.8013, apt: apt}
+      - {sentence: 1, similarity: 0.7393, apt: partly}
+      - {sentence: 2, similarity: 0.8699, apt: apt}
+  - question: measurement-intensity-correlation
+    mode: retrieval
+    trace_id: d67515e0ace2d64ba5621fb736d7e883
+    grounded: true
+    correct: true
+    note: >-
+      Mixed evidence, per study, right; no handles, so no Pointers. Names the author of the
+      eyes-closed LSD association from a citation the Chunk prints just before the parse gap,
+      judged by the Chunk (uncertain, as in run 1).
+  - question: measurement-intensity-correlation
+    mode: baseline
+    trace_id: 5b54a341995757df9eacaa619d08d21c
+    grounded: true
+    correct: true
+    note: >-
+      Mixed, with the right per-study findings; the stimulation result is read onto Murray et
+      al. from the Chunk's parse gap, judged by the Chunk (uncertain).
+    pointers:
+      - {sentence: 1, similarity: 0.8641, apt: apt}
+      - {sentence: 2, similarity: 0.9854, apt: apt}
+      - {sentence: 3, similarity: 0.7343, apt: partly}
+  - question: measurement-mcculloch-replication
+    mode: retrieval
+    trace_id: 01be4267640e3ad43b1b23f25cdbea4b
+    grounded: false
+    correct: true
+    note: >-
+      Replication count, null metrics, region-ordering, robust metrics and the alertness reading
+      are right; but it calls the studies dopamine-driven and mixes up studies and metrics.
+    pointers:
+      - {sentence: 0, similarity: 0.762, apt: apt}
+      - {sentence: 1, similarity: 0.7938, apt: apt}
+      - {sentence: 2, similarity: 0.7015, apt: partly}
+      - {sentence: 2, similarity: 0.7196, apt: partly}
+      - {sentence: 3, similarity: 0.8111, apt: apt}
+  - question: measurement-mcculloch-replication
+    mode: baseline
+    trace_id: 5e96992b6d5b49ce00d6d8a715afddf4
+    grounded: true
+    correct: true
+    note: >-
+      The findings are right but unpointed, while its Pointers sit on empty not-covered remarks;
+      template tokens and the model's own monologue about the reader leak into the text, with
+      repeats (uncertain whether that should make it incorrect).
+    pointers:
+      - {sentence: 2, similarity: 0.361, apt: not}
+      - {sentence: 2, similarity: 0.4465, apt: not}
+      - {sentence: 3, similarity: 0.4541, apt: not}
+  - question: method-brain-entropy-definition
+    mode: retrieval
+    trace_id: 848e0ab551ec731387fbfe75fe239dc8
+    grounded: false
+    correct: true
+    note: >-
+      The working definition is right and pointed, but it describes connectivity motifs as
+      falling below a threshold, where the Seed has them exceed it.
+    pointers:
+      - {sentence: 1, similarity: 0.7117, apt: partly}
+      - {sentence: 2, similarity: 0.7537, apt: partly}
+      - {sentence: 3, similarity: 0.8467, apt: apt}
+  - question: method-brain-entropy-definition
+    mode: baseline
+    trace_id: 73beb3f243b04bbe9e1908a06bcb03b1
+    grounded: true
+    correct: true
+    note: >-
+      Definition, its properties, state choices and the umbrella term, all right and pointed;
+      writes out the formula the parsed text lost, which its prose bears out.
+    pointers:
+      - {sentence: 0, similarity: 0.9066, apt: apt}
+      - {sentence: 1, similarity: 0.7279, apt: partly}
+      - {sentence: 2, similarity: 0.7937, apt: apt}
+      - {sentence: 3, similarity: 0.7588, apt: apt}
+      - {sentence: 4, similarity: 0.6575, apt: partly}
+      - {sentence: 5, similarity: 0.8697, apt: apt}
+      - {sentence: 6, similarity: 0.7689, apt: partly}
+      - {sentence: 6, similarity: 0.772, apt: partly}
+      - {sentence: 7, similarity: 0.8707, apt: apt}
+  - question: method-lzc-vs-shannon
+    mode: retrieval
+    trace_id: c4718fba6b318aa28f6a4e0e8f79d68b
+    grounded: true
+    correct: true
+    note: Both differences and the example, right; handles in parentheses, so no Pointers.
+  - question: method-lzc-vs-shannon
+    mode: baseline
+    trace_id: 8ede9c578a08f17c989ee5cccaa99257
+    grounded: true
+    correct: true
+    note: Both differences and the figure's example, all right and pointed.
+    pointers:
+      - {sentence: 0, similarity: 0.8566, apt: apt}
+      - {sentence: 1, similarity: 0.7079, apt: apt}
+      - {sentence: 1, similarity: 0.7719, apt: apt}
+      - {sentence: 2, similarity: 0.7538, apt: apt}
+      - {sentence: 3, similarity: 0.7496, apt: apt}
+  - question: method-sample-entropy-parameters
+    mode: retrieval
+    trace_id: 7ac7a610d43186032e5190d1da34a2c2
+    grounded: false
+    correct: true
+    note: >-
+      Names both parameters and that they change results, but wanders through entropy in
+      general, garbles two abbreviations into non-words and says the compression algorithm is a
+      choice; one call to a tool that does not exist.
+    pointers:
+      - {sentence: 1, similarity: 0.7676, apt: apt}
+      - {sentence: 1, similarity: 0.7462, apt: apt}
+      - {sentence: 1, similarity: 0.7782, apt: apt}
+      - {sentence: 2, similarity: 0.7165, apt: partly}
+      - {sentence: 3, similarity: 0.8562, apt: apt}
+      - {sentence: 4, similarity: 0.869, apt: apt}
+  - question: method-sample-entropy-parameters
+    mode: baseline
+    trace_id: c5b7289409b2182cea0d01e18bdb38f6
+    grounded: true
+    correct: true
+    note: >-
+      Both parameters and why they matter, right and pointed; then seven leaked lines behind
+      template tokens repeat that the Seed gives no values.
+    pointers:
+      - {sentence: 0, similarity: 0.9796, apt: apt}
+      - {sentence: 2, similarity: 0.8752, apt: apt}
+  - question: method-study-selection
+    mode: retrieval
+    trace_id: e8af071fbb9438421f2c78fd7a17b455
+    grounded: true
+    correct: true
+    note: >-
+      Selection criteria, studies per compound and the within-subject comparison, right; only
+      the last sentence pointed.
+    pointers:
+      - {sentence: 2, similarity: 0.8868, apt: apt}
+  - question: method-study-selection
+    mode: baseline
+    trace_id: 8317ea8cc76746304bee75a9f9cc5a64
+    grounded: true
+    correct: true
+    note: >-
+      Count, compounds and the within-subject comparison, right but thin (no selection
+      criteria); reference-style numbers instead of handles.
+  - question: shortcoming-main-limitations
+    mode: retrieval
+    trace_id: 69f81fddcda7adc1a3e8d0c4f11ba5f0
+    grounded: true
+    correct: true
+    note: >-
+      The four limitations with apt examples; cites section numbers, some invented, in place of
+      most handles; one call to a tool that does not exist.
+    pointers:
+      - {sentence: 1, similarity: 0.794, apt: apt}
+      - {sentence: 2, similarity: 0.6271, apt: partly}
+      - {sentence: 3, similarity: 0.7258, apt: partly}
+  - question: shortcoming-main-limitations
+    mode: baseline
+    trace_id: 0e8be28c986d82d537125213bab715f2
+    grounded: true
+    correct: true
+    note: >-
+      The four limitations, pointed; the specificity examples are loose (placebo under
+      stimulation read as sham treatments).
+    pointers:
+      - {sentence: 0, similarity: 0.7059, apt: partly}
+      - {sentence: 0, similarity: 0.7065, apt: partly}
+      - {sentence: 0, similarity: 0.7663, apt: partly}
+      - {sentence: 0, similarity: 0.724, apt: partly}
+      - {sentence: 1, similarity: 0.7652, apt: apt}
+      - {sentence: 2, similarity: 0.7814, apt: apt}
+      - {sentence: 2, similarity: 0.7699, apt: partly}
+      - {sentence: 3, similarity: 0.8044, apt: partly}
+      - {sentence: 3, similarity: 0.7109, apt: partly}
+  - question: shortcoming-specificity
+    mode: retrieval
+    trace_id: dc6e78946bae1373b0ebe16ded825235
+    grounded: true
+    correct: true
+    note: >-
+      Not specific, with apt examples (one drug's name garbled); no handles, so no Pointers.
+  - question: shortcoming-specificity
+    mode: baseline
+    trace_id: e0c9c6d9356bad84a6b6b6d6f315903d
+    grounded: true
+    correct: true
+    note: Not specific, with apt examples; numbers in parentheses instead of handles.
+  - question: shortcoming-scalar-measure
+    mode: retrieval
+    trace_id: 85b49b1e445ad5402eff89fe68849ded
+    grounded: true
+    correct: false
+    note: >-
+      Names the levels-based view but not why it fails (states differ along several dimensions,
+      with gains and losses); fills the rest with the metric-multiplicity limitation. No
+      Pointers.
+  - question: shortcoming-scalar-measure
+    mode: baseline
+    trace_id: 79cfebddd42f39f85acaeeeb31294922
+    grounded: false
+    correct: true
+    note: >-
+      The multidimensional argument with its perceptual examples is right and pointed, but it
+      invents a percentage on memory, treats reduced gating as an impairment, and invents a
+      metric-count recommendation; those two sentences point off the point.
+    pointers:
+      - {sentence: 0, similarity: 0.7613, apt: apt}
+      - {sentence: 1, similarity: 0.7667, apt: apt}
+      - {sentence: 3, similarity: 0.857, apt: apt}
+      - {sentence: 4, similarity: 0.8369, apt: partly}
+      - {sentence: 5, similarity: 0.7148, apt: not}
+      - {sentence: 5, similarity: 0.7073, apt: not}
+      - {sentence: 6, similarity: 0.7959, apt: apt}
+      - {sentence: 7, similarity: 0.4931, apt: not}
+  - question: shortcoming-fmri
+    mode: retrieval
+    trace_id: 072631e8273390da56c67325fc3d67e4
+    grounded: true
+    correct: true
+    note: Every problem the Seed names for fMRI, pointed, with four exact Quotes.
+    pointers:
+      - {sentence: 1, similarity: 0.9002, apt: apt}
+      - {sentence: 2, similarity: 0.8116, apt: apt}
+      - {sentence: 3, similarity: 0.8225, apt: apt}
+      - {sentence: 4, similarity: 0.9145, apt: apt}
+      - {sentence: 5, similarity: 0.8566, apt: apt}
+  - question: shortcoming-fmri
+    mode: baseline
+    trace_id: 619863b4e407f888dd8d830f7f10f290
+    grounded: true
+    correct: true
+    note: >-
+      Names the indirect signal and adds two general metric issues, true but thin; numbers in
+      brackets instead of handles.
+  - question: shortcoming-own-scope
+    mode: retrieval
+    trace_id: a6971f408ce6cf150a359530b253940c
+    grounded: true
+    correct: true
+    note: The scope the authors leave out, with their own words quoted exactly and pointed.
+    pointers:
+      - {sentence: 1, similarity: 0.9051, apt: apt}
+  - question: shortcoming-own-scope
+    mode: baseline
+    trace_id: ab535848905b3ed33c4103cdf2acb5c1
+    grounded: false
+    correct: true
+    note: >-
+      Names the scope left out, but opens by saying the Seed leaves nothing out systematically,
+      which its own next clause and the Seed contradict.
+    pointers:
+      - {sentence: 0, similarity: 0.7043, apt: apt}
+  - question: follow-up-study-designs
+    mode: retrieval
+    trace_id: 87e9e211887575930c3cef09d4bc4d47
+    grounded: false
+    correct: true
+    note: >-
+      The designs and controls the Seed calls for, mostly pointed; but it says metric choices
+      should rest on two mental functions the Seed never names for it; typos
+      and a word in Spanish.
+    pointers:
+      - {sentence: 1, similarity: 0.8397, apt: apt}
+      - {sentence: 2, similarity: 0.7801, apt: partly}
+      - {sentence: 3, similarity: 0.7433, apt: apt}
+  - question: follow-up-study-designs
+    mode: baseline
+    trace_id: 1813fa02b91ed44d5d817bb66b315e6a
+    grounded: true
+    correct: true
+    note: The full set of calls, each pointed, from multi-site studies to continuous tracking.
+    pointers:
+      - {sentence: 1, similarity: 0.8443, apt: apt}
+      - {sentence: 2, similarity: 0.7684, apt: partly}
+      - {sentence: 2, similarity: 0.8741, apt: apt}
+      - {sentence: 3, similarity: 0.7602, apt: partly}
+      - {sentence: 3, similarity: 0.7702, apt: partly}
+      - {sentence: 4, similarity: 0.8924, apt: apt}
+      - {sentence: 5, similarity: 0.7645, apt: apt}
+  - question: follow-up-alertness-controls
+    mode: retrieval
+    trace_id: c68156538c94b0f9bd16b37eb18c1a52
+    grounded: true
+    correct: true
+    note: Active placebos, stimulant comparisons and broader controls, all pointed.
+    pointers:
+      - {sentence: 0, similarity: 0.908, apt: apt}
+      - {sentence: 1, similarity: 0.8545, apt: apt}
+      - {sentence: 2, similarity: 0.7857, apt: apt}
+  - question: follow-up-alertness-controls
+    mode: baseline
+    trace_id: d437861473ccc4ee4a67a414c8f4b3ec
+    grounded: true
+    correct: true
+    note: Active placebos and stimulant comparisons, pointed.
+    pointers:
+      - {sentence: 0, similarity: 0.8772, apt: apt}
+      - {sentence: 1, similarity: 0.8518, apt: apt}
+  - question: follow-up-phenomenal-richness
+    mode: retrieval
+    trace_id: d0835fb3253308f75ce2e8d61b8e465e
+    grounded: true
+    correct: true
+    note: >-
+      Six proposals the Seed makes, each pointed; written as a numbered list against the
+      prompt.
+    pointers:
+      - {sentence: 3, similarity: 0.7669, apt: apt}
+      - {sentence: 6, similarity: 0.8404, apt: apt}
+      - {sentence: 9, similarity: 0.7592, apt: apt}
+      - {sentence: 12, similarity: 0.8409, apt: apt}
+      - {sentence: 15, similarity: 0.8137, apt: apt}
+      - {sentence: 18, similarity: 0.8597, apt: apt}
+  - question: follow-up-phenomenal-richness
+    mode: baseline
+    trace_id: 83a88c01e395c5c494da1bd5bcba73d7
+    grounded: true
+    correct: true
+    note: Questionnaires, inflated reports, correlation and continuous tracking; pointed.
+    pointers:
+      - {sentence: 0, similarity: 0.7189, apt: apt}
+      - {sentence: 1, similarity: 0.7044, apt: apt}
+      - {sentence: 2, similarity: 0.7436, apt: partly}
+      - {sentence: 2, similarity: 0.7157, apt: partly}
+  - question: follow-up-metric-choice
+    mode: retrieval
+    trace_id: 81169eb5ba715db19037ac3ccfebec3e
+    grounded: true
+    correct: false
+    note: >-
+      Restates the metric problem nearly word for word from one paragraph, unquoted, but gives
+      none of the recommendations (specify, justify, preregister, define from activity) beyond
+      the need for metric-level specificity; one call to a tool that does not exist.
+    pointers:
+      - {sentence: 1, similarity: 0.9698, apt: apt}
+      - {sentence: 2, similarity: 1.0, apt: apt}
+      - {sentence: 3, similarity: 0.9568, apt: apt}
+      - {sentence: 4, similarity: 0.901, apt: apt}
+      - {sentence: 5, similarity: 0.907, apt: apt}
+  - question: follow-up-metric-choice
+    mode: baseline
+    trace_id: e187a24579c3bc3023b54d7072ee23bc
+    grounded: true
+    correct: true
+    note: Every recommendation the Seed makes on metrics and designs, pointed.
+    pointers:
+      - {sentence: 1, similarity: 0.8874, apt: apt}
+      - {sentence: 2, similarity: 0.9462, apt: apt}
+      - {sentence: 3, similarity: 0.7925, apt: apt}
+      - {sentence: 4, similarity: 0.7614, apt: partly}
+      - {sentence: 5, similarity: 0.8604, apt: apt}
+      - {sentence: 6, similarity: 0.8808, apt: apt}
+      - {sentence: 8, similarity: 0.6942, apt: apt}
+  - question: uncovered-depression-dose
+    mode: retrieval
+    trace_id: 743e05e0a4b14b7d4714b08066fb1a44
+    grounded: true
+    correct: true
+    note: Says the Seed recommends no dose and what it says on therapy, pointed.
+    pointers:
+      - {sentence: 1, similarity: 0.7907, apt: apt}
+  - question: uncovered-depression-dose
+    mode: baseline
+    trace_id: 3d9b7b026343b536e2d30ee4c100114f
+    grounded: false
+    correct: true
+    note: >-
+      Rightly says there is no dose, then claims Table 1 reviews clinical studies and the
+      conclusions discuss benefits, neither of which holds.
+  - question: uncovered-own-experiment
+    mode: retrieval
+    trace_id: 1192b3a542c97f06be30bf72db75eb83
+    grounded: true
+    correct: true
+    note: Says there is no experiment of its own, being a review.
+  - question: uncovered-own-experiment
+    mode: baseline
+    trace_id: 4abeb43be994d432c82d23e7bd411302
+    grounded: true
+    correct: true
+    note: Says there is no experiment of its own; its one Pointer lands on a nearby abstract sentence.
+    pointers:
+      - {sentence: 1, similarity: 0.5426, apt: partly}
+  - question: uncovered-heart-rate
+    mode: retrieval
+    trace_id: 53f10551c8dbe0e57916934912f440bb
+    grounded: true
+    correct: true
+    note: Says the Seed does not cover it and what it covers instead.
+  - question: uncovered-heart-rate
+    mode: baseline
+    trace_id: 0f5bb18259c5803db4a1d70d0f073ea8
+    grounded: true
+    correct: true
+    note: Says the Seed does not cover it and what it covers instead.
+  - question: uncovered-analysis-software
+    mode: retrieval
+    trace_id: 998814d78c81219e1af98cfb26307784
+    grounded: false
+    correct: false
+    note: >-
+      Answers another Question: it describes a cited study's participants as if they were the
+      authors' data and never says the Seed names no software. Its Pointers are apt to their
+      sentences.
+    pointers:
+      - {sentence: 0, similarity: 0.7048, apt: apt}
+      - {sentence: 1, similarity: 0.7956, apt: apt}
+  - question: uncovered-analysis-software
+    mode: baseline
+    trace_id: f6cdff24cf61b7aaff6d132f64853513
+    grounded: true
+    correct: true
+    note: Says the Seed names no software and why.
+  - question: uncovered-eu-regulation
+    mode: retrieval
+    trace_id: 98818168b37761c68108a3d4b0ac969b
+    grounded: true
+    correct: true
+    note: Says the Seed does not cover regulation and what it covers instead.
+  - question: uncovered-eu-regulation
+    mode: baseline
+    trace_id: 3b55c2e1e7bb581863f6355e283f38a3
+    grounded: true
+    correct: true
+    note: Says the Seed does not cover regulation and what it covers instead.

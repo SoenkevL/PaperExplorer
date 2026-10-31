@@ -20,7 +20,7 @@ Before resolution and Sources, the reader can ask the Seed Questions in a sideba
   2. otherwise the best match in the other Chunks the model read in this turn: close if it clears the threshold, and the Pointer moves there;
   3. otherwise weak Support, leading to the best sentence of the cited Chunk.
 - **Quotes.** Quotation marks are the model's prose. Each quoted span is searched in every Chunk the model read in this turn, whatever its handle says, with ligatures and line-break hyphens folded for matching only. An exact Quote is shown in the authors' style and links to its place; any other Quote is marked not exact.
-- **Two marks, not one scale.** The Pointer chip shows Support (close, weak: the reader's high and low colours); quoted words show exactness (exact: the reader's certain colour). A legend in the sidebar explains them. Thresholds are set from the eval.
+- **Two marks, not one scale.** The Pointer chip shows Support (close, weak: the reader's high and low colours); quoted words show exactness (exact: the reader's certain colour). A legend in the sidebar explains them. The Support threshold, a bge-m3 cosine of 0.7, was set from the eval ([eval of 2026-10-29](eval-2026-10-29.md)).
 - **Clicking a Pointer** scrolls the reader to the block and highlights the matched sentence strongly and the rest of the Chunk faintly. Citations in the block stay clickable.
 
 ## The agent
@@ -39,8 +39,9 @@ Before resolution and Sources, the reader can ask the Seed Questions in a sideba
   - The map's abstract is the Seed's Chunks before its first heading: GROBID's abstract arrives as paragraphs without a Heading Path (else the Chunks under a first heading "Abstract"), up to 1,500 tokens. They carry handles and count as read every turn, since they are always in context.
   - A section's handle is a § number in the map (`§3 2.1 Data · p. 4`), one per Heading Path prefix the Chunks sit under, apart from the Chunks' `[#n]` so the model cannot cite a section as a Chunk. `read_section` takes the § number or the heading, and reads on in parts of about 3,000 tokens.
   - At the request limit, the sixth request offers no tools and tells the model it is its last, so it answers from what it read. A model that still calls a tool ends the turn with an `error`; the Conversation stays as before the Question.
+  - That note comes last in the request, after everything the model read, never among the instructions (eval of 2026-10-29: among them, the model called a tool on all 8 last requests; replayed with the note last, it answered 23 of 24). The baseline ends every request with its own note that it has no tools. A chat request whose stream stays silent for `PE_CHAT_TIMEOUT_S` (120 s) fails the turn.
   - The model's thinking is traced with its request but left out of the Conversation's messages, so earlier turns' reasoning does not fill the context.
-  - The prompt's version is the first 12 hex digits of its file's SHA-256, so an edit cannot forget it.
+  - The prompt's version is the first 12 hex digits of the SHA-256 of its file and of the notes the agent adds (the last request's, the baseline's), so an edit cannot forget it.
   - `Conversation` lives in `asking`, as it holds pydantic-ai's messages; `ask` takes an `AskingContext` (connection, Embedder, chat model, settings, tracing), as `run_stage` takes a `StageContext`.
 
 ## Conversations, API and web
@@ -92,6 +93,9 @@ As `design-v1.md`: paragraph Chunks of at most 400 bge-m3 tokens, HNSW plus Engl
   - Pointer coverage for the bar pools the substantive sentences of the covered Questions' Answers, and hit@8 counts covered Questions: an uncovered Question's "The Seed does not say …" is substantive and rightly unpointed.
   - "No Quote marked exact that is not" is checked, not assumed: each exact Quote's words are compared with the printed text at its place, folded on their own.
   - Whether an uncovered Question's Answer says so is a heuristic on its words ("the Seed does not say …" and its kin), reported for every turn and checked for uncovered Questions; stage 8b's reading decides.
+- **Judged** (stage 8b; the report: [eval of 2026-10-29](eval-2026-10-29.md)):
+  - Every Answer of a run is read against the Seed and judged grounded and correct, with a note in the judge's words, in `evals/runs/<run id>.verdicts.yaml` beside the run's summary, and posted as Langfuse scores `judge.grounded` and `judge.correct` on its trace (`scripts/post_verdicts.py`). Each Pointer's place is read too, as apt, partly or not, which is what set the Support threshold.
+  - Grounded: every claim is borne out by the Seed (by the place a Pointer leads to, else by what the model read); a true unpointed sentence is left to Pointer coverage. Correct: the substance on the point asked is right. A failed turn is neither.
 
 ## Order of work
 1. Docs: ADRs 0008 and 0009, `CONTEXT.md`, this design, `design-v1.md`, `architecture.md`, logbook.

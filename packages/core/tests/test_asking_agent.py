@@ -8,6 +8,7 @@ given as a string or as a function of the Conversation (to write a handle shown 
 import asyncio
 import json
 import re
+import time
 from collections.abc import AsyncIterator, Callable, Sequence
 from dataclasses import dataclass, replace
 
@@ -21,6 +22,7 @@ from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
     ModelResponse,
+    SystemPromptPart,
     TextPart,
     ThinkingPart,
     ToolCallPart,
@@ -41,7 +43,9 @@ from paperexplorer.asking import (
     ErrorEvent,
     StepEvent,
     ask,
+    chat_model,
 )
+from paperexplorer.asking.agent import LAST_REQUEST, NO_TOOLS
 from paperexplorer.config import Settings
 from paperexplorer.domain import Work
 from paperexplorer.embedding import Embedder, FakeEmbedder, OpenAICompatibleEmbedder
@@ -67,12 +71,14 @@ class Call:
 
 
 type Item = Think | Call | str | Callable[[], str]
+# A response is its items, or a function of the request's messages that gives them.
+type Response = Sequence[Item] | Callable[[list[ModelMessage]], Sequence[Item]]
 
 
 class Script:
     """A model that streams one scripted response per request and records each request."""
 
-    def __init__(self, *responses: Sequence[Item], then: Sequence[Item] | None = None) -> None:
+    def __init__(self, *responses: Response, then: Response | None = None) -> None:
         self._responses = list(responses)
         self._then = then
         self.requests: list[tuple[list[ModelMessage], AgentInfo]] = []
@@ -86,6 +92,8 @@ class Script:
         self.requests.append((list(messages), info))
         response = self._responses.pop(0) if self._responses else self._then
         assert response is not None, "the model was asked more often than scripted"
+        if callable(response):
+            response = response(list(messages))
         for i, item in enumerate(response):
             if isinstance(item, Think):
                 yield {i: DeltaThinkingPart(content=item.text)}
@@ -271,11 +279,13 @@ def test_the_last_request_offers_no_tools_so_the_model_answers(
     events = turn(context(store_db, script), conversation, QUESTION)
 
     assert len(script.requests) == REQUEST_LIMIT
-    *earlier, (_, last) = script.requests
+    *earlier, (last_messages, last) = script.requests
     assert all(len(info.function_tools) == 5 for _, info in earlier)
     assert last.function_tools == []
-    assert last.instructions is not None and "last request" in last.instructions
-    assert all("last request" not in (info.instructions or "") for _, info in earlier)
+    # The note that says so comes after everything the model read, not among the instructions.
+    assert LAST_REQUEST in (trailing_note(last_messages) or "")
+    assert all(trailing_note(messages) is None for messages, _ in earlier)
+    assert all(LAST_REQUEST not in (info.instructions or "") for _, info in script.requests)
     assert isinstance(events[-1], AnsweredEvent)
     assert sum(isinstance(e, StepEvent) for e in events) == REQUEST_LIMIT
 
@@ -291,6 +301,168 @@ def test_a_model_that_will_not_answer_ends_the_turn_with_an_error(
     assert f"{REQUEST_LIMIT} requests" in events[-1].message
     assert not any(isinstance(e, AnsweredEvent) for e in events)
     assert (conversation.messages, conversation.questions) == ([], 0)
+
+
+def user_prompts(messages: Sequence[ModelMessage]) -> list[str]:
+    """Every user prompt in the messages, in order."""
+    return [
+        str(part.content)
+        for m in messages
+        if isinstance(m, ModelRequest)
+        for part in m.parts
+        if isinstance(part, UserPromptPart)
+    ]
+
+
+def trailing_note(messages: Sequence[ModelMessage]) -> str | None:
+    """The words a request ends with after everything the model read, if they are a note."""
+    last = messages[-1]
+    if not isinstance(last, ModelRequest):
+        return None
+    part = last.parts[-1]
+    if isinstance(part, SystemPromptPart | UserPromptPart) and isinstance(part.content, str):
+        return part.content
+    return None
+
+
+def test_regression_eval_last_request_note_comes_after_the_reading(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    """Eval run 20261029T191529Z-94e980b, trace 0ba24102b1727f29db6f883add6e79a3.
+
+    The model read for five requests. The sixth offered no tools and said so among the
+    instructions, before everything it had read; the model called `search` anyway and the turn
+    failed, as in all 8 retrieval turns that reached the limit. Replayed on the tower three times
+    each, those 8 requests were answered 1 time in 24 as sent, 23 in 24 with the note last.
+    """
+
+    def recorded(messages: list[ModelMessage]) -> list[Item]:
+        if "last request" in (trailing_note(messages) or ""):
+            return ["Entropy was computed from each recording."]
+        return [Call("search", {"query": "neuron compuron theoretical hypothesis method"})]
+
+    script = Script(
+        [Call("read_around", {"handle": 2, "n": 3})],
+        [Call("read_section", {"heading": "§1"})],
+        [Call("read_section", {"heading": "§2"})],
+        [Call("read_around", {"handle": [1], "n": 3})],
+        [Call("read_around", {"handle": 1, "n": 3})],
+        recorded,
+    )
+
+    events = turn(context(store_db, script), conversation, QUESTION)
+
+    assert len(script.requests) == REQUEST_LIMIT
+    assert isinstance(events[-1], AnsweredEvent)
+    (last_messages, last_info) = script.requests[-1]
+    assert "last request" not in (last_info.instructions or "")
+    assert all(trailing_note(messages) is None for messages, _ in script.requests[:-1])
+    assert "last request" in (trailing_note(last_messages) or "")
+    # The note is for that request only: the Conversation keeps the Question, not the note.
+    assert user_prompts(conversation.messages) == [QUESTION]
+
+
+def test_regression_eval_whole_seed_model_calls_a_tool_it_was_never_offered(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    """Eval run 20261029T191529Z-94e980b, trace d87f1f36136df123414ad8f4a41a7a2b (baseline).
+
+    Offered no tools, the model called one named `Read` four times, and three more after the
+    retry prompt, so the turn failed; two more baseline turns failed the same way. The note that
+    there are no tools stood among the instructions, before the whole Seed; like the live
+    agent's last request, every whole-Seed request now ends with it.
+    """
+
+    def recorded(messages: list[ModelMessage]) -> list[Item]:
+        if "no tools" in (trailing_note(messages) or ""):
+            return ["Entropy was computed from each EEG recording."]
+        return [Call("Read", {"handle": f"[#{n}]"}) for n in (27, 48, 52, 53)]
+
+    script = Script(then=recorded)
+    ctx = replace(context(store_db, script), whole_seed=True)
+
+    events = turn(ctx, conversation, QUESTION)
+
+    assert isinstance(events[-1], AnsweredEvent)
+    [(messages, info)] = script.requests
+    assert info.function_tools == []
+    assert "no tools" in (trailing_note(messages) or "")
+    assert user_prompts(conversation.messages) == [QUESTION]
+
+
+async def _stall(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    """An OpenAI-compatible chat endpoint that streams the start of the model's thinking, then
+    nothing more, as Ollama did."""
+    head = await reader.readuntil(b"\r\n\r\n")
+    length = re.search(rb"(?i)content-length: *(\d+)", head)
+    await reader.readexactly(int(length.group(1)) if length else 0)
+    chunk = {
+        "id": "chatcmpl-1",
+        "object": "chat.completion.chunk",
+        "created": 0,
+        "model": "paperexplorer-chat",
+        "choices": [
+            {
+                "index": 0,
+                "delta": {"role": "assistant", "content": "", "reasoning": "The Seed defines"},
+                "finish_reason": None,
+            }
+        ],
+    }
+    event = f"data: {json.dumps(chunk)}\n\n".encode()
+    writer.write(
+        b"HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ntransfer-encoding: chunked\r\n\r\n"
+        + f"{len(event):x}\r\n".encode()
+        + event
+        + b"\r\n"
+    )
+    await writer.drain()
+    await asyncio.sleep(60)
+
+
+def test_regression_eval_a_stalled_stream_ends_the_turn_at_the_chat_timeout(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    """Eval run 20261029T191529Z-94e980b, trace 356df10f4a9dce19597d1ddeddd037aa (baseline).
+
+    The fourth request streamed the start of the model's thinking, then nothing; the turn failed
+    620 s after it began, at the OpenAI client's default timeout of 600 s.
+    """
+
+    async def ask_stalled() -> list[AnswerEvent]:
+        server = await asyncio.start_server(_stall, "127.0.0.1", 0)
+        port = server.sockets[0].getsockname()[1]
+        settings = Settings(
+            _env_file=None,  # pyright: ignore[reportCallIssue]
+            chat_base_url=f"http://127.0.0.1:{port}/v1",
+            chat_timeout_s=0.5,
+        )
+        ctx = AskingContext(
+            conn=store_db,
+            embedder=FakeEmbedder(),
+            model=chat_model(settings),
+            settings=settings,
+            tracing=Tracing.off(),
+            whole_seed=True,
+        )
+
+        async def collect() -> list[AnswerEvent]:
+            return [event async for event in ask(ctx, conversation, QUESTION)]
+
+        try:
+            return await asyncio.wait_for(collect(), timeout=20)
+        finally:
+            server.abort_clients()
+            server.close()
+            await server.wait_closed()
+
+    started = time.monotonic()
+    events = asyncio.run(ask_stalled())
+
+    assert isinstance(events[-1], ErrorEvent)
+    assert "timed out" in events[-1].message
+    assert time.monotonic() - started < 20
+    assert conversation.questions == 0
 
 
 def test_every_tool_the_model_runs_reads_the_seed_and_counts_as_read(
@@ -496,9 +668,11 @@ def test_the_whole_seed_mode_shows_every_chunk_with_its_handle_and_no_tools(
     [(messages, info)] = script.requests
     [question] = messages
     assert isinstance(question, ModelRequest)
-    assert [p.content for p in question.parts if isinstance(p, UserPromptPart)] == [
-        "How large was the sample?"
-    ]
+    # The Question, then the note that there are no tools, last; the Conversation keeps neither
+    # the note nor the Seed's text, only the Question and the Answer.
+    assert user_prompts(messages)[0] == "How large was the sample?"
+    assert NO_TOOLS in (trailing_note(messages) or "")
+    assert user_prompts(conversation.messages) == ["How large was the sample?"]
     assert info.function_tools == []
     assert info.instructions is not None
     assert info.instructions.startswith(SYSTEM_PROMPT.strip())

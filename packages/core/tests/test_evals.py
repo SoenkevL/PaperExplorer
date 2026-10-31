@@ -518,16 +518,15 @@ def test_regression_eval_fcb19996a0a8c2aca5129fb9fe75b646_a_turn_with_no_answer_
     assert summarize(report).modes[Mode.LIVE].failed == 1
 
 
-def test_the_committed_summaries_of_earlier_runs_still_read() -> None:
-    runs = sorted((QUESTION_SET.parent / "runs").glob("*Z-*.json"))
+@pytest.mark.parametrize("run_id", ["20261029T191529Z-94e980b", "20261029T202214Z-2b41752"])
+def test_the_committed_summaries_of_runs_before_adr_0010_still_read(run_id: str) -> None:
+    path = QUESTION_SET.parent / "runs" / f"{run_id}.json"
 
-    summaries = [EvalSummary.model_validate_json(path.read_text()) for path in runs]
+    summary = EvalSummary.model_validate_json(path.read_text())
 
-    assert [s.run.run_id for s in summaries][:2] == [
-        "20261029T191529Z-94e980b",
-        "20261029T202214Z-2b41752",
-    ]
-    assert set(summaries[0].modes) == {Mode.RETRIEVAL, Mode.BASELINE}
+    assert set(summary.modes) == {Mode.RETRIEVAL, Mode.BASELINE}
+    assert all(t.reading is None for q in summary.questions for t in q.turns.values())
+    assert all(m.readings == {} for m in summary.modes.values())
 
 
 def test_a_run_id_is_its_start_in_utc_and_the_commit() -> None:

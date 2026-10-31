@@ -1,15 +1,32 @@
 {% extends "base.html" %}
 {% block title %}{{ work.title or work.zotero_key }} · PaperExplorer{% endblock %}
 {% block scripts %}<script src="{{ url_for('static', path='conversation.js') }}" defer></script>{% endblock %}
-{% block sidebar %}{% include "conversation/sidebar.html" %}{% endblock %}
-{% block content %}
+{% block trail %}<span class="sep">/</span><span class="here">{{ work.title or work.zotero_key }}</span>{% endblock %}
+{% block toggles %}
+<div class="segmented" role="group" aria-label="Panes">
+  <button type="button" class="pane-toggle" data-pane="conversation" aria-controls="conversation" aria-pressed="true">Conversation</button>
+  <button type="button" class="pane-toggle" data-pane="citation" aria-controls="citation" aria-pressed="true">Citation</button>
+</div>
+{% endblock %}
+{% block layout %}
+{# Three panes: the Conversation, the Work on its sheet, the Citation. Below 80rem the Citation
+   is a bottom sheet, below 64rem the Conversation a drawer (style.css, panes.js). #}
+<div class="reader">
+{% include "conversation/sidebar.html" %}
+<main id="work" class="sheet">
 <header class="work">
-  <p class="back"><a href="/">All Works</a></p>
   <h1>{{ work.title or work.zotero_key }}</h1>
   <p class="byline">{{ work.creators | join("; ") }}{% if work.year %} ({{ work.year }}){% endif %}
     {% if work.doi %}· <a href="https://doi.org/{{ work.doi }}">{{ work.doi }}</a>{% endif %}</p>
-  <p class="legend">Underlined markers are Citations; click one for its Reference.
-    Solid: linked · dashed: low confidence · dotted: Unlinked Citation.</p>
+  <details class="key">
+    <summary>Key</summary>
+    <p class="legend">A Citation is drawn as a pill around its printed text; click one for its Reference.</p>
+    <ul class="legend">
+      <li><span class="citation certain">filled</span> linked</li>
+      <li><span class="citation low">outlined</span> linked with low confidence</li>
+      <li><span class="citation unlinked">dotted</span> an Unlinked Citation</li>
+    </ul>
+  </details>
   {% if work.text_origin == "ocr" %}
   <p class="banner ocr">This is OCR Text, read from a scan. It may misread the authors' words.</p>
   {% endif %}
@@ -29,7 +46,19 @@
 </{{ v.tag }}>
 {% endfor %}
 </article>
-{% endblock %}
-{% block aside %}
-<aside id="panel" class="panel" aria-live="polite"></aside>
+</main>
+<aside id="citation" class="pane citation-pane" aria-label="Citation">
+  <button class="sheet-handle" type="button" aria-label="Resize the Citation sheet; arrow keys move it"></button>
+  <header class="pane-head">
+    <h2>Citation</h2>
+    <button class="pane-close" type="button" data-pane="citation" aria-label="Close the Citation pane">×</button>
+  </header>
+  <p class="hint">Click a Citation in the Work to see its Reference.</p>
+  <div id="panel" class="panel" aria-live="polite"></div>
+</aside>
+</div>
+<div class="floating">
+  <button class="drawer-toggle" type="button" aria-controls="conversation" aria-expanded="false">Questions</button>
+  <button class="sheet-toggle" type="button" aria-controls="citation" aria-expanded="false" hidden>Citation</button>
+</div>
 {% endblock %}

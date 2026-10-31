@@ -100,10 +100,10 @@ def test_the_work_page_has_the_conversation_sidebar_beside_the_reader() -> None:
     # The reader and its Citation panel stay as they were.
     assert 'id="b1"' in page
     assert 'hx-get="/works/7/panel?c=11"' in page
-    assert '<aside id="panel"' in page
+    assert 'id="panel"' in page
 
 
-def test_below_92rem_the_sidebar_is_a_drawer_opened_by_a_button() -> None:
+def test_below_64rem_the_sidebar_is_a_drawer_opened_by_a_button() -> None:
     page = FakeApi().client().get("/works/7").text
     css = FakeApi().client().get("/static/style.css").text
 
@@ -111,7 +111,7 @@ def test_below_92rem_the_sidebar_is_a_drawer_opened_by_a_button() -> None:
     assert toggle, "no drawer toggle"
     assert 'aria-controls="conversation"' in toggle[0]
     assert 'aria-expanded="false"' in toggle[0]
-    assert re.search(r"@media \(min-width: 92rem\)", css)
+    assert re.search(r"@media \(max-width: 64rem\)", css)
     assert "conversation.js" in page
     assert "sse.min.js" in page
 

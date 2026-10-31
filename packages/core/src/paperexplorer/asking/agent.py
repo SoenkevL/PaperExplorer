@@ -165,7 +165,9 @@ async def _answer_turn(
     try:
         tools = SeedTools(ctx.conn, ctx.embedder, conversation)
     except Exception as error:
-        logger.exception("Question %d of Conversation %s found no Seed", position, conversation.id)
+        logger.exception(
+            "Question %d of Conversation %s could not read the Seed", position, conversation.id
+        )
         emit(ErrorEvent(message=f"The Seed could not be read: {error}"))
         return
     reading = ctx.reading.for_seed(tools.tokens(), ctx.settings.whole_seed_max_tokens)

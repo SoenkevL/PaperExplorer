@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+#
+# Git's post-merge hook on the tower, installed by scripts/setup-deploy.sh. Git runs it after a
+# pull or merge that changed HEAD (never on "Already up to date"); on `dev` it redeploys the
+# stack from that checkout. Hooks are shared by every worktree of the clone, and `dev` can be
+# checked out in only one of them, the deploy checkout, so other branches pass through.
+#
+# The redeploy's own steps live in scripts/redeploy.sh, so they update with each pull; this file
+# only decides whether to run them.
+
+[[ "$(git rev-parse --abbrev-ref HEAD)" == dev ]] || exit 0
+exec "$(git rev-parse --show-toplevel)/scripts/redeploy.sh"

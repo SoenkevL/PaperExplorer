@@ -40,6 +40,12 @@ for stage in fetch parse chunk embed extract_citations; do
 done
 ```
 
+Redeploy on merges to `dev`: once, on the tower, run `scripts/setup-deploy.sh` from the main checkout. It puts `dev` in its own checkout (`~/Projects/PaperExplorer-dev`, sharing `.env` and `data/`) and installs a post-merge hook; from then on a pull there that brings new commits rebuilds and restarts db, api and web, migrating first. A failed redeploy leaves the pull in place: read `data/redeploy.log` and run `scripts/redeploy.sh` again.
+
+```sh
+ssh tower 'git -C ~/Projects/PaperExplorer-dev pull --ff-only'   # after a PR merges into dev
+```
+
 Then open `http://tower:8080`: the Seed's page links every Citation to a panel with its Reference, and its sidebar (a drawer on narrower screens) answers Questions about it; a chip after a sentence of an Answer scrolls the reader to the sentence that bears it out.
 
 Search the Seed's Chunks (hybrid: bge-m3 Vectors and English full text, fused by RRF):

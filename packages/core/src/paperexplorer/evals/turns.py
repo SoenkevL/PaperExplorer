@@ -85,6 +85,7 @@ async def ask_turn(
     trace_id: str | None = None
     reading: asking.Reading | None = None
     steps: list[str] = []
+    redrafted = False
     first_delta: float | None = None
     started = time.monotonic()
     async for event in asking.ask(ctx, conversation, question):
@@ -94,6 +95,8 @@ async def ask_turn(
             case asking.DeltaEvent():
                 if first_delta is None:
                     first_delta = time.monotonic() - started
+            case asking.RedraftEvent():
+                redrafted = True
             case asking.AnsweredEvent():
                 answer, trace_id, reading = event.answer, event.trace_id, event.reading
             case asking.ErrorEvent():
@@ -108,8 +111,10 @@ async def ask_turn(
             for i, r in enumerate(found, start=1)
         ]
     # The forced search is the server's call, not the model's: it is neither a request nor a tool.
+    # A redraft's response replaces the first in the Conversation, yet it was a request too.
     forced = 1 if searched else 0
     requests = sum(isinstance(m, ModelResponse) for m in conversation.messages) - forced
+    requests += redrafted
     chunks = {c.id: c for c in conversation.handles.values()}
     logger.info(
         "Asked %r (%s, %s) in %.1f s: %s",
@@ -131,6 +136,7 @@ async def ask_turn(
         pointers=_pointers(answer, chunks, blocks) if answer else [],
         quotes=_quotes(answer, list(chunks.values()), blocks) if answer else [],
         says_not_covered=answer is not None and says_not_covered(answer.text),
+        redrafted=redrafted,
         model_requests=requests if answer else None,
         tool_calls=len(steps) - forced,
         tools=steps[forced:],

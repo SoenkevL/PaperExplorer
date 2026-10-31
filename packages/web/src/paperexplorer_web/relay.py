@@ -24,6 +24,7 @@ from paperexplorer_api.schemas import (
     AnsweredEvent,
     DeltaEvent,
     ErrorEvent,
+    RedraftEvent,
     StepEvent,
 )
 from paperexplorer_web.answers import Draft, DraftPiece, answer_runs
@@ -91,6 +92,10 @@ class Views:
         """More draft text, its handles as placeholder chips."""
         return self._render("draft", pieces=pieces)
 
+    def redraft(self, question_id: str) -> str:
+        """The draft emptied, out of band, and the line saying Pointers are being added."""
+        return self._render("redraft", question_id=question_id)
+
     def answer(self, answer: Answer, steps: Sequence[StepEvent]) -> str:
         """The resolved Answer with its Pointer chips and Quotes, replacing the reply so far."""
         return self._render("answer", runs=answer_runs(answer), steps=_lines(steps))
@@ -112,9 +117,10 @@ def relay(
 ) -> Generator[str]:
     """The Question's events as server-sent events carrying HTML, ending in `answer` or `error`.
 
-    Events: `step`, `delta` (draft text to append), `conversation` (the Conversation was gone
-    and a new one took over), then `answer` or `error`, which replace the reply and so close
-    the page's EventSource. Closing this iterator closes the API's stream, cancelling the turn.
+    Events: `step`, `delta` (draft text to append), `redraft` (the draft is written again with
+    its handles: emptied, and a line says so), `conversation` (the Conversation was gone and a
+    new one took over), then `answer` or `error`, which replace the reply and so close the
+    page's EventSource. Closing this iterator closes the API's stream, cancelling the turn.
     """
     if question is None:
         yield sse("error", views.error(LOST))
@@ -162,6 +168,9 @@ def _relay(
                 case DeltaEvent(text=text):
                     if pieces := draft.add(text):
                         yield sse("delta", views.draft(pieces))
+                case RedraftEvent():
+                    draft = Draft()
+                    yield sse("redraft", views.redraft(question_id))
                 case AnsweredEvent(answer=answer):
                     yield sse("answer", views.answer(answer, steps))
                     return

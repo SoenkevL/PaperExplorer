@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 # order first shown, not in reading order.
 # A group without `#`, `[74]` or `(5)`, is the Seed's own marker. The web app reads the same
 # grammar; tests/fixtures/handle-forms.json holds the forms both are tested with.
+# A Seed that numbers no Reference prints no `[74]` of its own, so there a bare group in square
+# brackets, not nested, is a handle too (`bare_handles`): the model wrote `[13]` for `[#13]`.
 _NUMBER = r"#*\d+"
 _ITEM = rf"{_NUMBER}(?:[ \t]*[-\u2010-\u2014][ \t]*{_NUMBER})?"
 _BRACKETS = ("[]", "()", "{}", "<>")
@@ -33,6 +35,7 @@ def _group(item: str) -> str:
 
 
 _HANDLE = re.compile(_group(rf"{_group(_ITEM)}|{_ITEM}"))
+_NESTED = re.compile(r"[(){}<>\[\]]")
 # A sentence ends at . ! or ?, perhaps inside closing quotes or brackets, before a capital.
 _SENTENCE_END = re.compile(r"[.!?][\"\u201d\u2019')\]]*(?=\s+[\"\u201c\u2018(\[]?[A-Z])")
 _WORD = re.compile(r"[^\W_]+")
@@ -64,11 +67,14 @@ def resolve_answer(
     read: Sequence[StoredChunk],
     embedder: Embedder,
     threshold: float,
+    *,
+    bare_handles: bool = False,
 ) -> Answer:
     """The Answer the reader sees for a complete draft, with its Pointers and Quotes.
 
     `handles` maps each handle of the Conversation to its Chunk; `read` are the Chunks the model
-    read in this turn. Handles leave the text, so every offset counts into what the reader sees.
+    read in this turn. `bare_handles` reads a bare `[13]` as `[#13]`, for a Seed that numbers no
+    Reference. Handles leave the text, so every offset counts into what the reader sees.
     A handle written right after a sentence's full stop belongs to that sentence; one that ties
     to no Chunk is dropped. Each Chunk a sentence cites gives one Pointer (design-asking.md):
     the cited Chunk's closest sentence if it clears `threshold`, else the closest sentence of
@@ -76,7 +82,7 @@ def resolve_answer(
     closest. Pointers that reach the same place are one. Every sentence to compare is embedded
     in a single `embedder.embed` call, and none without a handle.
     """
-    text, written = _without_handles(draft)
+    text, written = _without_handles(draft, bare_handles)
     spans = _sentences(text)
     cited: list[list[StoredChunk]] = [[] for _ in spans]
     unknown: list[int] = []
@@ -106,7 +112,7 @@ def resolve_answer(
     )
 
 
-def _without_handles(draft: str) -> tuple[str, list[_Handle]]:
+def _without_handles(draft: str, bare: bool) -> tuple[str, list[_Handle]]:
     """The draft without its handles, and where in it each handle stood.
 
     A handle takes the spaces before it along; one that starts its line takes the whitespace
@@ -116,7 +122,7 @@ def _without_handles(draft: str) -> tuple[str, list[_Handle]]:
     written: list[_Handle] = []
     last = 0
     for m in _HANDLE.finditer(draft):
-        if "#" not in m.group():
+        if "#" not in m.group() and not (bare and _bare(m.group())):
             continue  # the Seed's own marker, such as [74]
         text = (text + draft[last : m.start()]).rstrip(" \t")
         last = m.end()
@@ -126,6 +132,11 @@ def _without_handles(draft: str) -> tuple[str, list[_Handle]]:
                 text = text.rstrip()
         written += [_Handle(int(n), len(text)) for n in re.findall(r"\d+", m.group())]
     return text + draft[last:], written
+
+
+def _bare(group: str) -> bool:
+    """Whether a group without `#` is a bare handle: in square brackets, nothing nested."""
+    return group.startswith("[") and not _NESTED.search(group[1:-1])
 
 
 def _sentences(text: str) -> list[Span]:

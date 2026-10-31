@@ -179,6 +179,9 @@ details.steps summary { cursor: pointer; }
 .draft { color: var(--muted); white-space: pre-wrap; }
 .waiting { color: var(--muted); font-style: italic; font-size: 0.8rem; margin: 0.3rem 0; }
 .draft:not(:empty) + .waiting { display: none; }
+.turn .redraft { color: var(--muted); font-style: italic; font-size: 0.8rem; margin: 0.3rem 0; }
+.turn .redraft:empty { display: none; }
+.redraft:not(:empty) ~ .waiting { display: none; }
 .answer { white-space: pre-wrap; }
 .ask { display: grid; grid-template-columns: 1fr auto; gap: 0.4rem; padding: 0.8rem 1rem; border-top: 1px solid var(--rule); }
 .ask textarea { font: inherit; resize: vertical; padding: 0.4rem; background: var(--paper); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }

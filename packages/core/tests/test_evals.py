@@ -88,8 +88,12 @@ def scripted(drafts: Mapping[str, str]) -> FunctionModel:
 
     async def stream(messages: list[ModelMessage], info: AgentInfo) -> AsyncIterator[str]:
         requests = [m for m in messages if isinstance(m, ModelRequest)]
+        # Reading the whole Seed, the Question is the last line of the request's closing turn.
         question = next(
-            str(p.content) for m in requests for p in m.parts if isinstance(p, UserPromptPart)
+            str(p.content).rsplit("\n", 1)[-1]
+            for m in requests
+            for p in m.parts
+            if isinstance(p, UserPromptPart)
         )
         shown = "\n".join(
             [info.instructions or ""]

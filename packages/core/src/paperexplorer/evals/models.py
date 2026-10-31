@@ -131,6 +131,7 @@ class Turn(BaseModel):
     `reading` is how the turn read the Seed (None when it failed before it chose; runs before
     ADR 0010 did not record it). `search` is the forced search
     (`retrieval.search(question, k=8)`) of a turn that read by retrieval, else None.
+    `redrafted` says the model was asked once more for the Answer's handles.
     `model_requests` is None when the turn failed; `tools` are the model's own calls in order.
     """
 
@@ -145,6 +146,7 @@ class Turn(BaseModel):
     pointers: list[PointerCheck]
     quotes: list[QuoteCheck]
     says_not_covered: bool
+    redrafted: bool = False
     model_requests: int | None
     tool_calls: int
     tools: list[str]

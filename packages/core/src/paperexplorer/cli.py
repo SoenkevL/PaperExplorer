@@ -194,19 +194,22 @@ def ask_command(
         conversation = asking.Conversation(work=found)
         try:
             started = time.monotonic()
-            answered, steps = asyncio.run(_stream_answer(ctx, conversation, question))
+            answered, steps, redrafted = asyncio.run(_stream_answer(ctx, conversation, question))
             latency = time.monotonic() - started
         finally:
             tracing.flush()
         blocks = [b.text for b in (store.WorkTexts(conn).get(found.id) or _NO_TEXT).blocks]
     # The forced search is the server's call, not the model's: it is neither a request nor a tool.
+    # A redraft's response replaces the first in the Conversation, yet it was a request too.
     forced = 1 if answered.reading is asking.Reading.RETRIEVAL else 0
     requests = sum(isinstance(m, ModelResponse) for m in conversation.messages) - forced
+    requests += redrafted
     _print_answer(answered.answer, conversation, blocks)
     counts = answered.answer.counts()
     coverage = "-" if counts.pointer_coverage is None else f"{counts.pointer_coverage:.2f}"
     typer.echo(
-        f"summary: {answered.reading.value}, sentences {counts.sentences},"
+        f"summary: {answered.reading.value},{' redrafted,' if redrafted else ''}"
+        f" sentences {counts.sentences},"
         f" substantive {counts.substantive_sentences},"
         f" pointer coverage {coverage}, close {counts.pointers_close},"
         f" weak {counts.pointers_weak}, quotes exact {counts.quotes_exact},"
@@ -314,9 +317,10 @@ def eval_command(
 
 async def _stream_answer(
     ctx: asking.AskingContext, conversation: asking.Conversation, question: str
-) -> tuple[asking.AnsweredEvent, int]:
-    """Print each step and the draft as they come; the Answer and how many steps it took."""
+) -> tuple[asking.AnsweredEvent, int, bool]:
+    """Print each step and the draft as they come; the Answer, its steps, whether redrafted."""
     steps = 0
+    redrafted = False
     line_open = False
     async for event in asking.ask(ctx, conversation, question):
         match event:
@@ -329,10 +333,15 @@ async def _stream_answer(
             case asking.DeltaEvent(text=text):
                 typer.echo(text, nl=False)
                 line_open = not text.endswith("\n")
+            case asking.RedraftEvent():
+                if line_open:
+                    typer.echo()
+                typer.echo("→ redraft: the draft gave no handle, so it is written again")
+                redrafted, line_open = True, False
             case asking.AnsweredEvent():
                 if line_open:
                     typer.echo()
-                return event, steps
+                return event, steps, redrafted
             case asking.ErrorEvent(message=message):
                 if line_open:
                     typer.echo()

@@ -61,6 +61,17 @@ class Settings(BaseSettings):
         gt=0,
         description="Seconds a chat request may wait for its stream's next bytes.",
     )
+    # Sent with every chat request, so each trace records it; left to Ollama, it was unset and
+    # one pass of the eval could not tell a change from noise (docs/eval-2026-10-31.md).
+    chat_temperature: float = Field(
+        default=0.5, ge=0, le=2, description="The chat model's sampling temperature."
+    )
+    # A request that offers no tools must answer; thinking there is how chat-template tokens and
+    # monologue reached Answers (eval 2026-10-29). gemma-4 thinks only on or off.
+    chat_answer_thinking: bool = Field(
+        default=False,
+        description="Whether the model thinks before answering on a request that offers no tools.",
+    )
     # The API holds Conversations in memory (a restart clears them) and evicts the least recently
     # used beyond this many, and any left unused for this long.
     conversations_max: int = Field(

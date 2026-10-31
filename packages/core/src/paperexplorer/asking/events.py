@@ -23,6 +23,15 @@ class DeltaEvent(BaseModel):
     text: str
 
 
+class RedraftEvent(BaseModel):
+    """The draft gave no handle, so the model is asked once more for its Answer, with them.
+
+    The draft streamed so far is dropped: the deltas that follow are the new draft's.
+    """
+
+    type: Literal["redraft"] = "redraft"
+
+
 class AnsweredEvent(BaseModel):
     """The resolved Answer, with its Pointers and Quotes; the turn's last event.
 
@@ -49,6 +58,6 @@ class ErrorEvent(BaseModel):
 
 
 type AnswerEvent = Annotated[
-    StepEvent | DeltaEvent | AnsweredEvent | ErrorEvent, Field(discriminator="type")
+    StepEvent | DeltaEvent | RedraftEvent | AnsweredEvent | ErrorEvent, Field(discriminator="type")
 ]
 """One event of a turn, told apart by `type`: what the API sends as one SSE event."""

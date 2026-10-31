@@ -212,3 +212,12 @@ def test_citing_sentences_of_an_unknown_reference_says_so(seed_tools: SeedTools)
         "No Reference of the Seed matches 'Nobody 1999'. Give its key (as `reference` shows"
         " it, e.g. b12), its printed label or words of its text."
     )
+
+
+def test_a_seed_numbers_its_references_when_any_carries_a_printed_label(
+    store_db: Conn, seed_tools: SeedTools, unnumbered_seed: Work
+) -> None:
+    by_author_and_year = SeedTools(store_db, FakeEmbedder(), Conversation(work=unnumbered_seed))
+
+    assert seed_tools.numbered_references() is True
+    assert by_author_and_year.numbered_references() is False

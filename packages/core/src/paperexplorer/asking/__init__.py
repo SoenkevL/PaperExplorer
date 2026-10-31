@@ -15,6 +15,7 @@ from paperexplorer.asking.events import (
     AnswerEvent,
     DeltaEvent,
     ErrorEvent,
+    RedraftEvent,
     StepEvent,
 )
 from paperexplorer.asking.reading import Reading
@@ -31,6 +32,7 @@ __all__ = [
     "DeltaEvent",
     "ErrorEvent",
     "Reading",
+    "RedraftEvent",
     "SeedTools",
     "StepEvent",
     "ask",

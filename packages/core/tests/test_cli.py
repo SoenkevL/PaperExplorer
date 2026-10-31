@@ -197,6 +197,27 @@ def test_ask_streams_the_draft_then_lists_the_answers_pointers_and_quotes(
 
 
 @pytest.mark.usefixtures("embedded_seed")
+def test_ask_says_when_the_model_writes_its_answer_again_with_handles(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first = "Sample entropy was measured in every participant."
+    monkeypatch.setattr(asking, "chat_model", _scripted(first, f"{first} [#1]"))
+
+    result = CliRunner().invoke(app, ["ask", "YAAC9XCX", "How was entropy measured?"])
+
+    assert result.exit_code == 0, result.output
+    lines = result.stdout.splitlines()
+    assert lines[:3] == [
+        first,
+        "→ redraft: the draft gave no handle, so it is written again",
+        f"{first} [#1]",
+    ]
+    assert lines[-1].startswith("summary: whole_seed, redrafted, sentences 1,")
+    assert "pointer coverage 1.00" in lines[-1]
+    assert "model requests 2, tool calls 0, latency " in lines[-1]
+
+
+@pytest.mark.usefixtures("embedded_seed")
 def test_ask_searches_a_seed_over_the_whole_seed_budget(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

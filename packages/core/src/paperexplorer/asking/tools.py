@@ -97,6 +97,13 @@ class SeedTools:
         """The Seed's title and every Chunk in reading order, each with its handle: all read."""
         return f"{self._title()}\n\nIts whole text, in reading order:\n\n{self._show(self._chunks)}"
 
+    def numbered_references(self) -> bool:
+        """Whether the Seed numbers its References, so that a bare `[12]` is its own marker.
+
+        Parsing gives a Reference its printed label only where it numbers the bibliography.
+        """
+        return any(r.label for r in self._references.values())
+
     def tokens(self) -> int:
         """The Seed's size as `whole_seed` shows it: the sum of its Chunks' (bge-m3) tokens."""
         return sum(c.chunk.tokens for c in self._chunks)

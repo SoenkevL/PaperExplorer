@@ -186,3 +186,20 @@ def test_a_trace_is_scored_by_its_id_from_outside_it() -> None:
 
 def test_scoring_a_trace_by_id_with_tracing_off_does_nothing() -> None:
     Tracing.off().score_trace("0ba24102b1727f29db6f883add6e79a3", "judge.correct", True)
+
+
+def test_metadata_added_inside_a_trace_lands_on_its_root_and_replaces_a_key() -> None:
+    exporter = InMemorySpanExporter()
+    tracing = configure_tracing(settings(), http=tower(healthy), span_exporter=exporter)
+
+    tracing.add_metadata({"redrafted": "true"})  # outside a trace: nothing
+    with tracing.trace("question", metadata={"position": "1", "redrafted": "false"}):
+        with tracing.span("redraft"):
+            pass
+        tracing.add_metadata({"redrafted": "true"})
+    tracing.flush()
+    [root] = [s for s in exporter.get_finished_spans() if s.name == "question"]
+
+    attributes = root.attributes or {}
+    assert json.loads(str(attributes["langfuse.trace.metadata.redrafted"])) == "true"
+    assert json.loads(str(attributes["langfuse.trace.metadata.position"])) == "1"

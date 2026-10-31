@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from pathlib import Path
 
 import pytest
@@ -79,3 +80,31 @@ def test_the_whole_seed_budget_comes_from_the_environment(monkeypatch: pytest.Mo
 def test_the_whole_seed_budget_must_stay_below_the_chat_context(budget: int) -> None:
     with pytest.raises(ValidationError, match="PE_WHOLE_SEED_MAX_TOKENS"):
         Settings(_env_file=None, chat_num_ctx=32768, whole_seed_max_tokens=budget)  # pyright: ignore[reportCallIssue]
+
+
+def test_the_chat_samples_at_0_5_and_answers_without_thinking_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = Settings(_env_file=None)  # pyright: ignore[reportCallIssue]
+    assert (settings.chat_temperature, settings.chat_answer_thinking) == (0.5, False)
+
+    monkeypatch.setenv("PE_CHAT_TEMPERATURE", "0.2")
+    monkeypatch.setenv("PE_CHAT_ANSWER_THINKING", "true")
+    settings = Settings(_env_file=None)  # pyright: ignore[reportCallIssue]
+    assert (settings.chat_temperature, settings.chat_answer_thinking) == (0.2, True)
+
+    monkeypatch.setenv("PE_CHAT_TEMPERATURE", "-1")
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)  # pyright: ignore[reportCallIssue]
+
+
+def test_every_setting_is_mirrored_in_the_env_example() -> None:
+    example = (Path(__file__).parents[3] / ".env.example").read_text("utf-8")
+
+    missing = [
+        f"PE_{name.upper()}"
+        for name in Settings.model_fields
+        if not re.search(rf"^PE_{name.upper()}=", example, re.MULTILINE)
+    ]
+
+    assert missing == []

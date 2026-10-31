@@ -493,3 +493,41 @@ def test_regression_eval_handle_forms_are_read_with_every_number_they_carry(
     assert unknown.text == text
     # Every sentence of a draft with handles carries one here, and gets its Pointer.
     assert [bool(s.pointers) for s in tied.sentences] == [bool(numbers)] * len(tied.sentences)
+
+
+@pytest.mark.parametrize(
+    ("draft", "numbers", "text"),
+    [
+        ("Entropy rose [13].", [13], "Entropy rose."),
+        ("It rose [13, 14], then fell [13\u201315].", [13, 14, 13, 15], "It rose, then fell."),
+        ("It rose. [3][#4]", [3, 4], "It rose."),
+        # Only square brackets holding numbers: the Seed's abstract numbers its themes (1)…(4).
+        ("Its themes are (1) entropy and (2) richness.", [], None),
+        ("It rose {13} and <14>, then [<13>] and [13 a].", [], None),
+    ],
+)
+def test_a_bare_number_in_square_brackets_is_a_handle_where_the_seed_numbers_no_reference(
+    draft: str, numbers: list[int], text: str | None
+) -> None:
+    bare = resolve_answer(draft, {}, [], FakeEmbedder(), THRESHOLD, bare_handles=True)
+    numbered = resolve_answer(draft, {}, [], FakeEmbedder(), THRESHOLD)
+
+    assert (bare.unknown_handles, bare.text) == (numbers, text or draft)
+    # Where the Seed numbers its References, `[13]` is its own marker and stays text.
+    assert numbered.text == (draft if "#" not in draft else "It rose. [3]")
+    assert numbered.unknown_handles == ([4] if "#" in draft else [])
+
+
+def test_a_bare_handle_points_like_any_other() -> None:
+    answer = resolve_answer(
+        "Entropy was computed from the EEG recordings [1].",
+        {1: METHODS},
+        [METHODS],
+        FakeEmbedder(),
+        THRESHOLD,
+        bare_handles=True,
+    )
+
+    [sentence] = answer.sentences
+    [pointer] = sentence.pointers
+    assert (pointer.chunk_id, pointer.support) == (7, Support.CLOSE)

@@ -29,7 +29,7 @@ Before resolution and Sources, the reader can ask the Seed Questions in a sideba
   2. otherwise the best match in the other Chunks the model read in this turn: close if it clears the threshold, and the Pointer moves there;
   3. otherwise weak Support, leading to the best sentence of the cited Chunk.
 - **Quotes.** Quotation marks are the model's prose. Each quoted span is searched in every Chunk the model read in this turn, whatever its handle says, with ligatures and line-break hyphens folded for matching only. An exact Quote is shown in the authors' style and links to its place; any other Quote is marked not exact.
-- **Two marks, not one scale.** The Pointer chip shows Support (close, weak: the reader's high and low colours); quoted words show exactness (exact: the reader's certain colour). A legend in the sidebar explains them. The Support threshold, a bge-m3 cosine of 0.7, was set from the eval ([eval of 2026-10-29](eval-2026-10-29.md)).
+- **Two marks, not one scale.** The Pointer chip shows Support (close, weak: the reader's high and low colours); quoted words show exactness (exact: the reader's certain colour). A legend in the sidebar explains them. The Support threshold, a bge-m3 cosine of 0.7, was set from the eval ([eval of 2026-10-29](eval-2026-10-29.md)) and held in the next ([eval of 2026-10-31](eval-2026-10-31.md)).
 - **Clicking a Pointer** scrolls the reader to the block and highlights the matched sentence strongly and the rest of the Chunk faintly. Citations in the block stay clickable.
 
 ## The agent
@@ -110,6 +110,8 @@ As `design-v1.md`: paragraph Chunks of at most 400 bge-m3 tokens, HNSW plus Engl
 - **Judged** (stage 8b; the report: [eval of 2026-10-29](eval-2026-10-29.md)):
   - Every Answer of a run is read against the Seed and judged grounded and correct, with a note in the judge's words, in `evals/runs/<run id>.verdicts.yaml` beside the run's summary, and posted as Langfuse scores `judge.grounded` and `judge.correct` on its trace (`scripts/post_verdicts.py`). Each Pointer's place is read too, as apt, partly or not, which is what set the Support threshold.
   - Grounded: every claim is borne out by the Seed (by the place a Pointer leads to, else by what the model read); a true unpointed sentence is left to Pointer coverage. Correct: the substance on the point asked is right. A failed turn is neither.
+  - Where parsing lost words, an Answer is judged by the Chunk as stored, which is what the model read (settled by the user after 2026-10-29).
+- **Re-run with whole-Seed answering** (stage 9b; the report: [eval of 2026-10-31](eval-2026-10-31.md)): live read the whole Seed on all 22 turns. The bar is not met, on Pointer coverage alone (0.797, one sentence short of 0.80); 82% of live Answers are judged grounded and correct, hit@8 is 1.00 and no Quote is wrongly exact. Point 4 of the definition of done is not reached.
 
 ## Order of work
 1. Docs: ADRs 0008 and 0009, `CONTEXT.md`, this design, `design-v1.md`, `architecture.md`, logbook.

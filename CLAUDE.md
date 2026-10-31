@@ -34,6 +34,18 @@ Before the first edit, match the request to one line below and call the Skill to
 - **Editing CLAUDE.md, a skill, or a doc agents read**: `mattpocock-skills:writing-for-agents`.
 - After a milestone merges, offer `/improve-codebase-architecture`.
 
+### Issue tracker
+
+GitHub Issues on `SoenkevL/PaperExplorer`, through `gh`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five default roles, each label named as its role. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` and `docs/adr/` at the root. See `docs/agents/domain.md`.
+
 ## Code
 
 - Python 3.14, uv workspace. Pydantic models for every value crossing a module interface; pyright strict stays clean.

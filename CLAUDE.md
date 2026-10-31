@@ -4,7 +4,7 @@ A reader for following a paper's citations into the cited Works' own words. Text
 
 ## Read first
 
-- `CONTEXT.md`: the domain language. Name code, tables, routes and commits with its terms. When a term you need is missing or clashes with it, pause and settle it with the user (domain-modeling skill) before coding.
+- `CONTEXT.md`: the domain language. Name code, tables, routes and commits with its terms. When a term you need is missing or clashes with it, pause and settle it with the user (see Agent skills) before coding.
 - `docs/architecture.md`: packages, modules, seams, pipeline stages, API contract, testing rules. Check it before adding a module, a dependency or a seam.
 - `docs/adr/`: decisions that are hard to reverse. Reversing one is the user's call.
 - `docs/design-v1.md`: v1 scope and its definition of done.
@@ -12,10 +12,39 @@ A reader for following a paper's citations into the cited Works' own words. Text
 
 ## Workflow
 
-- Design happens with the user, in plan mode. Implementation runs autonomously; check in at milestones and whenever intent is unclear.
+- Design happens with the user, in plan mode, by grilling (see Agent skills). Implementation runs autonomously; check in at milestones and whenever intent is unclear.
 - Work on `feat/<slug>` branched from `dev`, then open a PR into `dev` on GitHub (remote `origin`, via `gh pr create --base dev`). Only the user merges and promotes `dev` → `main`; push only to your feature branch.
 - Every PR carries: a `CHANGELOG.md` line under *Unreleased* (Keep a Changelog), a `docs/logbook.md` line for any key decision, and an ADR when a decision is hard to reverse, surprising and a real trade-off.
-- Build test-first (tdd skill). A PR opens only on a green gate: `ruff check`, `ruff format --check`, `pyright`, `pytest`.
+- Build test-first. A PR opens only on a green gate: `ruff check`, `ruff format --check`, `pyright`, `pytest`.
+
+## Agent skills
+
+Before the first edit, match the request to one line below and call the Skill tool with the full name. A `/command` is one only the user can run: offer it, don't skip it.
+
+- **New feature or behaviour change**: grill in plan mode: call the Skill tool for `mattpocock-skills:grilling` and `mattpocock-skills:domain-modeling` (together, `/grill-with-docs`). Done when the frontier is empty and the user confirms. Spans sessions → offer `/to-spec`, then `/to-tickets`.
+- **Building it**: `mattpocock-skills:tdd`; seams confirmed with the user before the first test.
+- **Something broken, failing or slow**: `mattpocock-skills:diagnosing-bugs`; a red loop before any hypothesis.
+- **A module's shape, a seam, a new package**: `mattpocock-skills:codebase-design`.
+- **A term missing from or clashing with `CONTEXT.md`, or an ADR**: `mattpocock-skills:domain-modeling`.
+- **A design question hard to settle on paper**: `mattpocock-skills:prototype`.
+- **Facts from outside docs or APIs**: `mattpocock-skills:research`, findings in `docs/research/`.
+- **Before opening a PR**: `mattpocock-skills:code-review` against `dev`.
+- **Mid-merge or rebase conflict**: `mattpocock-skills:resolving-merge-conflicts`.
+- **A step only the user can take** (tower, Zotero, Langfuse keys): `mattpocock-skills:wizard`.
+- **Editing CLAUDE.md, a skill, or a doc agents read**: `mattpocock-skills:writing-for-agents`.
+- After a milestone merges, offer `/improve-codebase-architecture`.
+
+### Issue tracker
+
+GitHub Issues on `SoenkevL/PaperExplorer`, through `gh`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five default roles, each label named as its role. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` and `docs/adr/` at the root. See `docs/agents/domain.md`.
 
 ## Code
 

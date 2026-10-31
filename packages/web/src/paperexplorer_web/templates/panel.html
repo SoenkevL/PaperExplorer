@@ -1,15 +1,14 @@
-<button class="close" type="button" onclick="this.closest('aside').replaceChildren()" aria-label="Close">×</button>
 {% for d in details %}
+{%- set level = d.link.confidence_level if d.link else "unlinked" %}
 <section class="citation-detail">
   <p class="marker">
-    <span class="printed">{{ d.text }}</span>
-    <span class="level {{ d.link.confidence_level if d.link else 'unlinked' }}">
-      {{ d.link.confidence_level if d.link else "unlinked" }}</span>
+    <span class="citation {{ level }}">{{ d.text }}</span>
+    <span class="level {{ level }}">{{ level }}</span>
   </p>
   <blockquote class="citing-sentence">{{ d.citing_sentence }}</blockquote>
   {% if d.reference %}
   {% set r = d.reference %}
-  <h2>Reference</h2>
+  <h3>Reference</h3>
   <p class="reference{% if d.text_origin == 'ocr' %} ocr{% endif %}">{{ r.text }}</p>
   {% if d.text_origin == "ocr" %}<p class="note">OCR Text: it may misread the authors' words.</p>{% endif %}
   <dl class="fields">

@@ -1,22 +1,10 @@
-// The Conversation sidebar: its drawer, its Question box, and the Pointers and exact Quotes of
-// its Answers, which lead to their place in the reader.
+// The Conversation pane: its Question box, and the Pointers and exact Quotes of its Answers,
+// which lead to their place in the Work. Opening and closing the pane is panes.js's.
 //
 // Every offset counts code points of the block's text, as the API's do. JavaScript strings count
 // UTF-16 units, so a block's text nodes are walked code point by code point.
 (() => {
   "use strict";
-
-  const WIDE = window.matchMedia("(min-width: 92rem)");
-
-  function setDrawer(open) {
-    const sidebar = document.getElementById("conversation");
-    if (!sidebar) return;
-    sidebar.classList.toggle("open", open);
-    for (const button of document.querySelectorAll(".drawer-toggle")) {
-      button.setAttribute("aria-expanded", String(open));
-    }
-    if (open) sidebar.querySelector("textarea")?.focus();
-  }
 
   // The text node and the UTF-16 offset in it of code point `offset` of `block`'s text.
   function locate(block, offset) {
@@ -62,17 +50,20 @@
     } else {
       block.classList.add("pointed");
     }
-    if (!WIDE.matches) setDrawer(false);
-    const top = place.getBoundingClientRect().top;
-    window.scrollBy({ top: top - window.innerHeight / 3, behavior: "smooth" });
+    // A drawer over the Work would hide the place: close it (panes.js keeps columns open).
+    document.dispatchEvent(new CustomEvent("pane:close", { detail: "conversation" }));
+    // The Work scrolls on its own sheet, not the window.
+    const sheet = block.closest(".sheet");
+    if (sheet) {
+      const top = place.getBoundingClientRect().top - sheet.getBoundingClientRect().top;
+      const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      sheet.scrollBy({ top: top - sheet.clientHeight / 3, behavior: still ? "auto" : "smooth" });
+    }
     return true;
   }
 
   document.addEventListener("click", (event) => {
     if (!(event.target instanceof Element)) return;
-    const sidebar = document.getElementById("conversation");
-    if (event.target.closest(".drawer-toggle")) setDrawer(!sidebar?.classList.contains("open"));
-    if (event.target.closest(".drawer-close")) setDrawer(false);
     const link = event.target.closest("a[data-block]");
     if (link && show(link)) event.preventDefault();
   });

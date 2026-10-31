@@ -14,8 +14,25 @@ from paperexplorer.store import StoredChunk
 
 logger = logging.getLogger(__name__)
 
-# A handle ties a sentence to a Chunk: `[#12]`; `[#12, #14]` is read as `[#12][#14]`.
-_HANDLE = re.compile(r"\[#\d+(?:\s*[,;]\s*#\d+)*\]")
+# A handle ties a sentence to a Chunk (design-asking.md, Answers): a group in `[]`, `()`, `{}`
+# or `<>`, nested one deep (`[<#3><#4>]`), holding only numbers, at least one with a `#`. They
+# stand apart by commas, semicolons, spaces or `#` (`[#5, 6]`, `[#59##60]`). A range `#5-#7`,
+# any dash, reads as its two ends: handles number Chunks in the order first shown, not in
+# reading order.
+# A group without `#`, `[74]` or `(5)`, is the Seed's own marker. The web app reads the same
+# grammar; tests/fixtures/handle-forms.json holds the forms both are tested with.
+_NUMBER = r"#*\d+"
+_ITEM = rf"{_NUMBER}(?:[ \t]*[-\u2010-\u2014][ \t]*{_NUMBER})?"
+_BRACKETS = ("[]", "()", "{}", "<>")
+
+
+def _group(item: str) -> str:
+    """A bracketed group of `item`s; without a separator, the next starts with `#` or a bracket."""
+    items = rf"(?:{item})(?:(?:[ \t,;]+|(?=[#\[({{<]))(?:{item}))*"
+    return "|".join(rf"{re.escape(o)}[ \t]*{items}[ \t]*{re.escape(c)}" for o, c in _BRACKETS)
+
+
+_HANDLE = re.compile(_group(rf"{_group(_ITEM)}|{_ITEM}"))
 # A sentence ends at . ! or ?, perhaps inside closing quotes or brackets, before a capital.
 _SENTENCE_END = re.compile(r"[.!?][\"\u201d\u2019')\]]*(?=\s+[\"\u201c\u2018(\[]?[A-Z])")
 _WORD = re.compile(r"[^\W_]+")
@@ -99,6 +116,8 @@ def _without_handles(draft: str) -> tuple[str, list[_Handle]]:
     written: list[_Handle] = []
     last = 0
     for m in _HANDLE.finditer(draft):
+        if "#" not in m.group():
+            continue  # the Seed's own marker, such as [74]
         text = (text + draft[last : m.start()]).rstrip(" \t")
         last = m.end()
         if not text or text.endswith("\n"):

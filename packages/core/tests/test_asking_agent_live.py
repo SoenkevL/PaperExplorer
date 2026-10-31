@@ -22,6 +22,7 @@ from paperexplorer.asking import (
     AskingContext,
     Conversation,
     DeltaEvent,
+    Reading,
     StepEvent,
     ask,
     chat_model,
@@ -36,8 +37,11 @@ QUESTION = "How many ongoing clinical studies of psilocybin were there in Februa
 
 
 @pytest.mark.tower
+@pytest.mark.parametrize("reading", [Reading.AUTO, Reading.RETRIEVAL])
 def test_the_chat_model_answers_from_what_it_read_and_its_thinking_stays_in_the_trace(
-    store_db: psycopg.Connection[TupleRow], parse_fixture: Callable[[str], ParsedWork]
+    store_db: psycopg.Connection[TupleRow],
+    parse_fixture: Callable[[str], ParsedWork],
+    reading: Reading,
 ) -> None:
     settings = Settings()
     exporter = InMemorySpanExporter()
@@ -72,6 +76,7 @@ def test_the_chat_model_answers_from_what_it_read_and_its_thinking_stays_in_the_
         model=chat_model(settings),
         settings=settings,
         tracing=tracing,
+        reading=reading,
     )
 
     async def collect() -> list[AnswerEvent]:
@@ -82,7 +87,10 @@ def test_the_chat_model_answers_from_what_it_read_and_its_thinking_stays_in_the_
 
     answered = events[-1]
     assert isinstance(answered, AnsweredEvent), answered
-    assert events[0] == StepEvent(tool="search", args={"query": QUESTION})
+    # The fixture fits the whole-Seed budget: as the live app asks, it is read whole.
+    searched = answered.reading is Reading.RETRIEVAL
+    assert searched is (reading is Reading.RETRIEVAL)
+    assert (events[0] == StepEvent(tool="search", args={"query": QUESTION})) is searched
     answer = answered.answer
     assert "84" in answer.text, answer.text
     counts = answer.counts()

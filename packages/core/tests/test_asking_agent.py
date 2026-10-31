@@ -41,11 +41,12 @@ from paperexplorer.asking import (
     Conversation,
     DeltaEvent,
     ErrorEvent,
+    Reading,
     StepEvent,
     ask,
     chat_model,
 )
-from paperexplorer.asking.agent import LAST_REQUEST, NO_TOOLS
+from paperexplorer.asking.agent import LAST_REQUEST, NO_TOOLS, WHOLE_SEED
 from paperexplorer.config import Settings
 from paperexplorer.domain import Work
 from paperexplorer.embedding import Embedder, FakeEmbedder, OpenAICompatibleEmbedder
@@ -105,14 +106,22 @@ class Script:
 
 
 def context(
-    conn: Conn, script: Script, *, tracing: Tracing | None = None, embedder: Embedder | None = None
+    conn: Conn,
+    script: Script,
+    *,
+    tracing: Tracing | None = None,
+    embedder: Embedder | None = None,
+    reading: Reading = Reading.RETRIEVAL,
+    settings: Settings | None = None,
 ) -> AskingContext:
+    """The turn's context. The small Seed would fit whole; most tests here are of its tools."""
     return AskingContext(
         conn=conn,
         embedder=embedder or FakeEmbedder(),
         model=script.model(),
-        settings=Settings(_env_file=None),  # pyright: ignore[reportCallIssue]
+        settings=settings or Settings(_env_file=None),  # pyright: ignore[reportCallIssue]
         tracing=tracing or Tracing.off(),
+        reading=reading,
     )
 
 
@@ -379,7 +388,7 @@ def test_regression_eval_whole_seed_model_calls_a_tool_it_was_never_offered(
         return [Call("Read", {"handle": f"[#{n}]"}) for n in (27, 48, 52, 53)]
 
     script = Script(then=recorded)
-    ctx = replace(context(store_db, script), whole_seed=True)
+    ctx = context(store_db, script, reading=Reading.WHOLE_SEED)
 
     events = turn(ctx, conversation, QUESTION)
 
@@ -443,7 +452,7 @@ def test_regression_eval_a_stalled_stream_ends_the_turn_at_the_chat_timeout(
             model=chat_model(settings),
             settings=settings,
             tracing=Tracing.off(),
-            whole_seed=True,
+            reading=Reading.WHOLE_SEED,
         )
 
         async def collect() -> list[AnswerEvent]:
@@ -566,6 +575,7 @@ def test_one_question_is_one_trace_holding_every_model_tool_and_embedding_call(
         "prompt_version": PROMPT_VERSION,
         "model": "paperexplorer-chat",
         "num_ctx": "73728",
+        "reading": "retrieval",
     }
 
     def parent(span: ReadableSpan) -> str:
@@ -601,20 +611,18 @@ def test_one_question_is_one_trace_holding_every_model_tool_and_embedding_call(
 
 
 @pytest.mark.parametrize(
-    ("whole_seed", "tags"),
+    ("reading", "tags"),
     [
-        (False, ("asking", "work:SEED0001", "run:R1")),
-        (True, ("asking", "work:SEED0001", "whole-seed", "run:R1")),
+        (Reading.RETRIEVAL, ("asking", "work:SEED0001", "run:R1")),
+        (Reading.WHOLE_SEED, ("asking", "work:SEED0001", "whole-seed", "run:R1")),
     ],
 )
 def test_the_answer_names_its_trace_which_carries_the_callers_tags(
-    store_db: Conn, conversation: Conversation, whole_seed: bool, tags: tuple[str, ...]
+    store_db: Conn, conversation: Conversation, reading: Reading, tags: tuple[str, ...]
 ) -> None:
     tracing, exporter, _ = in_memory_tracing()
     script = Script(["Entropy was computed from each EEG recording."])
-    ctx = replace(
-        context(store_db, script, tracing=tracing), tags=("run:R1",), whole_seed=whole_seed
-    )
+    ctx = replace(context(store_db, script, tracing=tracing, reading=reading), tags=("run:R1",))
 
     events = turn(ctx, conversation, QUESTION)
     tracing.flush()
@@ -660,7 +668,7 @@ def test_the_whole_seed_mode_shows_every_chunk_with_its_handle_and_no_tools(
         return f'The authors write that "The sample was small". [#{handle}]'
 
     script = Script([draft])
-    ctx = replace(context(store_db, script), whole_seed=True)
+    ctx = context(store_db, script, reading=Reading.WHOLE_SEED)
 
     events = turn(ctx, conversation, "How large was the sample?")
 
@@ -690,7 +698,231 @@ def test_the_whole_seed_mode_shows_every_chunk_with_its_handle_and_no_tools(
     assert conversation.questions == 1
 
 
-def test_the_live_mode_is_the_default(store_db: Conn) -> None:
-    ctx = context(store_db, Script())
+def test_a_question_reads_the_whole_seed_when_it_fits_by_default(store_db: Conn) -> None:
+    settings = Settings(_env_file=None)  # pyright: ignore[reportCallIssue]
 
-    assert (ctx.tags, ctx.whole_seed) == ((), False)
+    ctx = AskingContext(store_db, FakeEmbedder(), Script().model(), settings, Tracing.off())
+
+    assert (ctx.tags, ctx.reading) == ((), Reading.AUTO)
+    assert settings.whole_seed_max_tokens == 40000
+
+
+def _metadata(span: ReadableSpan) -> dict[str, str]:
+    return {
+        key.removeprefix("langfuse.trace.metadata."): json.loads(str(value))
+        for key, value in (span.attributes or {}).items()
+        if key.startswith("langfuse.trace.metadata.")
+    }
+
+
+def test_auto_reads_a_seed_that_fits_whole_with_no_tools_and_no_search(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    tracing, exporter, _ = in_memory_tracing()
+    script = Script(["Entropy was computed from each EEG recording."])
+    ctx = context(store_db, script, tracing=tracing, reading=Reading.AUTO)
+
+    events = turn(ctx, conversation, QUESTION)
+    tracing.flush()
+
+    # No forced search: the draft is the first thing the turn streams.
+    assert [type(e) for e in events] == [DeltaEvent, AnsweredEvent]
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent)
+    assert answered.reading is Reading.WHOLE_SEED
+    [(messages, info)] = script.requests
+    assert info.function_tools == []
+    assert info.instructions is not None
+    assert info.instructions.startswith(f"{SYSTEM_PROMPT.strip()}\n\n{WHOLE_SEED}\n\n")
+    assert NO_TOOLS in (trailing_note(messages) or "")
+    [root] = [s for s in exporter.get_finished_spans() if s.name == "question"]
+    tags = ("asking", "work:SEED0001", "whole-seed")
+    assert (root.attributes or {})["langfuse.trace.tags"] == tags
+    assert _metadata(root)["reading"] == "whole_seed"
+
+
+@pytest.mark.parametrize(("spare", "reading"), [(0, Reading.WHOLE_SEED), (-1, Reading.RETRIEVAL)])
+def test_auto_searches_a_seed_whose_chunks_hold_more_tokens_than_the_budget(
+    store_db: Conn,
+    small_seed: Work,
+    conversation: Conversation,
+    spare: int,
+    reading: Reading,
+) -> None:
+    tokens = sum(c.chunk.tokens for c in Chunks(store_db).for_work(small_seed.id))
+    settings = Settings(_env_file=None, whole_seed_max_tokens=tokens + spare)  # pyright: ignore[reportCallIssue]
+    script = Script(["Entropy was computed from each EEG recording."])
+    ctx = context(store_db, script, reading=Reading.AUTO, settings=settings)
+
+    events = turn(ctx, conversation, QUESTION)
+
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent)
+    assert answered.reading is reading
+    [(_, info)] = script.requests
+    searched = reading is Reading.RETRIEVAL
+    assert (events[0] == StepEvent(tool="search", args={"query": QUESTION})) is searched
+    assert len(info.function_tools) == (5 if searched else 0)
+
+
+@pytest.mark.parametrize("reading", [Reading.RETRIEVAL, Reading.WHOLE_SEED])
+def test_a_reading_set_on_the_context_is_used_whatever_the_seeds_size(
+    store_db: Conn, conversation: Conversation, reading: Reading
+) -> None:
+    settings = Settings(_env_file=None, whole_seed_max_tokens=1)  # pyright: ignore[reportCallIssue]
+    script = Script(["Entropy was computed from each EEG recording."])
+
+    events = turn(
+        context(store_db, script, reading=reading, settings=settings), conversation, QUESTION
+    )
+
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent) and answered.reading is reading
+
+
+def deltas(events: Sequence[AnswerEvent]) -> list[str]:
+    return [e.text for e in events if isinstance(e, DeltaEvent)]
+
+
+def last_response_text(conversation: Conversation) -> list[str]:
+    """The text parts of the Conversation's last response: what later Questions see of it."""
+    response = next(m for m in reversed(conversation.messages) if isinstance(m, ModelResponse))
+    return [p.content for p in response.parts if isinstance(p, TextPart)]
+
+
+def test_regression_eval_5e96992b6d5b49ce00d6d8a715afddf4_answer_ends_at_a_leaked_channel_token(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    """Eval run 20261029T202214Z-2b41752, trace 5e96992b6d5b49ce00d6d8a715afddf4 (baseline).
+
+    After its Answer the model wrote gemma's `<channel|>`, then talked about the reader, then
+    wrote more Answer-like lines, each run ending in `<channel|>` again. The reader saw it all.
+    The Answer ends at the first control token, and so does the draft as it streams.
+    """
+    script = Script(
+        [
+            "The replication found the same rise in entropy. [#1]\n",
+            "<channel|>The reader may want the numbers too.\n\n",
+            "It did not report them. <channel|>The replication found it again.\n\n",
+            "<channel|>",
+        ]
+    )
+
+    events = turn(context(store_db, script, reading=Reading.WHOLE_SEED), conversation, QUESTION)
+
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent)
+    assert answered.answer.text == "The replication found the same rise in entropy."
+    assert "".join(deltas(events)) == "The replication found the same rise in entropy. [#1]\n"
+    # Later Questions see the Answer as cut, not what followed it.
+    assert last_response_text(conversation) == [
+        "The replication found the same rise in entropy. [#1]"
+    ]
+
+
+def test_regression_eval_c5b7289409b2182cea0d01e18bdb38f6_a_token_split_across_deltas_ends_it(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    """Eval run 20261029T202214Z-2b41752, trace c5b7289409b2182cea0d01e18bdb38f6 (baseline).
+
+    The Answer was followed by seven lines, each opening with `<channel|>`. A token may arrive
+    in pieces; none of it reaches the draft.
+    """
+    script = Script(
+        [
+            "Entropy was computed from each EEG recording. [#3]\n<cha",
+            "nnel|>Then the reader asks about it again.\n",
+            "<channel|>And once more.\n",
+            "<channel|>ok",
+        ]
+    )
+
+    events = turn(context(store_db, script, reading=Reading.WHOLE_SEED), conversation, QUESTION)
+
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent)
+    assert answered.answer.text == "Entropy was computed from each EEG recording."
+    assert deltas(events) == ["Entropy was computed from each EEG recording. [#3]\n"]
+
+
+def test_regression_eval_49f2a82d3fa6f54df59cc780a76aaa08_a_token_inside_a_delta_cuts_the_rest(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    """Eval run 20261029T191529Z-94e980b, trace 49f2a82d3fa6f54df59cc780a76aaa08 (retrieval).
+
+    `<channel|>` stood right after a full stop, mid-delta, and the model's monologue followed.
+    """
+    script = Script(
+        ["Two studies found no link with intensity.<channel|>So the reader also wants the dose."]
+    )
+
+    events = turn(context(store_db, script), conversation, QUESTION)
+
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent)
+    assert answered.answer.text == "Two studies found no link with intensity."
+    assert deltas(events) == ["Two studies found no link with intensity."]
+
+
+def test_regression_eval_fcb19996a0a8c2aca5129fb9fe75b646_a_token_alone_is_no_answer(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    """Eval run 20261029T191529Z-94e980b, trace fcb19996a0a8c2aca5129fb9fe75b646 (retrieval).
+
+    The whole Answer was gemma's `<|tool_response>`, and the turn counted as answered. Cut at
+    the token nothing is left: the turn fails and the Conversation stays as it was.
+    """
+    tracing, exporter, _ = in_memory_tracing()
+    script = Script(["<|tool_response>"])
+
+    events = turn(context(store_db, script, tracing=tracing), conversation, QUESTION)
+    tracing.flush()
+
+    assert [type(e) for e in events] == [StepEvent, ErrorEvent]
+    failed = events[-1]
+    assert isinstance(failed, ErrorEvent)
+    assert failed.message == "The model gave no Answer."
+    assert failed.reading is Reading.RETRIEVAL
+    [root] = [s for s in exporter.get_finished_spans() if s.name == "question"]
+    assert root.context is not None and failed.trace_id == format(root.context.trace_id, "032x")
+    assert (conversation.messages, conversation.questions) == ([], 0)
+
+
+def test_regression_eval_18ba564618a1ffce1b5033df85a5712e_an_echoed_system_block_is_left_out(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    """Eval run 20261029T191529Z-94e980b, trace 18ba564618a1ffce1b5033df85a5712e (baseline).
+
+    The Answer opened by echoing a `<system>` note in its tags, and it ended on a lone `<`, the
+    start of a token never finished. The block goes, the text around it stays.
+    """
+    script = Script(
+        [
+            "<system>Answer in plain",
+            " text.</system>The recordings were made in the afternoon.",
+            " They lasted an hour.<",
+        ]
+    )
+
+    events = turn(context(store_db, script, reading=Reading.WHOLE_SEED), conversation, QUESTION)
+
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent)
+    expected = "The recordings were made in the afternoon. They lasted an hour."
+    assert answered.answer.text == expected
+    assert "".join(deltas(events)) == expected
+    assert last_response_text(conversation) == [expected]
+
+
+def test_angle_brackets_that_start_no_token_stay_in_the_answer(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    text = "Entropy fell when p < 0.05 and x<y held, a <b> tag aside."
+    script = Script(["Entropy fell when p <", " 0.05 and x<", "y held, a <b", "> tag aside."])
+
+    events = turn(context(store_db, script, reading=Reading.WHOLE_SEED), conversation, QUESTION)
+
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent)
+    assert answered.answer.text == text
+    assert "".join(deltas(events)) == text

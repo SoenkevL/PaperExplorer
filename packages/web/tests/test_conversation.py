@@ -179,6 +179,20 @@ def test_the_first_question_starts_the_conversation_and_streams_from_the_web_app
     assert api.asked == []
 
 
+def test_the_reply_says_it_waits_until_the_first_draft_text_arrives() -> None:
+    client = FakeApi().client()
+
+    turn = _post(client)
+    css = client.get("/static/style.css").text
+
+    # A Seed read whole runs no search, so no step shows while the model reads and thinks.
+    reply = re.search(r'<div class="reply"[^>]*>(.*?)</div>\s*</section>', turn, re.S)
+    assert reply, "no reply"
+    waiting = r'<div class="draft"[^>]*></div>\s*<p class="waiting">[^<]+</p>'
+    assert re.search(waiting, reply[1]), reply[1]
+    assert ".draft:not(:empty) + .waiting { display: none; }" in css
+
+
 def test_a_later_question_is_asked_in_the_same_conversation() -> None:
     api = FakeApi([ANSWERED])
 

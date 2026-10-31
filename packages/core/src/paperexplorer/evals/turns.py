@@ -73,22 +73,17 @@ async def ask_turn(
 ) -> Turn:
     """Ask `question` of the Seed in a fresh Conversation and record what the turn produced.
 
-    The mode follows `ctx.whole_seed`. `blocks` are the Seed's block texts, for the places
-    Pointers and Quotes land on. The forced search is run once more outside the turn's trace,
-    as `retrieval.search(question, k=8)`, the same call with the same result.
+    The mode follows `ctx.reading`; the turn says how it read the Seed. `blocks` are the Seed's
+    block texts, for the places Pointers and Quotes land on. A turn that read by retrieval has
+    its forced search run once more outside its trace, as `retrieval.search(question, k=8)`,
+    the same call with the same result.
     """
-    mode = Mode.BASELINE if ctx.whole_seed else Mode.RETRIEVAL
-    search = None
-    if mode is Mode.RETRIEVAL:
-        found = retrieval.search(ctx.conn, ctx.embedder, question, Scope.of(work.id), k=HIT_K)
-        search = [
-            Hit(rank=i, chunk_id=r.id, place=Place.of(r.chunk), rrf=r.rrf)
-            for i, r in enumerate(found, start=1)
-        ]
+    mode = Mode.of(ctx.reading)
     conversation = asking.Conversation(work=work)
     answer: Answer | None = None
     error: str | None = None
     trace_id: str | None = None
+    reading: asking.Reading | None = None
     steps: list[str] = []
     first_delta: float | None = None
     started = time.monotonic()
@@ -100,23 +95,33 @@ async def ask_turn(
                 if first_delta is None:
                     first_delta = time.monotonic() - started
             case asking.AnsweredEvent():
-                answer, trace_id = event.answer, event.trace_id
+                answer, trace_id, reading = event.answer, event.trace_id, event.reading
             case asking.ErrorEvent():
-                error, trace_id = event.message, event.trace_id
+                error, trace_id, reading = event.message, event.trace_id, event.reading
     latency = time.monotonic() - started
+    searched = reading is asking.Reading.RETRIEVAL
+    search = None
+    if searched:
+        found = retrieval.search(ctx.conn, ctx.embedder, question, Scope.of(work.id), k=HIT_K)
+        search = [
+            Hit(rank=i, chunk_id=r.id, place=Place.of(r.chunk), rrf=r.rrf)
+            for i, r in enumerate(found, start=1)
+        ]
     # The forced search is the server's call, not the model's: it is neither a request nor a tool.
-    forced = 1 if mode is Mode.RETRIEVAL else 0
+    forced = 1 if searched else 0
     requests = sum(isinstance(m, ModelResponse) for m in conversation.messages) - forced
     chunks = {c.id: c for c in conversation.handles.values()}
     logger.info(
-        "Asked %r (%s) in %.1f s: %s",
+        "Asked %r (%s, %s) in %.1f s: %s",
         question,
         mode.value,
+        reading.value if reading else "-",
         latency,
         "answered" if answer else f"failed: {error}",
     )
     return Turn(
         mode=mode,
+        reading=reading,
         question=question,
         conversation_id=conversation.id,
         trace_id=trace_id,

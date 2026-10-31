@@ -11,11 +11,27 @@ from pydantic import BaseModel
 
 from paperexplorer_api.schemas import Answer, Pointer, Quote
 
-# The handle syntax `asking` reads: `[#3]`, and groups such as `[#3, #5]` or `[#3; #5]`.
-_HANDLE = re.compile(r"\[#\d+(?:\s*[,;]\s*#\d+)*\]")
-# The start of a handle the next delta may finish: `[`, `[#`, `[#1`, `[#1, #`, ... Each run of
-# whitespace has one place in the pattern, so a near miss cannot backtrack for long.
-_OPEN_HANDLE = re.compile(r"\[(?:#(?:\d+(?:\s*[,;]\s*#\d+)*(?:\s*(?:[,;]\s*#?)?)?)?)?")
+# The handle grammar `asking` reads (design-asking.md, Answers), written again here since the web
+# app cannot import core; tests/fixtures/handle-forms.json holds the forms both are tested with.
+# A group in `[]`, `()`, `{}` or `<>`, nested one deep, of numbers apart by commas, semicolons,
+# spaces, middle dots or `#`, at least one with a `#`; a range `#5-#7` (any dash) reads as its
+# two ends.
+_NUMBER = r"#*\d+"
+_ITEM = rf"{_NUMBER}(?:[ \t]*[-\u2010-\u2014][ \t]*{_NUMBER})?"
+_BRACKETS = {"[": "]", "(": ")", "{": "}", "<": ">"}
+
+
+def _group(item: str) -> str:
+    """A bracketed group of `item`s; without a separator, the next starts with `#` or a bracket."""
+    items = rf"(?:{item})(?:(?:[ \t,;·]+|(?=[#\[({{<]))(?:{item}))*"
+    return "|".join(
+        rf"{re.escape(o)}[ \t]*{items}[ \t]*{re.escape(c)}" for o, c in _BRACKETS.items()
+    )
+
+
+_HANDLE = re.compile(_group(rf"{_group(_ITEM)}|{_ITEM}"))
+# What a handle is written with; any other character ends the hope that a group is one.
+_HANDLE_CHARS = frozenset("#0123456789 \t,;\u00b7-\u2010\u2011\u2012\u2013\u2014[](){}<>")
 
 
 class DraftPiece(BaseModel):
@@ -38,13 +54,13 @@ class Draft:
     def add(self, delta: str) -> list[DraftPiece]:
         """The pieces of `delta` that can be shown now, after any text held from before."""
         text = self._held + delta
-        # An unfinished handle at the end starts at the last `[`, since a handle holds no other.
-        last = text.rfind("[")
-        cut = last if last >= 0 and _OPEN_HANDLE.fullmatch(text, last) else len(text)
+        cut = _unfinished(text)
         text, self._held = text[:cut], text[cut:]
         pieces: list[DraftPiece] = []
         at = 0
         for m in _HANDLE.finditer(text):
+            if "#" not in m.group():
+                continue  # the Seed's own marker, such as [74]
             if m.start() > at:
                 pieces.append(DraftPiece(text=text[at : m.start()], handle=None))
             pieces.extend(
@@ -54,6 +70,30 @@ class Draft:
         if at < len(text):
             pieces.append(DraftPiece(text=text[at:], handle=None))
         return pieces
+
+
+def _unfinished(text: str) -> int:
+    """Where a group the next delta may finish into a handle starts; else the end of `text`."""
+    start = len(text)
+    while start > 0 and text[start - 1] in _HANDLE_CHARS:
+        start -= 1
+    return next(
+        (i for i in range(start, len(text)) if text[i] in _BRACKETS and _still_open(text[i:])),
+        len(text),
+    )
+
+
+def _still_open(text: str) -> bool:
+    """Whether the group `text` opens is open at its end: never closed, nested one deep at most."""
+    closing: list[str] = []
+    for c in text:
+        if c in _BRACKETS:
+            if len(closing) == 2:
+                return False
+            closing.append(_BRACKETS[c])
+        elif c in _BRACKETS.values() and (not closing or closing.pop() != c or not closing):
+            return False
+    return bool(closing)
 
 
 class AnswerPiece(BaseModel):

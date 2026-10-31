@@ -153,8 +153,9 @@ def test_a_question_in_the_sidebar_streams_into_an_answer_pointing_into_the_read
     body = asking_reader.get(html.unescape(found[1])).text
 
     events = re.findall(r"^event: (\w+)$", body, re.M)
-    assert events[0] == "step"
-    assert "delta" in events
+    # The Work fits the whole-Seed budget, so the live app reads it whole: no search step.
+    assert "step" not in events
+    assert events[0] == "delta"
     assert events[-1] == "answer"
     chips = re.findall(r'<a class="pointer (close|weak)" href="#b(\d+)"', body)
     assert len(chips) == 1

@@ -9,6 +9,7 @@ import json
 import re
 from collections import Counter
 from collections.abc import AsyncIterator, Mapping
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -19,12 +20,13 @@ from pydantic import ValidationError
 from pydantic_ai.messages import ModelMessage, ModelRequest, ToolReturnPart, UserPromptPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
-from paperexplorer.asking import AskingContext
+from paperexplorer.asking import AskingContext, Reading
 from paperexplorer.config import Settings
 from paperexplorer.domain import Answer, AnswerSentence, ChunkId, Pointer, Support, Work
 from paperexplorer.embedding import FakeEmbedder
 from paperexplorer.evals import (
     EvalReport,
+    EvalSummary,
     Hit,
     Kind,
     Mode,
@@ -218,6 +220,7 @@ def _pointer(sentence: int, place: Place, support: Support, similarity: float) -
 def _turn(
     *,
     mode: Mode = Mode.RETRIEVAL,
+    reading: Reading = Reading.RETRIEVAL,
     search: list[Hit] | None = None,
     pointers: list[PointerCheck] | None = None,
     quotes: list[QuoteCheck] | None = None,
@@ -250,6 +253,7 @@ def _turn(
     answer = Answer(text=text, sentences=sentences, quotes=[]) if error is None else None
     return Turn(
         mode=mode,
+        reading=reading,
         question="Q?",
         conversation_id="c1",
         trace_id="t1",
@@ -326,10 +330,10 @@ def test_an_uncovered_turn_measures_whether_it_says_so_and_no_places() -> None:
     assert not {"hit_at_8", "pointers_on_expected", "places_pointed"} & set(measured)
 
 
-def test_the_baseline_has_no_search_so_no_hit_at_8() -> None:
+def test_a_turn_that_read_the_whole_seed_has_no_search_so_no_hit_at_8() -> None:
     meta = QuestionMeta(kind=Kind.METHOD, places=[RECORDING_PLACE])
 
-    measured = metrics(_turn(mode=Mode.BASELINE, search=None), meta)
+    measured = metrics(_turn(mode=Mode.LIVE, reading=Reading.WHOLE_SEED, search=None), meta)
 
     assert "hit_at_8" not in measured
 
@@ -345,17 +349,20 @@ def test_a_failed_turn_measures_only_that_it_failed_and_its_latency() -> None:
 # A run and its summary
 
 
-def test_a_run_asks_every_question_in_both_modes_each_in_a_fresh_conversation(
+def test_a_run_asks_every_question_live_and_by_retrieval_each_in_a_fresh_conversation(
     store_db: Conn, small_seed: Work, questions_file: Path
 ) -> None:
     report = run(store_db, small_seed, questions_file)
 
+    assert report.modes == [Mode.LIVE, Mode.RETRIEVAL]
     assert [q.name for q in report.questions] == ["method-entropy", "uncovered-caffeine"]
     covered, uncovered = report.questions
-    retrieval, baseline = covered.turns[Mode.RETRIEVAL], covered.turns[Mode.BASELINE]
+    live, retrieval = covered.turns[Mode.LIVE], covered.turns[Mode.RETRIEVAL]
+    # The small Seed fits the budget, so the live mode reads it whole and searches nothing.
+    assert (live.reading, retrieval.reading) == (Reading.WHOLE_SEED, Reading.RETRIEVAL)
     assert retrieval.search is not None and len(retrieval.search) == 5
-    assert baseline.search is None
-    for turn in (retrieval, baseline):
+    assert live.search is None
+    for turn in (live, retrieval):
         assert turn.answer is not None
         assert (
             turn.answer.text
@@ -372,8 +379,8 @@ def test_a_run_asks_every_question_in_both_modes_each_in_a_fresh_conversation(
         assert (turn.model_requests, turn.tool_calls, turn.tools) == (1, 0, [])
     assert covered.metrics[Mode.RETRIEVAL]["hit_at_8"] is True
     assert covered.metrics[Mode.RETRIEVAL]["pointers_on_expected"] == 0.5
-    assert "hit_at_8" not in covered.metrics[Mode.BASELINE]
-    assert uncovered.metrics[Mode.RETRIEVAL]["says_not_covered"] is True
+    assert "hit_at_8" not in covered.metrics[Mode.LIVE]
+    assert uncovered.metrics[Mode.LIVE]["says_not_covered"] is True
     conversations = [t.conversation_id for q in report.questions for t in q.turns.values()]
     assert len(set(conversations)) == 4
 
@@ -397,10 +404,11 @@ def test_each_turn_is_a_question_trace_tagged_with_the_run_and_named_in_the_repo
     assert {t.trace_id for t in turns} == set(tags)
     for t in turns:
         assert t.trace_id is not None
-        expected = ("asking", "work:SEED0001", "run:20261029T120000Z-abc1234")
-        if t.mode is Mode.BASELINE:
+        expected = ("asking", "work:SEED0001", run_tag)
+        if t.reading is Reading.WHOLE_SEED:
             expected = ("asking", "work:SEED0001", "whole-seed", run_tag)
         assert tags[t.trace_id] == expected
+    assert {t.mode for t in turns if t.reading is Reading.WHOLE_SEED} == {Mode.LIVE}
 
 
 def test_the_summary_carries_metrics_and_trace_ids_but_no_seed_or_answer_text(
@@ -441,18 +449,22 @@ def test_the_summary_carries_metrics_and_trace_ids_but_no_seed_or_answer_text(
     [covered, uncovered] = loaded["questions"]
     assert covered["question"] == COVERED and uncovered["question"] == UNCOVERED
     assert covered["turns"]["retrieval"]["trace_id"] is None
+    assert covered["turns"]["live"]["reading"] == "whole_seed"
+    assert covered["turns"]["retrieval"]["reading"] == "retrieval"
     assert [p["similarity"] for p in covered["turns"]["retrieval"]["pointers"]] == [
         pytest.approx(p.similarity, abs=1e-4)
         for p in report.questions[0].turns[Mode.RETRIEVAL].pointers
     ]
 
 
-def test_the_summary_checks_the_bar_on_the_live_mode(
+def test_the_summary_checks_the_bar_on_the_live_mode_with_hit_at_8_from_the_forced_search(
     store_db: Conn, small_seed: Work, questions_file: Path
 ) -> None:
     summary = summarize(run(store_db, small_seed, questions_file))
 
     bar = {b.name: b for b in summary.bar}
+    # The live mode read the Seed whole: hit@8 is the retrieval mode's, a check on the fallback.
+    assert summary.modes[Mode.LIVE].hit_at_8 is None
     assert (bar["hit@8"].value, bar["hit@8"].met) == (1.0, True)
     # The uncovered Question's Answer says so and is unpointed; coverage counts covered ones.
     assert (bar["Pointer coverage"].value, bar["Pointer coverage"].met) == (1.0, True)
@@ -461,13 +473,60 @@ def test_the_summary_checks_the_bar_on_the_live_mode(
         bar["Quotes marked exact that are not"].met,
     ) == (0, True)
     assert bar["Answers judged grounded and correct"].met is None
-    retrieval = summary.modes[Mode.RETRIEVAL]
-    assert (retrieval.answered, retrieval.uncovered, retrieval.uncovered_said) == (2, 1, 1)
-    assert summary.modes[Mode.BASELINE].hit_at_8 is None
-    assert retrieval.similarity.count == 2
-    assert sum(b.close + b.weak for b in retrieval.similarity.buckets) == 2
+    live = summary.modes[Mode.LIVE]
+    assert (live.answered, live.uncovered, live.uncovered_said) == (2, 1, 1)
+    assert live.readings == {Reading.WHOLE_SEED: 2}
+    assert summary.modes[Mode.RETRIEVAL].readings == {Reading.RETRIEVAL: 2}
+    assert live.similarity.count == 2
+    assert sum(b.close + b.weak for b in live.similarity.buckets) == 2
     markdown = render_summary(summary)
     assert "| hit@8 | 1.00 | ≥ 0.80 | met |" in markdown
+    assert "| Reading (turns) | whole_seed 2 | retrieval 2 |" in markdown
+
+
+def test_without_the_retrieval_mode_a_seed_read_whole_runs_no_hit_at_8(
+    store_db: Conn, small_seed: Work, questions_file: Path
+) -> None:
+    questions = load_questions(questions_file)
+    report = asyncio.run(
+        run_eval(context(store_db), small_seed, questions, info(small_seed), [Mode.LIVE])
+    )
+
+    bar = {b.name: b for b in summarize(report).bar}
+
+    assert (bar["hit@8"].value, bar["hit@8"].met) == (None, None)
+    assert bar["Pointer coverage"].met is True
+
+
+def test_regression_eval_fcb19996a0a8c2aca5129fb9fe75b646_a_turn_with_no_answer_has_failed(
+    store_db: Conn, small_seed: Work, questions_file: Path
+) -> None:
+    """Eval run 20261029T191529Z-94e980b, trace fcb19996a0a8c2aca5129fb9fe75b646 (retrieval).
+
+    An Answer that was only gemma's `<|tool_response>` counted as answered. It is no Answer.
+    """
+    model = scripted({COVERED: "<|tool_response>", UNCOVERED: UNCOVERED_DRAFT})
+    ctx = replace(context(store_db), model=model)
+    questions = load_questions(questions_file)
+
+    report = asyncio.run(run_eval(ctx, small_seed, questions, info(small_seed), [Mode.LIVE]))
+
+    covered = report.questions[0]
+    turn = covered.turns[Mode.LIVE]
+    assert (turn.answer, turn.error) == (None, "The model gave no Answer.")
+    assert covered.metrics[Mode.LIVE]["answered"] is False
+    assert summarize(report).modes[Mode.LIVE].failed == 1
+
+
+@pytest.mark.parametrize("run_id", ["20261029T191529Z-94e980b", "20261029T202214Z-2b41752"])
+def test_the_committed_summaries_of_runs_before_adr_0010_still_read(run_id: str) -> None:
+    path = QUESTION_SET.parent / "runs" / f"{run_id}.json"
+
+    summary = EvalSummary.model_validate_json(path.read_text())
+
+    assert set(summary.modes) == {Mode.RETRIEVAL, Mode.BASELINE}
+    assert all(t.reading is None for q in summary.questions for t in q.turns.values())
+    assert all(m.readings == {} for m in summary.modes.values())
 
 
 def test_a_run_id_is_its_start_in_utc_and_the_commit() -> None:

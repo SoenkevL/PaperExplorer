@@ -199,16 +199,19 @@ def ask_command(
         finally:
             tracing.flush()
         blocks = [b.text for b in (store.WorkTexts(conn).get(found.id) or _NO_TEXT).blocks]
-    requests = sum(isinstance(m, ModelResponse) for m in conversation.messages) - 1
+    # The forced search is the server's call, not the model's: it is neither a request nor a tool.
+    forced = 1 if answered.reading is asking.Reading.RETRIEVAL else 0
+    requests = sum(isinstance(m, ModelResponse) for m in conversation.messages) - forced
     _print_answer(answered.answer, conversation, blocks)
     counts = answered.answer.counts()
     coverage = "-" if counts.pointer_coverage is None else f"{counts.pointer_coverage:.2f}"
     typer.echo(
-        f"summary: sentences {counts.sentences}, substantive {counts.substantive_sentences},"
+        f"summary: {answered.reading.value}, sentences {counts.sentences},"
+        f" substantive {counts.substantive_sentences},"
         f" pointer coverage {coverage}, close {counts.pointers_close},"
         f" weak {counts.pointers_weak}, quotes exact {counts.quotes_exact},"
         f" not exact {counts.quotes_not_exact}, unknown handles {counts.unknown_handles},"
-        f" model requests {requests}, tool calls {steps - 1}, latency {latency:.1f} s"
+        f" model requests {requests}, tool calls {steps - forced}, latency {latency:.1f} s"
     )
 
 
@@ -221,8 +224,12 @@ def eval_command(
     questions: Annotated[
         Path, typer.Option(exists=True, dir_okay=False, help="The Question set to ask.")
     ] = Path("evals/seed-questions.yaml"),
-    baseline: Annotated[
-        bool, typer.Option("--baseline/--no-baseline", help="Also ask with the whole Seed.")
+    retrieval_mode: Annotated[
+        bool,
+        typer.Option(
+            "--retrieval/--no-retrieval",
+            help="Also ask by retrieval, forced: the fallback for a Seed too large to read whole.",
+        ),
     ] = True,
     only: Annotated[
         list[str] | None, typer.Option(help="Ask only this Question, by name; repeatable.")
@@ -234,7 +241,7 @@ def eval_command(
         "evals/runs"
     ),
 ) -> None:
-    """Ask the Seed its eval Questions as the reader does, and with the whole Seed; report both.
+    """Ask the Seed its eval Questions as the reader does, and by retrieval; report both.
 
     Traces go to Langfuse's `eval` environment. The full report, Answers and all, goes to
     `<PE_DATA_DIR>/eval/<run id>/`; the summary, without the Seed's or the Answers' words, also
@@ -248,7 +255,7 @@ def eval_command(
             typer.echo(f"No such Question in {questions}: {', '.join(missing)}", err=True)
             raise typer.Exit(1)
         dataset.cases = [c for c in dataset.cases if c.name in only]
-    modes = [evals.Mode.RETRIEVAL, *([evals.Mode.BASELINE] if baseline else [])]
+    modes = [evals.Mode.LIVE, *([evals.Mode.RETRIEVAL] if retrieval_mode else [])]
     with psycopg.connect(settings.database_url, autocommit=True) as conn:
         store.migrate(conn)
         found = store.Works(conn).find(work)
@@ -297,7 +304,7 @@ def eval_command(
     summary = evals.summarize(report)
     written = evals.write_run(report, summary, settings.data_dir / "eval", summary_dir)
     for check in summary.bar:
-        met = {True: "met", False: "NOT met", None: "stage 8b"}[check.met]
+        met = {True: "met", False: "NOT met", None: "to judge"}[check.met]
         value = check.value
         shown = "-" if value is None else f"{value:.2f}" if isinstance(value, float) else value
         typer.echo(f"{check.name} {shown} ({check.bar}): {met}")

@@ -13,3 +13,5 @@ Open-access papers under Creative Commons Attribution licences, redistributed un
 `grobid/<pdf stem>.tei.xml` holds GROBID 0.9.1 (CRF image) output for each PDF with a text layer, recorded by `scripts/record_grobid_fixtures.py`. Tests read these recordings instead of calling GROBID; one live test checks that a fresh GROBID still produces the same structure.
 
 `tessdata/eng.traineddata` is Tesseract's fast English model (tesseract-ocr/tessdata_fast at commit 8741641, Apache-2.0), so OCR tests run offline. The pipeline image uses the more accurate tessdata_best model.
+
+`handle-forms.json` is the table of handle forms that core's `asking` and the web app's draft both read (`docs/design-asking.md`, Answers): each draft written for the test around a form an eval run recorded, named by its trace, or a plain one. No words of the Seed or of an Answer are in it.

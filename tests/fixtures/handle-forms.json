@@ -1,0 +1,133 @@
+{
+  "about": "The handle forms Answers are read with (design-asking.md, Answers), shared by core's and the web's tests: the web cannot import core's grammar. Each draft is written anew around a form an eval run recorded (run, trace), or a plain one; `handles` are the numbers read from it, in order, and `text` the draft without them, as `asking.resolve_answer` gives it. A form with no `#` is the Seed's own marker and stays text.",
+  "forms": [
+    {
+      "name": "plain",
+      "draft": "Entropy rose. [#3]",
+      "handles": [3],
+      "text": "Entropy rose."
+    },
+    {
+      "name": "grouped",
+      "draft": "It rose [#3, #5] and fell [#7; #8].",
+      "handles": [3, 5, 7, 8],
+      "text": "It rose and fell."
+    },
+    {
+      "name": "angled",
+      "draft": "It rose <#4>.",
+      "handles": [4],
+      "text": "It rose."
+    },
+    {
+      "name": "spaced-range",
+      "draft": "It rose [#5 – #7].",
+      "handles": [5, 7],
+      "text": "It rose."
+    },
+    {
+      "name": "seed-markers",
+      "draft": "As printed (5), (Smith, 2019) and [1–3], and #5 alone.",
+      "handles": [],
+      "text": "As printed (5), (Smith, 2019) and [1–3], and #5 alone."
+    },
+    {
+      "name": "5360989acf8be6dfafd59ee97e83ff8e",
+      "run": "20261029T191529Z-94e980b",
+      "draft": "One measure counts new patterns, the other weighs how often each occurs (#9).",
+      "handles": [9],
+      "text": "One measure counts new patterns, the other weighs how often each occurs."
+    },
+    {
+      "name": "6db73737200381fe360218af04d45075",
+      "run": "20261029T191529Z-94e980b",
+      "draft": "The review names several limits of the measure. [<#3><#4><#7><#13-14>]",
+      "handles": [3, 4, 7, 13, 14],
+      "text": "The review names several limits of the measure."
+    },
+    {
+      "name": "0c189ef68f66a5b0f7d55a267b26bead",
+      "run": "20261029T191529Z-94e980b",
+      "draft": "The first limits are set out together [#59–#61, #67, #69, #72], the later ones apart [#62–#66].",
+      "handles": [59, 61, 67, 69, 72, 62, 66],
+      "text": "The first limits are set out together, the later ones apart."
+    },
+    {
+      "name": "970f226705856e25d3561cee589bed2f",
+      "run": "20261029T191529Z-94e980b",
+      "draft": "A single number hides how the parts differ [#59##60##62].",
+      "handles": [59, 60, 62],
+      "text": "A single number hides how the parts differ."
+    },
+    {
+      "name": "970f226705856e25d3561cee589bed2f-middle-dot",
+      "run": "20261029T191529Z-94e980b",
+      "draft": "Each part changes on a scale of its own [#65·66].",
+      "handles": [65, 66],
+      "text": "Each part changes on a scale of its own."
+    },
+    {
+      "name": "1598bd4a15cc3a832762d1d25f1e00fb",
+      "run": "20261029T191529Z-94e980b",
+      "draft": "The review keeps to the resting brain (#95). It leaves tasks aside (#95).",
+      "handles": [95, 95],
+      "text": "The review keeps to the resting brain. It leaves tasks aside."
+    },
+    {
+      "name": "3f29ffee1d551c2c606815f271e0401c",
+      "run": "20261029T191529Z-94e980b",
+      "draft": "Later studies should also control for alertness {#92}",
+      "handles": [92],
+      "text": "Later studies should also control for alertness"
+    },
+    {
+      "name": "94b4ec34a550a419d156bf3befa3dd40",
+      "run": "20261029T191529Z-94e980b",
+      "draft": "Two of the studies disagree on this [74] [77].",
+      "handles": [],
+      "text": "Two of the studies disagree on this [74] [77]."
+    },
+    {
+      "name": "c424915d193fc9be73521dcfd0e2b217",
+      "run": "20261029T191529Z-94e980b",
+      "draft": "Both measures are in wide use [11] [25].",
+      "handles": [],
+      "text": "Both measures are in wide use [11] [25]."
+    },
+    {
+      "name": "c4718fba6b318aa28f6a4e0e8f79d68b",
+      "run": "20261029T202214Z-2b41752",
+      "draft": "Both measures read how ordered the signal is (#5, #9). The first counts the patterns it meets (#2).",
+      "handles": [5, 9, 2],
+      "text": "Both measures read how ordered the signal is. The first counts the patterns it meets."
+    },
+    {
+      "name": "69f81fddcda7adc1a3e8d0c4f11ba5f0",
+      "run": "20261029T202214Z-2b41752",
+      "draft": "The last limit concerns the method itself (3.E, [#13-14]).",
+      "handles": [13, 14],
+      "text": "The last limit concerns the method itself (3.E,)."
+    },
+    {
+      "name": "1813fa02b91ed44d5d817bb66b315e6a",
+      "run": "20261029T202214Z-2b41752",
+      "draft": "Longer and repeated designs would help [#93, 94].",
+      "handles": [93, 94],
+      "text": "Longer and repeated designs would help."
+    },
+    {
+      "name": "619863b4e407f888dd8d830f7f10f290",
+      "run": "20261029T202214Z-2b41752",
+      "draft": "Several scans agree on it [23, 76].",
+      "handles": [],
+      "text": "Several scans agree on it [23, 76]."
+    },
+    {
+      "name": "83a88c01e395c5c494da1bd5bcba73d7",
+      "run": "20261029T202214Z-2b41752",
+      "draft": "Richness is hard to measure ().",
+      "handles": [],
+      "text": "Richness is hard to measure ()."
+    }
+  ]
+}

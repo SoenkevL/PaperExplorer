@@ -5,6 +5,7 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
+from paperexplorer.asking import Reading
 from paperexplorer.domain import Answer, Chunk, ChunkId, Support
 
 
@@ -59,10 +60,32 @@ class QuestionMeta(BaseModel):
 
 
 class Mode(StrEnum):
-    """How the Question is asked: as the reader asks it, or with the whole Seed in context."""
+    """How the Question is asked: as the reader asks it (live), or by retrieval, forced.
 
-    RETRIEVAL = "retrieval"  # the live agent: forced search, then its tools
-    BASELINE = "baseline"  # the whole Seed in context, no tools (AskingContext.whole_seed)
+    `baseline`, the whole Seed forced, is the mode of runs before ADR 0010: their committed
+    summaries still read, and in them `retrieval` was the live agent.
+    """
+
+    LIVE = "live"  # as the API asks: the whole Seed when it fits, else retrieval
+    RETRIEVAL = "retrieval"  # the forced search, then the tools: the fallback for larger Seeds
+    BASELINE = "baseline"
+
+    @property
+    def reading(self) -> Reading:
+        """The reading a turn in this mode is asked with."""
+        return _READINGS[self]
+
+    @classmethod
+    def of(cls, reading: Reading) -> Mode:
+        """The mode whose turns are asked with `reading`."""
+        return next(mode for mode, r in _READINGS.items() if r is reading)
+
+
+_READINGS = {
+    Mode.LIVE: Reading.AUTO,
+    Mode.RETRIEVAL: Reading.RETRIEVAL,
+    Mode.BASELINE: Reading.WHOLE_SEED,
+}
 
 
 class Hit(BaseModel):
@@ -105,11 +128,14 @@ class QuoteCheck(BaseModel):
 class Turn(BaseModel):
     """One Question asked of the Seed in one mode, in a fresh Conversation: all it produced.
 
-    `search` is the forced search (`retrieval.search(question, k=8)`), None in the baseline.
+    `reading` is how the turn read the Seed (None when it failed before it chose; runs before
+    ADR 0010 did not record it). `search` is the forced search
+    (`retrieval.search(question, k=8)`) of a turn that read by retrieval, else None.
     `model_requests` is None when the turn failed; `tools` are the model's own calls in order.
     """
 
     mode: Mode
+    reading: Reading | None = None
     question: str
     conversation_id: str
     trace_id: str | None

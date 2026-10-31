@@ -1,9 +1,10 @@
 """The eval of asking the Seed (design-asking.md, Eval): its Questions, runs and summaries.
 
-`run_eval` asks every Question of a pydantic-evals dataset in fresh Conversations, as the live
-agent does and as the baseline with the whole Seed in context, and measures each turn: hit@8,
-Pointer coverage and Support, Pointers on expected places, exact Quotes checked, requests,
-tools and latency. `summarize` keeps what may be committed: no words of the Seed or the Answers.
+`run_eval` asks every Question of a pydantic-evals dataset in fresh Conversations, as the reader
+asks it (live: the whole Seed when it fits) and by retrieval, forced, and measures each turn:
+hit@8, Pointer coverage and Support, Pointers on expected places, exact Quotes checked,
+requests, tools and latency. `summarize` keeps what may be committed: no words of the Seed or
+the Answers.
 A judge's `Verdicts` on a run are committed beside its summary and posted as Langfuse scores.
 """
 

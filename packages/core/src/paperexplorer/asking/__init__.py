@@ -17,6 +17,7 @@ from paperexplorer.asking.events import (
     ErrorEvent,
     StepEvent,
 )
+from paperexplorer.asking.reading import Reading
 from paperexplorer.asking.tools import SeedTools
 
 __all__ = [
@@ -29,6 +30,7 @@ __all__ = [
     "Conversation",
     "DeltaEvent",
     "ErrorEvent",
+    "Reading",
     "SeedTools",
     "StepEvent",
     "ask",

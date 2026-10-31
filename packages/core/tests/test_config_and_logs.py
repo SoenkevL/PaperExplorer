@@ -67,3 +67,15 @@ def test_the_support_threshold_is_a_cosine_read_from_the_environment(
     monkeypatch.setenv("PE_SUPPORT_THRESHOLD", "1.5")
     with pytest.raises(ValidationError):
         Settings(_env_file=None)  # pyright: ignore[reportCallIssue]
+
+
+def test_the_whole_seed_budget_comes_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PE_WHOLE_SEED_MAX_TOKENS", "20000")
+
+    assert Settings(_env_file=None).whole_seed_max_tokens == 20000  # pyright: ignore[reportCallIssue]
+
+
+@pytest.mark.parametrize("budget", [32768, 40000])
+def test_the_whole_seed_budget_must_stay_below_the_chat_context(budget: int) -> None:
+    with pytest.raises(ValidationError, match="PE_WHOLE_SEED_MAX_TOKENS"):
+        Settings(_env_file=None, chat_num_ctx=32768, whole_seed_max_tokens=budget)  # pyright: ignore[reportCallIssue]

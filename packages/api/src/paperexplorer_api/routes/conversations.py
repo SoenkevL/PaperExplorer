@@ -77,6 +77,8 @@ def _event(event: asking.AnswerEvent) -> schemas.AnswerEvent:
             return schemas.StepEvent(tool=tool, args=args)
         case asking.DeltaEvent(text=text):
             return schemas.DeltaEvent(text=text)
+        case asking.RedraftEvent():
+            return schemas.RedraftEvent()
         case asking.AnsweredEvent(answer=answer):
             return schemas.AnsweredEvent(answer=_answer(answer))
         case asking.ErrorEvent(message=message):

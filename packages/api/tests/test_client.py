@@ -10,7 +10,13 @@ from psycopg.rows import TupleRow
 
 from paperexplorer.store import Works
 from paperexplorer_api.client import ApiClient, ConflictError, NotFoundError
-from paperexplorer_api.schemas import AnsweredEvent, DeltaEvent, ErrorEvent, StepEvent
+from paperexplorer_api.schemas import (
+    AnsweredEvent,
+    DeltaEvent,
+    ErrorEvent,
+    RedraftEvent,
+    StepEvent,
+)
 
 from .conftest import AppFactory, Call, Script, Stored
 
@@ -134,6 +140,9 @@ def test_the_client_reads_server_sent_events_past_keep_alive_comments() -> None:
         "\n"
         ": ping\n"
         "\n"
+        "event: redraft\n"
+        'data: {"type":"redraft"}\n'
+        "\n"
         "event: error\n"
         'data: {"type":"error","message":"The model could not answer"}\n'
         "\n"
@@ -143,6 +152,7 @@ def test_the_client_reads_server_sent_events_past_keep_alive_comments() -> None:
 
     assert events == [
         DeltaEvent(text="It was"),
+        RedraftEvent(),
         ErrorEvent(message="The model could not answer"),
     ]
 

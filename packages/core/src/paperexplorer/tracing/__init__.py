@@ -96,6 +96,17 @@ class Tracing:
         ):
             yield self._langfuse.get_current_trace_id()
 
+    def add_metadata(self, metadata: Mapping[str, str]) -> None:
+        """Add metadata to the current trace, or replace a key it was opened with.
+
+        Call it where the trace's own span is current, as `trace` leaves it: the metadata goes
+        on that span. Outside a trace, or off, nothing.
+        """
+        if self._langfuse is None or not _in_trace():
+            return
+        with propagate_attributes(metadata=dict(metadata)):
+            pass
+
     @contextmanager
     def embedding(self, model: str, texts: Sequence[str]) -> Generator[Observation]:
         """Record one embedding call under the current trace; outside a trace, or off, nothing.

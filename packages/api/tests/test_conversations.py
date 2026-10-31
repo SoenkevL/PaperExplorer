@@ -187,6 +187,25 @@ def test_a_question_about_a_work_that_fits_streams_its_draft_and_answer_with_no_
     assert len(sentence["pointers"]) == 1
 
 
+def test_an_answer_asked_again_for_its_handles_streams_a_redraft_then_the_new_draft(
+    make_app: AppFactory, villiger: Stored
+) -> None:
+    script = Script(
+        ["The therapists took part in a training."],
+        ["The therapists took part in a training. [#1]"],
+    )
+    client = TestClient(make_app(script.model(), reading=Reading.AUTO))
+    conversation_id = start(client, villiger.work)
+
+    response = client.post(f"/conversations/{conversation_id}/questions", json={"text": QUESTION})
+
+    events = sse(response.text)
+    assert [name for name, _ in events] == ["delta", "redraft", "delta", "answer"]
+    assert events[1][1] == {"type": "redraft"}
+    [sentence] = events[-1][1]["answer"]["sentences"]
+    assert len(sentence["pointers"]) == 1
+
+
 def test_the_next_question_continues_the_conversation(
     make_app: AppFactory, villiger: Stored
 ) -> None:

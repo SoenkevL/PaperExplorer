@@ -2,18 +2,21 @@
 
 The full report quotes the Seed and holds the Answers, so it stays under `data/` (the Seed's
 licence is unknown); the summary holds metrics, places, similarities and trace ids only, and is
-committed (design-asking.md, Eval).
+committed (design-asking.md, Eval). The live mode may ask each Question several times, each a
+repeat of its own; the bar pools them.
 """
 
 import hashlib
 import logging
+import re
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from pydantic_evals import Dataset
 from pydantic_evals.reporting import EvaluationReport, ReportCase
 
@@ -34,10 +37,18 @@ HIT_AT_8_BAR = 0.8
 POINTER_COVERAGE_BAR = 0.8
 # Pointer cosines are counted in these buckets: below the first edge, then 0.05 wide up to 1.
 _EDGES = [0.5 + 0.05 * i for i in range(10)]
+# A tool's name is a word; the model once sent a call whose name was a drafted Answer
+# (trace 448b0aa1), which would put its words in git.
+_TOOL_NAME = re.compile(r"\w{1,40}", re.ASCII)
+WITHHELD_TOOL = "(withheld: not shaped like a tool's name)"
 
 
 class RunInfo(BaseModel):
-    """What a run ran against: Seed, commit, model, prompt, embeddings, threshold, Questions."""
+    """What a run ran against: Seed, commit, model, prompt, embeddings, threshold, Questions.
+
+    `temperature` and `answer_thinking` are the chat settings each request went with (None in
+    runs before they were set); `repeat`, how many times the live mode asked each Question.
+    """
 
     run_id: str
     started_at: datetime
@@ -47,6 +58,9 @@ class RunInfo(BaseModel):
     model: str
     prompt_version: str
     num_ctx: int
+    temperature: float | None = None
+    answer_thinking: bool | None = None
+    repeat: int = 1
     embedding_model: str
     support_threshold: float
     questions_file: str
@@ -56,15 +70,23 @@ class RunInfo(BaseModel):
 
 
 class QuestionRun(BaseModel):
-    """One Question of a run: its turn in each mode and what each measured (the full report)."""
+    """One Question of a run: its turns in each mode and what each measured (the full report).
+
+    A mode's turns come in the order asked, each with its repeat; `metrics` and `failures`
+    (cases pydantic-evals could not run or measure) are keyed by mode, then repeat.
+    """
 
     name: str
     kind: Kind
     question: str
     places: list[Place]
-    turns: dict[Mode, Turn]
-    metrics: dict[Mode, Metrics]
-    failures: dict[Mode, str] = {}
+    turns: dict[Mode, list[Turn]]
+    metrics: dict[Mode, dict[int, Metrics]]
+    failures: dict[Mode, dict[int, str]] = {}
+
+    def measured(self, mode: Mode, turn: Turn) -> Metrics:
+        """What one of the mode's turns measured."""
+        return self.metrics.get(mode, {}).get(turn.repeat, {})
 
 
 class EvalReport(BaseModel):
@@ -78,13 +100,17 @@ class EvalReport(BaseModel):
 class BarCheck(BaseModel):
     """One line of the design's bar: the value measured, the bar, and whether it is met.
 
-    `met` is None for what this run does not measure (the judged Answers, stage 8b).
+    `met` is None for what this run does not measure (the judged Answers, stage 8b). `value`
+    pools every turn of the mode; asked more than once, `per_repeat` gives each repeat's value
+    and `spread` the largest less the smallest of them.
     """
 
     name: str
     value: int | float | None
     bar: str
     met: bool | None
+    per_repeat: list[int | float | None] = []
+    spread: float | None = None
 
 
 class SimilarityBucket(BaseModel):
@@ -118,11 +144,16 @@ class PointerSummary(BaseModel):
 
 
 class TurnSummary(BaseModel):
-    """A turn without words: its trace, reading, metrics, Pointers and tools."""
+    """A turn without words: its repeat, trace, reading, metrics, Pointers and tools.
 
+    A tool's name not shaped like one is withheld (`WITHHELD_TOOL`): it may hold model text.
+    """
+
+    repeat: int = 1  # runs before repeats asked each Question once
     trace_id: str | None
     conversation_id: str
     reading: Reading | None = None  # runs before ADR 0010 did not record it
+    redrafted: bool = False
     failed: bool
     metrics: Metrics
     pointers: list[PointerSummary]
@@ -131,25 +162,49 @@ class TurnSummary(BaseModel):
 
 
 class QuestionSummary(BaseModel):
-    """A Question with its expected places, the forced search's places and each mode's turn."""
+    """A Question with its expected places, the forced search's places and each mode's turns."""
 
     name: str
     kind: Kind
     question: str
     places: list[Place]
     search: list[Place] | None
-    turns: dict[Mode, TurnSummary]
+    turns: dict[Mode, list[TurnSummary]]
+
+    @field_validator("turns", mode="before")
+    @classmethod
+    def _one_turn_is_a_list_of_one(cls, value: Any) -> Any:
+        """Runs before repeats recorded one turn per mode, not a list."""
+        if isinstance(value, dict):
+            return {m: [t] if isinstance(t, dict) else t for m, t in value.items()}  # pyright: ignore[reportUnknownVariableType]
+        return value
+
+
+class RepeatSummary(BaseModel):
+    """One repeat of a mode asked more than once: the values its bar is checked on."""
+
+    repeat: int
+    answered: int
+    failed: int
+    redrafted: int
+    hit_at_8: float | None
+    pointer_coverage: float | None
+    quotes_exact_unverified: int
 
 
 class ModeSummary(BaseModel):
-    """One mode's aggregates. Coverage, hit@8 and places count the covered Questions only.
+    """One mode's aggregates over all its turns; coverage, hit@8 and places count covered ones.
 
-    `readings` counts the mode's turns by how they read the Seed (none in runs before ADR 0010).
+    `repeats` is how many times each Question was asked in it, `by_repeat` each repeat's values
+    when more than once. `readings` counts the mode's turns by how they read the Seed (none in
+    runs before ADR 0010); `redrafted` the turns asked once more for their Answer's handles.
     """
 
     questions: int
+    repeats: int = 1
     answered: int
     failed: int
+    redrafted: int = 0
     readings: dict[Reading, int] = {}
     covered: int
     uncovered: int
@@ -167,6 +222,7 @@ class ModeSummary(BaseModel):
     latency_s_mean: float | None
     latency_s_max: float | None
     similarity: Similarity
+    by_repeat: list[RepeatSummary] = []
 
 
 class EvalSummary(BaseModel):
@@ -212,8 +268,9 @@ def run_info(
     tracing_host: str | None,
     started: datetime,
     run_id: str | None = None,
+    repeat: int = 1,
 ) -> RunInfo:
-    """What a run starting now runs against."""
+    """What a run starting now runs against, asking each Question live `repeat` times."""
     return RunInfo(
         run_id=run_id or new_run_id(started, git_sha),
         started_at=started,
@@ -223,6 +280,9 @@ def run_info(
         model=settings.chat_model,
         prompt_version=PROMPT_VERSION,
         num_ctx=settings.chat_num_ctx,
+        temperature=settings.chat_temperature,
+        answer_thinking=settings.chat_answer_thinking,
+        repeat=repeat,
         embedding_model=embedding_model,
         support_threshold=settings.support_threshold,
         questions_file=questions_file.name,
@@ -241,54 +301,60 @@ async def run_eval(
 ) -> EvalReport:
     """Ask every Question in each mode, one at a time, each in a fresh Conversation.
 
-    Each turn is a `question` trace tagged `run:<run id>`; those that read the whole Seed are
-    also tagged `whole-seed`. pydantic-evals runs the cases and measures them with
-    `AskingMetrics`.
+    The live mode asks every Question `info.repeat` times, a pass of all of them per repeat;
+    the others once. Each turn is a `question` trace tagged `run:<run id>`; those that read the
+    whole Seed are also tagged `whole-seed`. pydantic-evals runs the cases and measures them
+    with `AskingMetrics`.
     """
     parsed = WorkTexts(ctx.conn).get(work.id)
     blocks = [b.text for b in parsed.blocks] if parsed else []
     dataset = Dataset[str, Turn, QuestionMeta](
         name=questions.name, cases=questions.cases, evaluators=[AskingMetrics()]
     )
-    reports: dict[Mode, EvaluationReport[str, Turn, QuestionMeta]] = {}
+    reports: dict[tuple[Mode, int], EvaluationReport[str, Turn, QuestionMeta]] = {}
     for mode in modes:
         asked = replace(ctx, tags=(*ctx.tags, f"run:{info.run_id}"), reading=mode.reading)
-        logger.info("Asking %d Questions (%s)", len(dataset.cases), mode.value)
+        repeats = info.repeat if mode is Mode.LIVE else 1
+        for repeat in range(1, repeats + 1):
+            name = mode.value if repeats == 1 else f"{mode.value} {repeat}"
+            logger.info("Asking %d Questions (%s)", len(dataset.cases), name)
 
-        async def task(question: str, asked: AskingContext = asked) -> Turn:
-            return await ask_turn(asked, work, question, blocks)
+            async def task(
+                question: str, asked: AskingContext = asked, repeat: int = repeat
+            ) -> Turn:
+                return await ask_turn(asked, work, question, blocks, repeat)
 
-        reports[mode] = await dataset.evaluate(
-            task,
-            name=mode.value,
-            task_name=f"ask ({mode.value})",
-            max_concurrency=1,
-            progress=False,
-        )
+            reports[mode, repeat] = await dataset.evaluate(
+                task,
+                name=name,
+                task_name=f"ask ({name})",
+                max_concurrency=1,
+                progress=False,
+            )
     return EvalReport(run=info, modes=list(modes), questions=_questions(dataset, reports))
 
 
 def _questions(
     dataset: Dataset[str, Turn, QuestionMeta],
-    reports: dict[Mode, EvaluationReport[str, Turn, QuestionMeta]],
+    reports: dict[tuple[Mode, int], EvaluationReport[str, Turn, QuestionMeta]],
 ) -> list[QuestionRun]:
     runs: list[QuestionRun] = []
     for case in dataset.cases:
         name = case.name or ""
         meta = case.metadata or QuestionMeta(kind=Kind.UNCOVERED)
-        turns: dict[Mode, Turn] = {}
-        measured: dict[Mode, Metrics] = {}
-        failures: dict[Mode, str] = {}
-        for mode, report in reports.items():
+        turns: dict[Mode, list[Turn]] = {}
+        measured: dict[Mode, dict[int, Metrics]] = {}
+        failures: dict[Mode, dict[int, str]] = {}
+        for (mode, repeat), report in reports.items():
             done = next((c for c in report.cases if c.name == name), None)
             failed = next((f for f in report.failures if f.name == name), None)
             if done is not None:
-                turns[mode] = done.output
-                measured[mode] = _metrics(done)
+                turns.setdefault(mode, []).append(done.output)
+                measured.setdefault(mode, {})[repeat] = _metrics(done)
                 if done.evaluator_failures:
-                    failures[mode] = done.evaluator_failures[0].error_message
+                    failures.setdefault(mode, {})[repeat] = done.evaluator_failures[0].error_message
             elif failed is not None:
-                failures[mode] = failed.error_message
+                failures.setdefault(mode, {})[repeat] = failed.error_message
         runs.append(
             QuestionRun(
                 name=name,
@@ -322,43 +388,81 @@ def summarize(report: EvalReport) -> EvalSummary:
 
 
 def _bar(live: ModeSummary | None, retrieval: ModeSummary | None) -> list[BarCheck]:
-    """The bar, on the live mode; hit@8 is the forced search's, a check on the fallback.
+    """The bar, on the live mode's turns pooled; hit@8 is the forced search's, on the fallback.
 
-    A live mode that read the Seed whole searched nothing, so hit@8 comes from the retrieval mode.
+    A live mode that read the Seed whole searched nothing, so hit@8 comes from the retrieval mode,
+    asked once. Asked more than once, each live repeat's values stand beside the pooled ones.
     """
-    hit = next((m.hit_at_8 for m in (live, retrieval) if m and m.hit_at_8 is not None), None)
+    searched = next((m for m in (live, retrieval) if m and m.hit_at_8 is not None), None)
+    hit = searched.hit_at_8 if searched else None
     coverage = live.pointer_coverage if live else None
     unverified = live.quotes_exact_unverified if live else None
+    repeats = live.by_repeat if live else []
     return [
         BarCheck(
             name="hit@8",
             value=hit,
             bar=f"≥ {HIT_AT_8_BAR:.2f}",
             met=None if hit is None else hit >= HIT_AT_8_BAR,
+            **_per_repeat([r.hit_at_8 for r in searched.by_repeat] if searched else []),
         ),
         BarCheck(
             name="Pointer coverage",
             value=coverage,
             bar=f"≥ {POINTER_COVERAGE_BAR:.2f}",
             met=None if coverage is None else coverage >= POINTER_COVERAGE_BAR,
+            **_per_repeat([r.pointer_coverage for r in repeats]),
         ),
         BarCheck(
             name="Quotes marked exact that are not",
             value=unverified,
             bar="0",
             met=None if unverified is None else unverified == 0,
+            **_per_repeat([r.quotes_exact_unverified for r in repeats]),
         ),
         BarCheck(name="Answers judged grounded and correct", value=None, bar="≥ 80%", met=None),
     ]
 
 
+def _per_repeat(values: Sequence[int | float | None]) -> dict[str, Any]:
+    """Each repeat's value and their spread, the largest less the smallest; none for one pass."""
+    known = [v for v in values if v is not None]
+    spread = max(known) - min(known) if known else None
+    return {"per_repeat": list(values), "spread": spread} if len(values) > 1 else {}
+
+
 def _mode(report: EvalReport, mode: Mode) -> ModeSummary:
-    asked = [(q, q.turns[mode]) for q in report.questions if mode in q.turns]
+    """The mode's aggregates over all its turns, and each repeat's when asked more than once."""
+    asked = [(q, t) for q in report.questions for t in q.turns.get(mode, [])]
+    repeats = max((t.repeat for _, t in asked), default=1)
+    summary = _aggregate(report, mode, asked, repeats)
+    if repeats > 1:
+        for repeat in range(1, repeats + 1):
+            one = _aggregate(report, mode, [(q, t) for q, t in asked if t.repeat == repeat], 1)
+            summary.by_repeat.append(
+                RepeatSummary(
+                    repeat=repeat,
+                    answered=one.answered,
+                    failed=one.failed,
+                    redrafted=one.redrafted,
+                    hit_at_8=one.hit_at_8,
+                    pointer_coverage=one.pointer_coverage,
+                    quotes_exact_unverified=one.quotes_exact_unverified,
+                )
+            )
+    return summary
+
+
+def _aggregate(
+    report: EvalReport, mode: Mode, asked: Sequence[tuple[QuestionRun, Turn]], repeats: int
+) -> ModeSummary:
     answered = [(q, t) for q, t in asked if t.answer is not None]
     covered = [q for q in report.questions if q.kind is not Kind.UNCOVERED]
     uncovered = [q for q in report.questions if q.kind is Kind.UNCOVERED]
     hits = [
-        bool(q.metrics[mode]["hit_at_8"]) for q in covered if "hit_at_8" in q.metrics.get(mode, {})
+        bool(m["hit_at_8"])
+        for q, t in asked
+        if q.kind is not Kind.UNCOVERED and "hit_at_8" in (m := q.measured(mode, t))
     ]
     substantive = [
         s
@@ -377,8 +481,10 @@ def _mode(report: EvalReport, mode: Mode) -> ModeSummary:
     readings = Counter(t.reading for _, t in asked if t.reading is not None)
     return ModeSummary(
         questions=len(report.questions),
+        repeats=repeats,
         answered=len(answered),
-        failed=len(report.questions) - len(answered),
+        failed=len(report.questions) * repeats - len(answered),
+        redrafted=sum(t.redrafted for _, t in asked),
         readings={r: readings[r] for r in Reading if r in readings},
         covered=len(covered),
         uncovered=len(uncovered),
@@ -443,35 +549,38 @@ def _similarity(answered: Sequence[tuple[QuestionRun, Turn]]) -> Similarity:
 
 
 def _question(q: QuestionRun) -> QuestionSummary:
-    found = next((t.search for t in q.turns.values() if t.search), None)
+    found = next((t.search for ts in q.turns.values() for t in ts if t.search), None)
     return QuestionSummary(
         name=q.name,
         kind=q.kind,
         question=q.question,
         places=q.places,
         search=[h.place for h in found] if found else None,
-        turns={
-            mode: TurnSummary(
-                trace_id=t.trace_id,
-                conversation_id=t.conversation_id,
-                reading=t.reading,
-                failed=t.answer is None,
-                metrics=q.metrics.get(mode, {}),
-                pointers=[
-                    PointerSummary(
-                        sentence=p.sentence,
-                        support=p.support,
-                        similarity=round(p.similarity, 4),
-                        place=p.place,
-                        on_expected=None if q.kind is Kind.UNCOVERED else p.place in q.places,
-                    )
-                    for p in t.pointers
-                ],
-                tools=t.tools,
-                first_delta_s=t.first_delta_s,
+        turns={mode: [_turn_summary(q, mode, t) for t in turns] for mode, turns in q.turns.items()},
+    )
+
+
+def _turn_summary(q: QuestionRun, mode: Mode, t: Turn) -> TurnSummary:
+    return TurnSummary(
+        repeat=t.repeat,
+        trace_id=t.trace_id,
+        conversation_id=t.conversation_id,
+        reading=t.reading,
+        redrafted=t.redrafted,
+        failed=t.answer is None,
+        metrics=q.measured(mode, t),
+        pointers=[
+            PointerSummary(
+                sentence=p.sentence,
+                support=p.support,
+                similarity=round(p.similarity, 4),
+                place=p.place,
+                on_expected=None if q.kind is Kind.UNCOVERED else p.place in q.places,
             )
-            for mode, t in q.turns.items()
-        },
+            for p in t.pointers
+        ],
+        tools=[n if _TOOL_NAME.fullmatch(n) else WITHHELD_TOOL for n in t.tools],
+        first_delta_s=t.first_delta_s,
     )
 
 
@@ -510,29 +619,46 @@ def render_summary(summary: EvalSummary) -> str:
         f"- Started {run.started_at:%Y-%m-%d %H:%M} UTC at commit {run.git_sha or '-'};"
         f" traces in Langfuse's `{run.langfuse_environment}` environment"
         f" ({run.tracing_host or 'tracing off'}), tagged `run:{run.run_id}`.",
-        f"- Model `{run.model}` (num_ctx {run.num_ctx}), prompt version `{run.prompt_version}`,"
-        f" embeddings `{run.embedding_model}`, Support threshold {run.support_threshold:.2f}.",
+        f"- Model `{run.model}` (num_ctx {run.num_ctx}, temperature {_number(run.temperature)},"
+        f" thinking on a request without tools {_on(run.answer_thinking)}), prompt version"
+        f" `{run.prompt_version}`, embeddings `{run.embedding_model}`, Support threshold"
+        f" {run.support_threshold:.2f}.",
         f"- Questions `{run.questions_file}` (sha256 `{run.questions_sha}`):"
         f" {len(summary.questions)}, {covered} covered and"
         f" {len(summary.questions) - covered} uncovered.",
+    ]
+    if run.repeat > 1:
+        lines.append(
+            f"- Live asked {run.repeat} times per Question, each in a fresh Conversation; the"
+            " other modes once."
+        )
+    repeated = any(check.per_repeat for check in summary.bar)
+    lines += [
         "",
         "## The bar (live, as the reader asks)",
         "",
-        "| Check | Value | Bar | Met |",
-        "|---|---|---|---|",
+        "| Check | Value | Bar | Met |" + (" Per repeat (spread) |" if repeated else ""),
+        "|---|---|---|---|" + ("---|" if repeated else ""),
     ]
     for check in summary.bar:
         met = {True: "met", False: "NOT met", None: "to judge"}[check.met]
         if check.met is None and check.value is None and check.name == "hit@8":
             met = "not run"
-        lines.append(f"| {check.name} | {_number(check.value)} | {check.bar} | {met} |")
+        row = f"| {check.name} | {_number(check.value)} | {check.bar} | {met} |"
+        if repeated:
+            each = " / ".join(_number(v) for v in check.per_repeat) or "-"
+            spread = f" (spread {_number(check.spread)})" if check.per_repeat else ""
+            row += f" {each}{spread} |"
+        lines.append(row)
     lines += [
         "",
         "hit@8 and Pointer coverage count the covered Questions: coverage pools the substantive"
         " sentences of their Answers. hit@8 is the forced search's, a check on the fallback: a"
         " live turn that read the Seed whole searched nothing, so it comes from the retrieval"
         " mode then. Quotes marked exact that are not: exact Quotes whose words differ from the"
-        " printed text at their place, folded as Quote matching folds them.",
+        " printed text at their place, folded as Quote matching folds them. Asked more than"
+        " once, a value pools every repeat's turns; the spread is the largest repeat's value"
+        " less the smallest.",
         "",
         "## The modes",
         "",
@@ -547,7 +673,12 @@ def render_summary(summary: EvalSummary) -> str:
                 for s in summary.modes.values()
             ],
         ),
-        ("Answered", [f"{s.answered} of {s.questions}" for s in summary.modes.values()]),
+        ("Repeats", [str(s.repeats) for s in summary.modes.values()]),
+        (
+            "Answered",
+            [f"{s.answered} of {s.questions * s.repeats}" for s in summary.modes.values()],
+        ),
+        ("Redrafted (turns)", [str(s.redrafted) for s in summary.modes.values()]),
         ("hit@8 (covered)", [_number(s.hit_at_8) for s in summary.modes.values()]),
         (
             "Pointer coverage (covered)",
@@ -617,31 +748,17 @@ def render_summary(summary: EvalSummary) -> str:
             "",
             f"### {mode.value}",
             "",
-            "| Question | Kind | Reading | hit@8 | Coverage | Close / weak | On expected | Quotes"
-            " exact / not | Requests | Tools | Latency (s) | Says not covered | Trace |",
-            "|---|---|---|---|---|---|---|---|---|---|---|---|---|",
+            "| Question | Kind | Repeat | Reading | Redrafted | hit@8 | Coverage | Close / weak"
+            " | On expected | Quotes exact / not | Requests | Tools | Latency (s)"
+            " | Says not covered | Trace |",
+            "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
         ]
         for question in summary.questions:
-            turn = question.turns.get(mode)
-            if turn is None:
+            turns = question.turns.get(mode, [])
+            if not turns:
                 lines.append(f"| {question.name} | {question.kind.value} | not asked |")
-                continue
-            m = turn.metrics
-            said = "-"
-            if question.kind is Kind.UNCOVERED and "says_not_covered" in m:
-                said = "yes" if m["says_not_covered"] else "NO"
-            lines.append(
-                f"| {question.name} | {question.kind.value}"
-                f" | {turn.reading.value if turn.reading else '-'}"
-                f" | {_flag(m.get('hit_at_8'))}"
-                f" | {_number(m.get('pointer_coverage'))}"
-                f" | {m.get('pointers_close', '-')} / {m.get('pointers_weak', '-')}"
-                f" | {_number(m.get('pointers_on_expected'))}"
-                f" | {m.get('quotes_exact', '-')} / {m.get('quotes_not_exact', '-')}"
-                f" | {m.get('model_requests', '-')} | {m.get('tool_calls', '-')}"
-                f" | {_number(m.get('latency_s'), 1)} | {said}"
-                f" | {'failed · ' if turn.failed else ''}`{turn.trace_id or '-'}` |"
-            )
+            for turn in turns:
+                lines.append(_turn_row(question, turn))
     lines += ["", "### The Questions", ""]
     lines += [
         f"- `{q.name}` ({q.kind.value}): {q.question}"
@@ -649,6 +766,26 @@ def render_summary(summary: EvalSummary) -> str:
         for q in summary.questions
     ]
     return "\n".join(lines) + "\n"
+
+
+def _turn_row(question: QuestionSummary, turn: TurnSummary) -> str:
+    """One turn's row in its mode's table of Questions."""
+    m = turn.metrics
+    said = "-"
+    if question.kind is Kind.UNCOVERED and "says_not_covered" in m:
+        said = "yes" if m["says_not_covered"] else "NO"
+    return (
+        f"| {question.name} | {question.kind.value} | {turn.repeat}"
+        f" | {turn.reading.value if turn.reading else '-'} | {_flag(turn.redrafted)}"
+        f" | {_flag(m.get('hit_at_8'))}"
+        f" | {_number(m.get('pointer_coverage'))}"
+        f" | {m.get('pointers_close', '-')} / {m.get('pointers_weak', '-')}"
+        f" | {_number(m.get('pointers_on_expected'))}"
+        f" | {m.get('quotes_exact', '-')} / {m.get('quotes_not_exact', '-')}"
+        f" | {m.get('model_requests', '-')} | {m.get('tool_calls', '-')}"
+        f" | {_number(m.get('latency_s'), 1)} | {said}"
+        f" | {'failed · ' if turn.failed else ''}`{turn.trace_id or '-'}` |"
+    )
 
 
 def render_answers(report: EvalReport) -> str:
@@ -666,45 +803,53 @@ def render_answers(report: EvalReport) -> str:
         if q.places:
             lines.append(f"Expected: {'; '.join(str(p) for p in q.places)}")
         for mode in report.modes:
-            turn = q.turns.get(mode)
-            lines += ["", f"### {mode.value}"]
-            if turn is None:
-                lines.append(f"Not asked: {q.failures.get(mode, 'no turn')}")
-                continue
-            lines.append(
-                f"trace `{turn.trace_id or '-'}` · reading"
-                f" {turn.reading.value if turn.reading else '-'}"
-                f" · requests {turn.model_requests or '-'}"
-                f" · tools {', '.join(turn.tools) or '-'} · {turn.latency_s:.1f} s"
-            )
-            if turn.search is not None:
-                found = ", ".join(
-                    f"{h.rank}{'*' if h.place in q.places else ''} {h.place}" for h in turn.search
-                )
-                lines.append(f"search (* expected): {found}")
-            lines.append("")
-            if turn.answer is None:
-                lines.append(f"Failed: {turn.error}")
-                continue
-            lines.append(turn.answer.text)
-            lines += ["", "Pointers:" if turn.pointers else "Pointers: none"]
-            for p in turn.pointers:
-                expected = " (expected)" if p.place in q.places else ""
-                lines.append(
-                    f"- s{p.sentence + 1} {p.support.value} {p.similarity:.2f} {p.place}{expected}:"
-                    f" {p.matched}"
-                )
-            lines.append("Quotes:" if turn.quotes else "Quotes: none")
-            for quote in turn.quotes:
-                state = "not exact"
-                if quote.exact:
-                    state = f"exact at {quote.place}, " + (
-                        "verified" if quote.verified else "NOT VERIFIED"
-                    )
-                lines.append(f'- "{quote.words}" {state}')
-            measured = q.metrics.get(mode, {})
-            lines.append("Metrics: " + ", ".join(f"{k} {v}" for k, v in measured.items()))
+            turns = q.turns.get(mode, [])
+            for repeat, failure in q.failures.get(mode, {}).items():
+                if all(t.repeat != repeat for t in turns):
+                    lines += ["", f"### {mode.value} {repeat}", f"Not asked: {failure}"]
+            if not turns and not q.failures.get(mode):
+                lines += ["", f"### {mode.value}", "Not asked: no turn"]
+            for turn in turns:
+                lines += _answer_lines(q, mode, turn, repeated=len(turns) > 1)
     return "\n".join(lines) + "\n"
+
+
+def _answer_lines(q: QuestionRun, mode: Mode, turn: Turn, *, repeated: bool) -> list[str]:
+    """One turn's Answer with its Pointers' places, Quotes and metrics, under its heading."""
+    lines = ["", f"### {mode.value} {turn.repeat}" if repeated else f"### {mode.value}"]
+    lines.append(
+        f"trace `{turn.trace_id or '-'}` · reading"
+        f" {turn.reading.value if turn.reading else '-'}"
+        f"{' · redrafted' if turn.redrafted else ''}"
+        f" · requests {turn.model_requests or '-'}"
+        f" · tools {', '.join(turn.tools) or '-'} · {turn.latency_s:.1f} s"
+    )
+    if turn.search is not None:
+        found = ", ".join(
+            f"{h.rank}{'*' if h.place in q.places else ''} {h.place}" for h in turn.search
+        )
+        lines.append(f"search (* expected): {found}")
+    lines.append("")
+    if turn.answer is None:
+        lines.append(f"Failed: {turn.error}")
+        return lines
+    lines.append(turn.answer.text)
+    lines += ["", "Pointers:" if turn.pointers else "Pointers: none"]
+    for p in turn.pointers:
+        expected = " (expected)" if p.place in q.places else ""
+        lines.append(
+            f"- s{p.sentence + 1} {p.support.value} {p.similarity:.2f} {p.place}{expected}:"
+            f" {p.matched}"
+        )
+    lines.append("Quotes:" if turn.quotes else "Quotes: none")
+    for quote in turn.quotes:
+        state = "not exact"
+        if quote.exact:
+            state = f"exact at {quote.place}, " + ("verified" if quote.verified else "NOT VERIFIED")
+        lines.append(f'- "{quote.words}" {state}')
+    measured = q.measured(mode, turn)
+    lines.append("Metrics: " + ", ".join(f"{k} {v}" for k, v in measured.items()))
+    return lines
 
 
 def _mean(values: Sequence[float]) -> float | None:
@@ -733,3 +878,7 @@ def _flag(value: float | int | bool | None) -> str:
     if value is None:
         return "-"
     return "yes" if value else "no"
+
+
+def _on(value: bool | None) -> str:
+    return "-" if value is None else "on" if value else "off"

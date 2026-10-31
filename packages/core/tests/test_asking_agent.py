@@ -9,7 +9,7 @@ import asyncio
 import json
 import re
 import time
-from collections.abc import AsyncIterator, Callable, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from dataclasses import dataclass, replace
 
 import httpx
@@ -46,14 +46,20 @@ from paperexplorer.asking import (
     ask,
     chat_model,
 )
-from paperexplorer.asking.agent import LAST_REQUEST, NO_TOOLS, WHOLE_SEED
+from paperexplorer.asking.agent import (
+    LAST_REQUEST,
+    NO_TOOLS,
+    QUESTION_LABEL,
+    REDRAFT,
+    WHOLE_SEED,
+)
 from paperexplorer.config import Settings
 from paperexplorer.domain import Work
 from paperexplorer.embedding import Embedder, FakeEmbedder, OpenAICompatibleEmbedder
 from paperexplorer.store import Chunks, StoredChunk
 from paperexplorer.tracing import Tracing
 
-from .conftest import DISCUSSION, RECORDING, in_memory_tracing
+from .conftest import AUTHOR_YEAR_DISCUSSION, DISCUSSION, RECORDING, in_memory_tracing
 
 Conn = psycopg.Connection[TupleRow]
 QUESTION = "How was the entropy computed?"
@@ -384,7 +390,7 @@ def test_regression_eval_whole_seed_model_calls_a_tool_it_was_never_offered(
 
     def recorded(messages: list[ModelMessage]) -> list[Item]:
         if "no tools" in (trailing_note(messages) or ""):
-            return ["Entropy was computed from each EEG recording."]
+            return ["Entropy was computed from each EEG recording. [#3]"]
         return [Call("Read", {"handle": f"[#{n}]"}) for n in (27, 48, 52, 53)]
 
     script = Script(then=recorded)
@@ -575,7 +581,10 @@ def test_one_question_is_one_trace_holding_every_model_tool_and_embedding_call(
         "prompt_version": PROMPT_VERSION,
         "model": "paperexplorer-chat",
         "num_ctx": "73728",
+        "temperature": "0.5",
+        "answer_thinking": "false",
         "reading": "retrieval",
+        "redrafted": "false",
     }
 
     def parent(span: ReadableSpan) -> str:
@@ -621,7 +630,7 @@ def test_the_answer_names_its_trace_which_carries_the_callers_tags(
     store_db: Conn, conversation: Conversation, reading: Reading, tags: tuple[str, ...]
 ) -> None:
     tracing, exporter, _ = in_memory_tracing()
-    script = Script(["Entropy was computed from each EEG recording."])
+    script = Script(["Entropy was computed from each EEG recording. [#3]"])
     ctx = replace(context(store_db, script, tracing=tracing, reading=reading), tags=("run:R1",))
 
     events = turn(ctx, conversation, QUESTION)
@@ -676,10 +685,9 @@ def test_the_whole_seed_mode_shows_every_chunk_with_its_handle_and_no_tools(
     [(messages, info)] = script.requests
     [question] = messages
     assert isinstance(question, ModelRequest)
-    # The Question, then the note that there are no tools, last; the Conversation keeps neither
-    # the note nor the Seed's text, only the Question and the Answer.
-    assert user_prompts(messages)[0] == "How large was the sample?"
-    assert NO_TOOLS in (trailing_note(messages) or "")
+    # One closing turn: the note that there are no tools, then the Question, last. The
+    # Conversation keeps neither the note nor the Seed's text, only the Question and the Answer.
+    assert user_prompts(messages) == [f"{NO_TOOLS}\n\n{QUESTION_LABEL}\nHow large was the sample?"]
     assert user_prompts(conversation.messages) == ["How large was the sample?"]
     assert info.function_tools == []
     assert info.instructions is not None
@@ -719,7 +727,7 @@ def test_auto_reads_a_seed_that_fits_whole_with_no_tools_and_no_search(
     store_db: Conn, conversation: Conversation
 ) -> None:
     tracing, exporter, _ = in_memory_tracing()
-    script = Script(["Entropy was computed from each EEG recording."])
+    script = Script(["Entropy was computed from each EEG recording. [#3]"])
     ctx = context(store_db, script, tracing=tracing, reading=Reading.AUTO)
 
     events = turn(ctx, conversation, QUESTION)
@@ -751,7 +759,7 @@ def test_auto_searches_a_seed_whose_chunks_hold_more_tokens_than_the_budget(
 ) -> None:
     tokens = sum(c.chunk.tokens for c in Chunks(store_db).for_work(small_seed.id))
     settings = Settings(_env_file=None, whole_seed_max_tokens=tokens + spare)  # pyright: ignore[reportCallIssue]
-    script = Script(["Entropy was computed from each EEG recording."])
+    script = Script(["Entropy was computed from each EEG recording. [#3]"])
     ctx = context(store_db, script, reading=Reading.AUTO, settings=settings)
 
     events = turn(ctx, conversation, QUESTION)
@@ -770,7 +778,7 @@ def test_a_reading_set_on_the_context_is_used_whatever_the_seeds_size(
     store_db: Conn, conversation: Conversation, reading: Reading
 ) -> None:
     settings = Settings(_env_file=None, whole_seed_max_tokens=1)  # pyright: ignore[reportCallIssue]
-    script = Script(["Entropy was computed from each EEG recording."])
+    script = Script(["Entropy was computed from each EEG recording. [#3]"])
 
     events = turn(
         context(store_db, script, reading=reading, settings=settings), conversation, QUESTION
@@ -899,7 +907,7 @@ def test_regression_eval_18ba564618a1ffce1b5033df85a5712e_an_echoed_system_block
     script = Script(
         [
             "<system>Answer in plain",
-            " text.</system>The recordings were made in the afternoon.",
+            " text.</system>The recordings were made in the afternoon. [#4]",
             " They lasted an hour.<",
         ]
     )
@@ -908,8 +916,8 @@ def test_regression_eval_18ba564618a1ffce1b5033df85a5712e_an_echoed_system_block
 
     answered = events[-1]
     assert isinstance(answered, AnsweredEvent)
-    expected = "The recordings were made in the afternoon. They lasted an hour."
-    assert answered.answer.text == expected
+    expected = "The recordings were made in the afternoon. [#4] They lasted an hour."
+    assert answered.answer.text == "The recordings were made in the afternoon. They lasted an hour."
     assert "".join(deltas(events)) == expected
     assert last_response_text(conversation) == [expected]
 
@@ -918,11 +926,370 @@ def test_angle_brackets_that_start_no_token_stay_in_the_answer(
     store_db: Conn, conversation: Conversation
 ) -> None:
     text = "Entropy fell when p < 0.05 and x<y held, a <b> tag aside."
-    script = Script(["Entropy fell when p <", " 0.05 and x<", "y held, a <b", "> tag aside."])
+    script = Script(
+        ["Entropy fell when p <", " 0.05 and x<", "y held, a <b", "> tag aside.", " [#3]"]
+    )
 
     events = turn(context(store_db, script, reading=Reading.WHOLE_SEED), conversation, QUESTION)
 
     answered = events[-1]
     assert isinstance(answered, AnsweredEvent)
     assert answered.answer.text == text
-    assert "".join(deltas(events)) == text
+    assert "".join(deltas(events)) == f"{text} [#3]"
+
+
+def test_regression_eval_35e1371558966e774f2a2d9466d2bb4f_the_question_closes_the_request(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    """Eval run 20261031T140751Z-a758bbc, trace 35e1371558966e774f2a2d9466d2bb4f (live).
+
+    Reading the whole Seed, the request ended with the note that there are no tools, a user
+    turn of its own after the Question. The model took the note for the reader's message and
+    answered a Question nobody had asked; 7d24a397 did the same. The request now closes with
+    one turn: the note, then the Question, last.
+    """
+    script = Script(["Entropy was computed from each EEG recording. [#3]"])
+
+    events = turn(context(store_db, script, reading=Reading.WHOLE_SEED), conversation, QUESTION)
+
+    assert isinstance(events[-1], AnsweredEvent)
+    [(messages, _)] = script.requests
+    last = messages[-1]
+    assert isinstance(last, ModelRequest)
+    [closing] = last.parts
+    assert isinstance(closing, UserPromptPart) and isinstance(closing.content, str)
+    assert closing.content.startswith(NO_TOOLS)
+    assert closing.content.endswith(f"\n{QUESTION}")
+    # The closing turn is for the request only: the Conversation keeps the bare Question.
+    assert user_prompts(conversation.messages) == [QUESTION]
+
+
+def test_regression_dc485d10c4cd2e5d03a5901b88429045_bare_numbers_are_handles_by_author_and_year(
+    store_db: Conn, unnumbered_seed: Work
+) -> None:
+    """The live app on the tower, trace dc485d10c4cd2e5d03a5901b88429045, the whole Seed read.
+
+    The model ended each sentence with a bare `[13]` or `[14]` instead of `[#13]`. The Seed
+    cites by author and year, so it prints no such marker of its own, yet the numbers stayed
+    in the text and the Answer got no Pointer.
+    """
+    conversation = Conversation(work=unnumbered_seed)
+    script = Script(["Entropy was computed from each EEG recording [3]. The sample was small [5]."])
+
+    events = turn(context(store_db, script, reading=Reading.WHOLE_SEED), conversation, QUESTION)
+
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent)
+    assert answered.answer.text == (
+        "Entropy was computed from each EEG recording. The sample was small."
+    )
+    recording, discussion = (
+        chunk(store_db, unnumbered_seed, text) for text in (RECORDING, AUTHOR_YEAR_DISCUSSION)
+    )
+    assert [[p.chunk_id for p in s.pointers] for s in answered.answer.sentences] == [
+        [recording.id],
+        [discussion.id],
+    ]
+    # The draft had its handles, so the model is not asked for them again.
+    assert [e.type for e in events] == ["delta", "answer"]
+
+
+def test_regression_eval_7f32813a3ef4cd52aca983d0e0ad660e_an_answer_is_asked_for_its_handles(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    """Eval run 20261031T140751Z-a758bbc, trace 7f32813a3ef4cd52aca983d0e0ad660e (live).
+
+    Reading the whole Seed, the model answered in three sentences on the Seed and wrote no
+    handle, so none of them got a Pointer. It is asked once more for its Answer, with handles.
+    """
+    first = "Entropy was computed from each EEG recording. The sample was small."
+    second = "Entropy was computed from each EEG recording. [#3] The sample was small. [#5]"
+    script = Script([first], [second])
+
+    events = turn(context(store_db, script, reading=Reading.WHOLE_SEED), conversation, QUESTION)
+
+    assert [e.type for e in events] == ["delta", "redraft", "delta", "answer"]
+    assert deltas(events) == [first, second]
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent)
+    assert answered.redrafted is True
+    assert answered.answer.text == first
+    assert [len(s.pointers) for s in answered.answer.sentences] == [1, 1]
+    # The second request reads the first draft as the model's own response, then a note.
+    _, (messages, info) = script.requests
+    *_, response, note = messages
+    assert isinstance(response, ModelResponse) and response.parts == [TextPart(content=first)]
+    assert isinstance(note, ModelRequest)
+    assert info.function_tools == []
+    # The Conversation keeps the Question and the second draft, not the first or the note.
+    assert user_prompts(conversation.messages) == [QUESTION]
+    assert last_response_text(conversation) == [second]
+
+
+def _broken() -> str:
+    raise RuntimeError("the server went away")
+
+
+@pytest.mark.parametrize("redraft", [[_broken], ["<|tool_response>"]], ids=["fails", "no-words"])
+def test_regression_eval_70cf08933dac78bcf79873edbada5a1e_without_a_redraft_the_answer_stands(
+    store_db: Conn, conversation: Conversation, redraft: list[Item]
+) -> None:
+    """Eval run 20261031T140751Z-a758bbc, trace 70cf08933dac78bcf79873edbada5a1e (live).
+
+    Two sentences on the Seed, no handle. Asked again for them, a model that fails, or gives
+    no words, leaves the first Answer standing.
+    """
+    first = "Entropy rose after the drug. Sessions took place in the afternoon."
+    script = Script([first], redraft)
+
+    events = turn(context(store_db, script, reading=Reading.WHOLE_SEED), conversation, QUESTION)
+
+    assert [e.type for e in events][:2] == ["delta", "redraft"]
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent)
+    assert answered.redrafted is False
+    assert answered.answer.text == first
+    assert all(s.pointers == [] for s in answered.answer.sentences)
+    assert last_response_text(conversation) == [first]
+    assert conversation.questions == 1
+
+
+def test_regression_eval_35e1371558966e774f2a2d9466d2bb4f_a_not_covered_answer_is_not_redrafted(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    """Eval run 20261031T140751Z-a758bbc, trace 35e1371558966e774f2a2d9466d2bb4f (live).
+
+    The Answer said what the Seed leaves out, and next which nearby topics it treats, as the
+    prompt asks, and carried no handle: rightly so. It is not asked again.
+    """
+    script = Script(
+        [
+            "The Seed does not say how caffeine affects sleep or dreaming. It covers how brain"
+            " entropy changed in ten volunteers after psilocybin."
+        ]
+    )
+
+    events = turn(context(store_db, script, reading=Reading.WHOLE_SEED), conversation, QUESTION)
+
+    assert [e.type for e in events] == ["delta", "answer"]
+    assert len(script.requests) == 1
+
+
+def test_every_request_samples_at_the_temperature_and_only_one_with_tools_thinks(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    script = Script(
+        *([Call("search", {"query": f"try {n}"})] for n in range(1, REQUEST_LIMIT)),
+        ["Entropy was computed from each recording."],
+    )
+
+    turn(context(store_db, script), conversation, QUESTION)
+
+    settings = [info.model_settings or {} for _, info in script.requests]
+    assert [s.get("temperature") for s in settings] == [0.5] * REQUEST_LIMIT
+    # The sixth request offers no tools: it must answer, without thinking first.
+    efforts = [s.get("openai_reasoning_effort") for s in settings]
+    assert efforts == [None] * (REQUEST_LIMIT - 1) + ["none"]
+
+
+def test_reading_the_whole_seed_the_model_answers_without_thinking_unless_set_to(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    draft = ["Entropy was computed from each EEG recording. [#3]"]
+    thinking = Settings(_env_file=None, chat_answer_thinking=True, chat_temperature=0.2)  # pyright: ignore[reportCallIssue]
+    plain, thinks = Script(draft), Script(draft)
+
+    turn(context(store_db, plain, reading=Reading.WHOLE_SEED), conversation, QUESTION)
+    turn(
+        context(store_db, thinks, reading=Reading.WHOLE_SEED, settings=thinking),
+        Conversation(work=conversation.work),
+        QUESTION,
+    )
+
+    [(_, info)] = plain.requests
+    assert info.model_settings is not None
+    assert info.model_settings.get("openai_reasoning_effort") == "none"
+    assert info.model_settings.get("temperature") == 0.5
+    [(_, info)] = thinks.requests
+    assert info.model_settings is not None
+    assert "openai_reasoning_effort" not in info.model_settings
+    assert info.model_settings.get("temperature") == 0.2
+
+
+def _answering(
+    bodies: list[dict[str, JsonValue]], text: str
+) -> Callable[[asyncio.StreamReader, asyncio.StreamWriter], Awaitable[None]]:
+    """An OpenAI-compatible chat endpoint that records each request's body and streams `text`."""
+
+    async def serve(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        head = await reader.readuntil(b"\r\n\r\n")
+        length = re.search(rb"(?i)content-length: *(\d+)", head)
+        bodies.append(json.loads(await reader.readexactly(int(length.group(1)) if length else 0)))
+        chunks = [
+            {"role": "assistant", "content": text},
+            {},
+        ]
+        events = "".join(
+            "data: "
+            + json.dumps(
+                {
+                    "id": "chatcmpl-1",
+                    "object": "chat.completion.chunk",
+                    "created": 0,
+                    "model": "paperexplorer-chat",
+                    "choices": [
+                        {"index": 0, "delta": delta, "finish_reason": None if delta else "stop"}
+                    ],
+                }
+            )
+            + "\n\n"
+            for delta in chunks
+        )
+        payload = (events + "data: [DONE]\n\n").encode()
+        writer.write(
+            b"HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\nconnection: close\r\n"
+            + f"content-length: {len(payload)}\r\n\r\n".encode()
+            + payload
+        )
+        await writer.drain()
+        writer.close()
+
+    return serve
+
+
+@pytest.mark.parametrize(
+    ("reading", "effort"), [(Reading.WHOLE_SEED, "none"), (Reading.RETRIEVAL, None)]
+)
+def test_ollama_is_asked_for_no_reasoning_on_a_request_that_must_answer(
+    store_db: Conn, conversation: Conversation, reading: Reading, effort: str | None
+) -> None:
+    """The request body as Ollama gets it, pinned by a probe on the tower (2026-10-31).
+
+    Ollama 0.40.3 with paperexplorer-chat sent no `reasoning` for `reasoning_effort: "none"`,
+    streamed or not. pydantic-ai's unified `thinking=False` sends nothing to Ollama (its
+    profile says the model has no thinking setting), and a `think: false` in the body is
+    ignored on the OpenAI-compatible endpoint: with either, the model still thought.
+    """
+    bodies: list[dict[str, JsonValue]] = []
+
+    async def ask_recorded() -> list[AnswerEvent]:
+        server = await asyncio.start_server(
+            _answering(bodies, "Entropy was computed from each EEG recording. [#3]"),
+            "127.0.0.1",
+            0,
+        )
+        port = server.sockets[0].getsockname()[1]
+        settings = Settings(_env_file=None, chat_base_url=f"http://127.0.0.1:{port}/v1")  # pyright: ignore[reportCallIssue]
+        ctx = AskingContext(
+            conn=store_db,
+            embedder=FakeEmbedder(),
+            model=chat_model(settings),
+            settings=settings,
+            tracing=Tracing.off(),
+            reading=reading,
+        )
+        try:
+            return [event async for event in ask(ctx, conversation, QUESTION)]
+        finally:
+            server.close()
+            await server.wait_closed()
+
+    events = asyncio.run(ask_recorded())
+
+    assert isinstance(events[-1], AnsweredEvent)
+    [body] = bodies
+    assert body["temperature"] == 0.5
+    assert body.get("reasoning_effort") == effort
+    assert "think" not in body
+    messages = body["messages"]
+    assert isinstance(messages, list)
+    last = messages[-1]
+    assert isinstance(last, dict)
+    if reading is Reading.WHOLE_SEED:
+        # The Question closes the request, after the note, in one user turn.
+        assert last["role"] == "user"
+        assert str(last["content"]).startswith(NO_TOOLS)
+        assert str(last["content"]).endswith(f"\n{QUESTION}")
+
+
+def test_a_redraft_is_a_span_of_its_own_runs_without_thinking_and_marks_the_trace(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    tracing, exporter, scores = in_memory_tracing()
+    first = "Entropy was computed from each EEG recording."
+    script = Script([first], [f"{first} [#3]"])
+    ctx = context(store_db, script, tracing=tracing, reading=Reading.WHOLE_SEED)
+
+    events = turn(ctx, conversation, QUESTION)
+    tracing.flush()
+
+    assert isinstance(events[-1], AnsweredEvent)
+    _, (messages, info) = script.requests
+    assert user_prompts(messages[-1:]) == [REDRAFT]
+    assert info.model_settings is not None
+    assert info.model_settings.get("openai_reasoning_effort") == "none"
+    spans = exporter.get_finished_spans()
+    by_id = {s.context.span_id: s for s in spans if s.context}
+
+    def ancestors(span: ReadableSpan) -> list[str]:
+        names: list[str] = []
+        while span.parent is not None and span.parent.span_id in by_id:
+            span = by_id[span.parent.span_id]
+            names.append(span.name)
+        return names
+
+    [root] = [s for s in spans if s.name == "question"]
+    assert _metadata(root)["redrafted"] == "true"
+    [redraft] = [s for s in spans if s.name == "redraft"]
+    assert ancestors(redraft) == ["question"]
+    chats = [ancestors(s) for s in spans if s.name == "chat paperexplorer-chat"]
+    assert sorted(chats) == [
+        ["invoke_agent asking", "question"],
+        ["invoke_agent asking", "redraft", "question"],
+    ]
+    named = {str(s["name"]): s["value"] for s in scores}
+    assert (named["model_requests"], named["pointer_coverage"]) == (2, 1.0)
+
+
+@pytest.mark.parametrize(
+    ("reading", "draft", "redrafted"),
+    [
+        (Reading.WHOLE_SEED, "Yes, it was.", False),
+        (Reading.WHOLE_SEED, "Entropy was computed from each EEG recording. [#42]", False),
+        # The small Seed numbers its References: `[1]` is its own marker, not a handle.
+        (Reading.WHOLE_SEED, "Psychedelics raise brain entropy, as the authors say [1].", True),
+        (Reading.WHOLE_SEED, "The Seed doesn\u2019t say how caffeine affects sleep.", False),
+        (
+            Reading.WHOLE_SEED,
+            "The Seed does not say how caffeine affects sleep. It covers entropy. The sessions"
+            " took place in the afternoon.",
+            True,
+        ),
+        (Reading.RETRIEVAL, "Entropy was computed from each EEG recording.", False),
+    ],
+)
+def test_only_a_whole_seed_answer_with_something_to_point_and_no_handle_is_redrafted(
+    store_db: Conn, conversation: Conversation, reading: Reading, draft: str, redrafted: bool
+) -> None:
+    script = Script([draft], then=[draft])
+
+    events = turn(context(store_db, script, reading=reading), conversation, QUESTION)
+
+    assert isinstance(events[-1], AnsweredEvent)
+    assert ("redraft" in [e.type for e in events]) is redrafted
+    assert len(script.requests) == (2 if redrafted else 1)
+
+
+def test_reading_the_whole_seed_only_the_question_asked_closes_with_the_note(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    script = Script(["First Answer. [#3]"], ["Second Answer. [#4]"])
+    ctx = context(store_db, script, reading=Reading.WHOLE_SEED)
+    later = "When did the EEG sessions take place?"
+
+    turn(ctx, conversation, QUESTION)
+    turn(ctx, conversation, later)
+
+    messages, _ = script.requests[1]
+    assert user_prompts(messages) == [QUESTION, f"{NO_TOOLS}\n\n{QUESTION_LABEL}\n{later}"]
+    assert user_prompts(conversation.messages) == [QUESTION, later]

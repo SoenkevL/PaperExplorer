@@ -200,13 +200,16 @@ def ask_command(
             tracing.flush()
         blocks = [b.text for b in (store.WorkTexts(conn).get(found.id) or _NO_TEXT).blocks]
     # The forced search is the server's call, not the model's: it is neither a request nor a tool.
+    # A redraft's response replaces the first in the Conversation, yet it was a request too.
     forced = 1 if answered.reading is asking.Reading.RETRIEVAL else 0
     requests = sum(isinstance(m, ModelResponse) for m in conversation.messages) - forced
+    requests += answered.redrafted
     _print_answer(answered.answer, conversation, blocks)
     counts = answered.answer.counts()
     coverage = "-" if counts.pointer_coverage is None else f"{counts.pointer_coverage:.2f}"
     typer.echo(
-        f"summary: {answered.reading.value}, sentences {counts.sentences},"
+        f"summary: {answered.reading.value},{' redrafted,' if answered.redrafted else ''}"
+        f" sentences {counts.sentences},"
         f" substantive {counts.substantive_sentences},"
         f" pointer coverage {coverage}, close {counts.pointers_close},"
         f" weak {counts.pointers_weak}, quotes exact {counts.quotes_exact},"
@@ -234,6 +237,14 @@ def eval_command(
     only: Annotated[
         list[str] | None, typer.Option(help="Ask only this Question, by name; repeatable.")
     ] = None,
+    repeat: Annotated[
+        int,
+        typer.Option(
+            min=1,
+            help="Ask each Question live this many times, each in a fresh Conversation;"
+            " retrieval asks it once.",
+        ),
+    ] = 1,
     run_id: Annotated[
         str | None, typer.Option(help="The run's id; else its start in UTC and the commit.")
     ] = None,
@@ -243,9 +254,10 @@ def eval_command(
 ) -> None:
     """Ask the Seed its eval Questions as the reader does, and by retrieval; report both.
 
-    Traces go to Langfuse's `eval` environment. The full report, Answers and all, goes to
-    `<PE_DATA_DIR>/eval/<run id>/`; the summary, without the Seed's or the Answers' words, also
-    to `--summary-dir`, to be committed.
+    The live mode asks each Question `--repeat` times, retrieval once; the bar pools the live
+    turns and shows each repeat beside them. Traces go to Langfuse's `eval` environment. The
+    full report, Answers and all, goes to `<PE_DATA_DIR>/eval/<run id>/`; the summary, without
+    the Seed's or the Answers' words, also to `--summary-dir`, to be committed.
     """
     settings = evals.eval_settings()
     dataset = evals.load_questions(questions)
@@ -284,6 +296,7 @@ def eval_command(
             tracing_host=tracing.base_url,
             started=datetime.now(UTC),
             run_id=run_id,
+            repeat=repeat,
         )
         ctx = asking.AskingContext(
             conn=conn,
@@ -293,9 +306,13 @@ def eval_command(
             tracing=tracing,
         )
         asked = len(dataset.cases)
+        named = [
+            f"{m.value} {repeat} times" if m is evals.Mode.LIVE and repeat > 1 else m.value
+            for m in modes
+        ]
         typer.echo(
             f"eval {work}: {asked} Question{'s' if asked != 1 else ''},"
-            f" {' and '.join(m.value for m in modes)}, run {info.run_id}"
+            f" {' and '.join(named)}, run {info.run_id}"
         )
         try:
             report = asyncio.run(evals.run_eval(ctx, found, dataset, info, modes))
@@ -329,6 +346,11 @@ async def _stream_answer(
             case asking.DeltaEvent(text=text):
                 typer.echo(text, nl=False)
                 line_open = not text.endswith("\n")
+            case asking.RedraftEvent():
+                if line_open:
+                    typer.echo()
+                typer.echo("→ redraft: the draft gave no handle, so it is written again")
+                line_open = False
             case asking.AnsweredEvent():
                 if line_open:
                     typer.echo()

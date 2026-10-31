@@ -128,13 +128,16 @@ class QuoteCheck(BaseModel):
 class Turn(BaseModel):
     """One Question asked of the Seed in one mode, in a fresh Conversation: all it produced.
 
-    `reading` is how the turn read the Seed (None when it failed before it chose; runs before
-    ADR 0010 did not record it). `search` is the forced search
+    `repeat` counts the times the Question was asked in this mode, from 1 (runs before repeats
+    asked once). `reading` is how the turn read the Seed (None when it failed before it chose;
+    runs before ADR 0010 did not record it). `search` is the forced search
     (`retrieval.search(question, k=8)`) of a turn that read by retrieval, else None.
+    `redrafted` says the Answer is the model's draft written again with handles.
     `model_requests` is None when the turn failed; `tools` are the model's own calls in order.
     """
 
     mode: Mode
+    repeat: int = 1
     reading: Reading | None = None
     question: str
     conversation_id: str
@@ -145,6 +148,7 @@ class Turn(BaseModel):
     pointers: list[PointerCheck]
     quotes: list[QuoteCheck]
     says_not_covered: bool
+    redrafted: bool = False
     model_requests: int | None
     tool_calls: int
     tools: list[str]

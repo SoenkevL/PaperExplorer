@@ -1,6 +1,7 @@
 {# A posted Question and the reply its stream fills: steps and draft until `answer` or `error`
    replaces the reply, which removes the EventSource with it. A Seed read whole runs no search,
-   so the waiting line shows until the draft's first text hides it (style.css). #}
+   so the waiting line shows until the draft's first text hides it (style.css). `redraft` empties
+   the draft in place and fills the line above it, out of band. #}
 <section class="turn">
   <p class="question">{{ text }}</p>
   {% if refused %}
@@ -8,9 +9,10 @@
   {% else %}
   <p class="notice" id="notice-{{ question_id }}"></p>
   <div class="reply" hx-ext="sse" sse-connect="/questions/{{ question_id }}/stream" sse-swap="answer,error" hx-swap="outerHTML">
-    <div hidden sse-swap="conversation" hx-swap="none"></div>
+    <div hidden sse-swap="conversation,redraft" hx-swap="none"></div>
     <ol class="steps" sse-swap="step" hx-swap="beforeend"></ol>
-    <div class="draft" sse-swap="delta" hx-swap="beforeend"></div>
+    <p class="redraft" id="redraft-{{ question_id }}"></p>
+    <div class="draft" id="draft-{{ question_id }}" sse-swap="delta" hx-swap="beforeend"></div>
     <p class="waiting">The model is reading the Work and thinking…</p>
   </div>
   {% endif %}

@@ -23,17 +23,28 @@ class DeltaEvent(BaseModel):
     text: str
 
 
+class RedraftEvent(BaseModel):
+    """The draft gave no handle, so the model is asked once more for its Answer, with them.
+
+    The draft streamed so far is dropped: the deltas that follow are the new draft's.
+    """
+
+    type: Literal["redraft"] = "redraft"
+
+
 class AnsweredEvent(BaseModel):
     """The resolved Answer, with its Pointers and Quotes; the turn's last event.
 
     `trace_id` is the Question's `question` trace (None with tracing off), for scores added later;
-    `reading` is how the turn read the Seed, whole or by retrieval.
+    `reading` is how the turn read the Seed, whole or by retrieval; `redrafted` says the Answer is
+    the draft written again with handles (a redraft that failed leaves the first standing).
     """
 
     type: Literal["answer"] = "answer"
     answer: Answer
     trace_id: str | None = None
     reading: Reading
+    redrafted: bool = False
 
 
 class ErrorEvent(BaseModel):
@@ -49,6 +60,6 @@ class ErrorEvent(BaseModel):
 
 
 type AnswerEvent = Annotated[
-    StepEvent | DeltaEvent | AnsweredEvent | ErrorEvent, Field(discriminator="type")
+    StepEvent | DeltaEvent | RedraftEvent | AnsweredEvent | ErrorEvent, Field(discriminator="type")
 ]
 """One event of a turn, told apart by `type`: what the API sends as one SSE event."""

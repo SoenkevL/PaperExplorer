@@ -69,11 +69,12 @@ def says_not_covered(text: str) -> bool:
 
 
 async def ask_turn(
-    ctx: asking.AskingContext, work: Work, question: str, blocks: Sequence[str]
+    ctx: asking.AskingContext, work: Work, question: str, blocks: Sequence[str], repeat: int = 1
 ) -> Turn:
     """Ask `question` of the Seed in a fresh Conversation and record what the turn produced.
 
-    The mode follows `ctx.reading`; the turn says how it read the Seed. `blocks` are the Seed's
+    The mode follows `ctx.reading`; the turn says how it read the Seed, and which `repeat` of
+    the Question it is. `blocks` are the Seed's
     block texts, for the places Pointers and Quotes land on. A turn that read by retrieval has
     its forced search run once more outside its trace, as `retrieval.search(question, k=8)`,
     the same call with the same result.
@@ -85,6 +86,7 @@ async def ask_turn(
     trace_id: str | None = None
     reading: asking.Reading | None = None
     steps: list[str] = []
+    redrafted = False
     first_delta: float | None = None
     started = time.monotonic()
     async for event in asking.ask(ctx, conversation, question):
@@ -94,8 +96,11 @@ async def ask_turn(
             case asking.DeltaEvent():
                 if first_delta is None:
                     first_delta = time.monotonic() - started
+            case asking.RedraftEvent():
+                pass  # the Answer says whether the redraft stood
             case asking.AnsweredEvent():
                 answer, trace_id, reading = event.answer, event.trace_id, event.reading
+                redrafted = event.redrafted
             case asking.ErrorEvent():
                 error, trace_id, reading = event.message, event.trace_id, event.reading
     latency = time.monotonic() - started
@@ -108,8 +113,10 @@ async def ask_turn(
             for i, r in enumerate(found, start=1)
         ]
     # The forced search is the server's call, not the model's: it is neither a request nor a tool.
+    # A redraft's response replaces the first in the Conversation, yet it was a request too.
     forced = 1 if searched else 0
     requests = sum(isinstance(m, ModelResponse) for m in conversation.messages) - forced
+    requests += redrafted
     chunks = {c.id: c for c in conversation.handles.values()}
     logger.info(
         "Asked %r (%s, %s) in %.1f s: %s",
@@ -121,6 +128,7 @@ async def ask_turn(
     )
     return Turn(
         mode=mode,
+        repeat=repeat,
         reading=reading,
         question=question,
         conversation_id=conversation.id,
@@ -131,6 +139,7 @@ async def ask_turn(
         pointers=_pointers(answer, chunks, blocks) if answer else [],
         quotes=_quotes(answer, list(chunks.values()), blocks) if answer else [],
         says_not_covered=answer is not None and says_not_covered(answer.text),
+        redrafted=redrafted,
         model_requests=requests if answer else None,
         tool_calls=len(steps) - forced,
         tools=steps[forced:],

@@ -197,6 +197,27 @@ def test_ask_streams_the_draft_then_lists_the_answers_pointers_and_quotes(
 
 
 @pytest.mark.usefixtures("embedded_seed")
+def test_ask_says_when_the_model_writes_its_answer_again_with_handles(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first = "Sample entropy was measured in every participant."
+    monkeypatch.setattr(asking, "chat_model", _scripted(first, f"{first} [#1]"))
+
+    result = CliRunner().invoke(app, ["ask", "YAAC9XCX", "How was entropy measured?"])
+
+    assert result.exit_code == 0, result.output
+    lines = result.stdout.splitlines()
+    assert lines[:3] == [
+        first,
+        "→ redraft: the draft gave no handle, so it is written again",
+        f"{first} [#1]",
+    ]
+    assert lines[-1].startswith("summary: whole_seed, redrafted, sentences 1,")
+    assert "pointer coverage 1.00" in lines[-1]
+    assert "model requests 2, tool calls 0, latency " in lines[-1]
+
+
+@pytest.mark.usefixtures("embedded_seed")
 def test_ask_searches_a_seed_over_the_whole_seed_budget(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -317,6 +338,40 @@ def test_eval_without_retrieval_asks_only_as_the_reader_does(
 
     assert result.exit_code == 0, result.output
     assert ": 1 Question, live, run " in result.stdout.splitlines()[0]
+
+
+@pytest.mark.usefixtures("embedded_seed")
+def test_eval_repeats_each_question_live_as_often_as_asked_and_retrieval_once(
+    monkeypatch: pytest.MonkeyPatch, eval_files: Path
+) -> None:
+    measured = "Sample entropy was measured in every participant. [#1]"
+    monkeypatch.setattr(asking, "chat_model", _scripted(measured, measured, measured))
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "eval",
+            "YAAC9XCX",
+            "--questions",
+            str(eval_files / "questions.yaml"),
+            "--summary-dir",
+            str(eval_files / "evals" / "runs"),
+            "--only",
+            "method-entropy",
+            "--repeat",
+            "2",
+            "--run-id",
+            "test-run",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    lines = result.stdout.splitlines()
+    assert lines[0] == "eval YAAC9XCX: 1 Question, live 2 times and retrieval, run test-run"
+    summary = json.loads((eval_files / "evals" / "runs" / "test-run.json").read_text())
+    assert summary["run"]["repeat"] == 2
+    assert (summary["modes"]["live"]["repeats"], summary["modes"]["retrieval"]["repeats"]) == (2, 1)
+    assert [t["repeat"] for t in summary["questions"][0]["turns"]["live"]] == [1, 2]
 
 
 @pytest.mark.usefixtures("embedded_seed")

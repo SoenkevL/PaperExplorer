@@ -21,6 +21,7 @@ from paperexplorer_api.schemas import (
     ErrorEvent,
     Pointer,
     Quote,
+    RedraftEvent,
     StepEvent,
     WorkText,
 )
@@ -230,6 +231,37 @@ def test_each_event_is_relayed_as_html_for_its_place_in_the_question() -> None:
     assert re.search(r'<div class="reply"[^>]*sse-swap="answer,error" hx-swap="outerHTML"', turn)
     assert answer.startswith('<div class="reply answered">')
     assert "Entropy rose. It fell." in _text(answer)
+
+
+def test_a_redraft_clears_the_draft_and_says_pointers_are_being_added() -> None:
+    api = FakeApi(
+        [
+            DeltaEvent(text="Entropy rose. It fell [#"),
+            RedraftEvent(),
+            DeltaEvent(text="Entropy rose. [#3] It fell."),
+            ANSWERED,
+        ]
+    )
+    client = api.client()
+    turn = _post(client)
+    question_id = _stream_url(turn).split("/")[2]
+    css = client.get("/static/style.css").text
+
+    events = _events(client.get(_stream_url(turn)).text)
+
+    assert [name for name, _ in events] == ["delta", "redraft", "delta", "answer"]
+    _, redraft, again, _ = (data for _, data in events)
+    # Out of band: the draft emptied in place, so its stream goes on into it, and a line.
+    assert f'<div id="draft-{question_id}" hx-swap-oob="innerHTML"></div>' in redraft
+    assert re.search(rf'<p class="redraft" id="redraft-{question_id}" hx-swap-oob="true">', redraft)
+    assert "Pointers" in _text(redraft)
+    assert re.search(rf'<div class="draft" id="draft-{question_id}" sse-swap="delta"', turn)
+    assert re.search(rf'<p class="redraft" id="redraft-{question_id}"></p>', turn)
+    assert re.search(r'<div hidden sse-swap="conversation,redraft" hx-swap="none">', turn)
+    # The first draft's open handle is dropped with it, not prefixed to the new draft.
+    assert re.fullmatch(r'Entropy rose\. <span class="chip"[^>]*>#3</span> It fell\.', again)
+    assert ".turn .redraft:empty { display: none; }" in css
+    assert ".redraft:not(:empty) ~ .waiting { display: none; }" in css
 
 
 def _words(element: ET.Element) -> str:

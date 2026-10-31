@@ -2,14 +2,17 @@
 
 `design-asking.md` (The agent) and `architecture.md` (Tracing) give the shape. A Seed that fits
 `PE_WHOLE_SEED_MAX_TOKENS` is read whole: the system prompt and every Chunk in context, one
-request, no tools. A larger one is searched: the Seed's map in context, a forced first search,
-five tools, at most `REQUEST_LIMIT` model requests. The model's thinking is traced but never
-shown; each Question is one `question` trace.
+request, no tools; an Answer it gives without a handle is asked for them once more. A larger
+one is searched: the Seed's map in context, a forced first search, five tools, at most
+`REQUEST_LIMIT` model requests. A request that offers no tools must answer, and runs without
+thinking unless `PE_CHAT_ANSWER_THINKING` says otherwise. The model's thinking is traced but
+never shown; each Question is one `question` trace.
 """
 
 import asyncio
 import hashlib
 import logging
+import re
 import time
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, replace
@@ -17,7 +20,7 @@ from importlib import resources
 
 import psycopg
 from psycopg.rows import TupleRow
-from pydantic_ai import Agent, RunContext, Tool
+from pydantic_ai import Agent, AgentRunResult, RunContext, Tool
 from pydantic_ai.capabilities import AbstractCapability, Instrumentation, PrepareTools
 from pydantic_ai.exceptions import UsageLimitExceeded
 from pydantic_ai.messages import (
@@ -38,9 +41,9 @@ from pydantic_ai.messages import (
 )
 from pydantic_ai.models import Model, ModelRequestContext
 from pydantic_ai.models.instrumented import InstrumentationSettings
-from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.models.openai import OpenAIChatModel, OpenAIChatModelSettings
 from pydantic_ai.providers.ollama import OllamaProvider
-from pydantic_ai.settings import ModelSettings
+from pydantic_ai.settings import ModelSettings, merge_model_settings
 from pydantic_ai.tools import ToolDefinition
 from pydantic_ai.usage import RunUsage, UsageLimits
 
@@ -52,6 +55,7 @@ from paperexplorer.asking.events import (
     AnswerEvent,
     DeltaEvent,
     ErrorEvent,
+    RedraftEvent,
     StepEvent,
 )
 from paperexplorer.asking.reading import Reading
@@ -80,11 +84,29 @@ NO_TOOLS = (
     "You have no tools for this Question: the Seed's whole text is in your instructions. Answer"
     " now from it, and where it does not settle the Question, say what the Seed does not say."
 )
+# Reading the whole Seed, the request closes with one turn: `NO_TOOLS`, then this, then the
+# Question, last. As a turn of its own after the Question, the note was taken for the reader's
+# message, and another Question answered (docs/eval-2026-10-31.md).
+QUESTION_LABEL = "The reader's Question:"
+# An Answer from the whole Seed that gives no handle is asked for them once more.
+REDRAFT = (
+    "Your Answer above gives no handle. Write it again word for word, and after each sentence"
+    " write the handle of the Chunk it rests on, such as [#7], right after its full stop. A"
+    " sentence that says what the Seed does not say gets no handle. Change nothing else."
+)
 NO_ANSWER = "The model gave no Answer."
 # The prompt's version hashes every text of ours the model reads, so an edit cannot forget it.
 PROMPT_VERSION = hashlib.sha256(
-    "\n\n".join([SYSTEM_PROMPT, LAST_REQUEST, WHOLE_SEED, NO_TOOLS]).encode()
+    "\n\n".join(
+        [SYSTEM_PROMPT, LAST_REQUEST, WHOLE_SEED, NO_TOOLS, QUESTION_LABEL, REDRAFT]
+    ).encode()
 ).hexdigest()[:12]
+# Probed on the tower (Ollama 0.40.3, 2026-10-31): `reasoning_effort: "none"` is what Ollama's
+# OpenAI-compatible endpoint honours, so no `reasoning` comes back. pydantic-ai's unified
+# `thinking=False` sends nothing to Ollama, and `think: false` in the body is ignored there.
+_WITHOUT_THINKING = OpenAIChatModelSettings(openai_reasoning_effort="none")
+# "The Seed does not say …", the form the prompt asks for where the Seed does not answer.
+_NOT_SAID = re.compile(r"\bthe seed (?:does not|doesn't|did not|didn't) say\b", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -180,7 +202,10 @@ async def _answer_turn(
         "prompt_version": PROMPT_VERSION,
         "model": ctx.model.model_name,
         "num_ctx": str(ctx.settings.chat_num_ctx),
+        "temperature": str(ctx.settings.chat_temperature),
+        "answer_thinking": str(ctx.settings.chat_answer_thinking).lower(),
         "reading": reading.value,
+        "redrafted": "false",
     }
     whole = ["whole-seed"] if reading is Reading.WHOLE_SEED else []
     tags = ["asking", f"work:{key}", *whole, *ctx.tags]
@@ -188,7 +213,7 @@ async def _answer_turn(
         "question", tags=tags, session_id=conversation.id, metadata=metadata
     ) as trace_id:
         try:
-            answer, messages, usage = await _answer(
+            answer, messages, usage, redrafted = await _answer(
                 ctx, tools, reading, conversation, question, emit
             )
         except _NoAnswerError:
@@ -217,16 +242,19 @@ async def _answer_turn(
             return
         conversation.messages = _without_thinking(messages)
         conversation.questions = position
+        if redrafted:
+            ctx.tracing.add_metadata({"redrafted": "true"})
         _score(ctx.tracing, answer, usage, time.monotonic() - started)
     logger.info(
-        "Answered Question %d of Conversation %s (%s) in %d requests, %.1f s",
+        "Answered Question %d of Conversation %s (%s%s) in %d requests, %.1f s",
         position,
         conversation.id,
         reading.value,
+        ", redrafted" if redrafted else "",
         usage.requests,
         time.monotonic() - started,
     )
-    emit(AnsweredEvent(answer=answer, trace_id=trace_id, reading=reading))
+    emit(AnsweredEvent(answer=answer, trace_id=trace_id, reading=reading, redrafted=redrafted))
 
 
 async def _answer(
@@ -236,14 +264,20 @@ async def _answer(
     conversation: Conversation,
     question: str,
     emit: Callable[[AnswerEvent | None], None],
-) -> tuple[Answer, list[ModelMessage], RunUsage]:
-    """Run the agent on the Question and resolve its draft into the Answer."""
+) -> tuple[Answer, list[ModelMessage], RunUsage, bool]:
+    """Run the agent on the Question and resolve its draft into the Answer; whether redrafted.
+
+    Reading the whole Seed, an Answer with sentences to point at the Seed and no handle at all
+    is asked for its handles once more (`_redraft`); if that fails, the first Answer stands.
+    """
     whole = reading is Reading.WHOLE_SEED
+    asked = len(conversation.messages)  # where the Question's request is in the run's messages
     if whole:
         instructions = f"{SYSTEM_PROMPT.strip()}\n\n{WHOLE_SEED}\n\n{tools.whole_seed()}"
+        closing = f"{NO_TOOLS}\n\n{QUESTION_LABEL}\n{question}"
         history: list[ModelMessage] = [
             *conversation.messages,
-            ModelRequest(parts=[UserPromptPart(question)]),
+            ModelRequest(parts=[UserPromptPart(closing)]),
         ]
     else:
         instructions = f"{SYSTEM_PROMPT.strip()}\n\n{tools.seed_map()}"
@@ -255,19 +289,45 @@ async def _answer(
         name="asking",
         instructions=instructions,
         tools=[] if whole else _TOOLS,
+        model_settings=ModelSettings(temperature=ctx.settings.chat_temperature),
         capabilities=[
             PrepareTools(_no_tools_on_the_last_request),
-            _NoteAfterReading(whole_seed=whole),
+            _NoteAfterReading(),
+            _ThinkingOnlyWithTools(thinking=ctx.settings.chat_answer_thinking),
             Instrumentation(
                 settings=InstrumentationSettings(tracer_provider=ctx.tracing.tracer_provider)
             ),
         ],
     )
+    result = await _run(agent, tools, history, REQUEST_LIMIT, emit)
+    draft = answer_draft(result.output)
+    answer = _resolve(ctx, tools, conversation, draft)
+    if not any(c.isalnum() for c in answer.text):
+        raise _NoAnswerError
+    messages, usage, redrafted = _with_draft(result.all_messages(), draft), result.usage, False
+    if whole and _wants_handles(answer):
+        again = await _redraft(ctx, agent, tools, conversation, messages, draft, emit)
+        if again is not None:
+            answer, response, more = again
+            messages, usage, redrafted = [*messages[:-1], response], usage + more, True
+    if whole:
+        messages = _with_question(messages, asked, question)
+    return answer, messages, usage, redrafted
+
+
+async def _run(
+    agent: Agent[SeedTools, str],
+    tools: SeedTools,
+    history: list[ModelMessage],
+    request_limit: int,
+    emit: Callable[[AnswerEvent | None], None],
+) -> AgentRunResult[str]:
+    """Run the agent on `history`, streaming its steps and its draft as cut; its result."""
     async with agent.iter(
         None,
         message_history=history,
         deps=tools,
-        usage_limits=UsageLimits(request_limit=REQUEST_LIMIT),
+        usage_limits=UsageLimits(request_limit=request_limit),
     ) as run:
         async for node in run:
             if Agent.is_model_request_node(node):
@@ -284,7 +344,13 @@ async def _answer(
                             emit(StepEvent(tool=event.part.tool_name, args=args))
     result = run.result
     assert result is not None, "the run ended without a result"
-    draft = answer_draft(result.output)
+    return result
+
+
+def _resolve(
+    ctx: AskingContext, tools: SeedTools, conversation: Conversation, draft: str
+) -> Answer:
+    """The draft resolved into the Answer, in a `resolve answer` span of its own."""
     with ctx.tracing.span("resolve answer", input=draft) as span:
         answer = resolve_answer(
             draft,
@@ -292,11 +358,63 @@ async def _answer(
             tools.chunks_read(),
             ctx.embedder,
             ctx.settings.support_threshold,
+            bare_handles=not tools.numbered_references(),
         )
         span.update(output=answer.counts().model_dump())
+    return answer
+
+
+def _wants_handles(answer: Answer) -> bool:
+    """Whether an Answer gives no handle, yet has a sentence a Pointer should bear out.
+
+    A sentence saying what the Seed does not say needs none, nor the one after it on what the
+    Seed covers nearby, as the prompt asks: an Answer saying the Seed does not cover the
+    Question is not redrafted.
+    """
+    if answer.unknown_handles or any(s.pointers for s in answer.sentences):
+        return False
+    after_gap = False
+    for sentence in answer.sentences:
+        gap = _NOT_SAID.search(answer.text[sentence.start : sentence.end].replace("\u2019", "'"))
+        if sentence.substantive and not gap and not after_gap:
+            return True
+        after_gap = gap is not None
+    return False
+
+
+async def _redraft(
+    ctx: AskingContext,
+    agent: Agent[SeedTools, str],
+    tools: SeedTools,
+    conversation: Conversation,
+    messages: list[ModelMessage],
+    first: str,
+    emit: Callable[[AnswerEvent | None], None],
+) -> tuple[Answer, ModelResponse, RunUsage] | None:
+    """Ask once more for the Answer, word for word with its handles: the Answer and its response.
+
+    One request, without tools: the run's `messages`, which end with the `first` draft as the
+    model's response, then `REDRAFT`, for this request only. None when it fails or leaves no
+    words.
+    """
+    emit(RedraftEvent())
+    history = [*_without_thinking(messages), ModelRequest(parts=[UserPromptPart(REDRAFT)])]
+    with ctx.tracing.span("redraft", input=first) as span:
+        try:
+            result = await _run(agent, tools, history, 1, emit)
+        except Exception as error:
+            logger.warning("Asked again for its handles, the model failed", exc_info=True)
+            span.update(output=f"failed: {error}")
+            return None
+        draft = answer_draft(result.output)
+        span.update(output=draft)
+    answer = _resolve(ctx, tools, conversation, draft)
     if not any(c.isalnum() for c in answer.text):
-        raise _NoAnswerError
-    return answer, _with_draft(result.all_messages(), draft), result.usage
+        logger.warning("Asked again for its handles, the model gave no Answer")
+        return None
+    response = _with_draft(result.all_messages(), draft)[-1]
+    assert isinstance(response, ModelResponse), "the redraft ended without a response"
+    return answer, response, result.usage
 
 
 class _NoAnswerError(Exception):
@@ -336,33 +454,49 @@ def _draft(event: AgentStreamEvent) -> str | None:
 
 @dataclass
 class _NoteAfterReading(AbstractCapability[SeedTools]):
-    """A request that offers no tools ends with a note saying so, after all the model has read.
+    """Retrieval's last request, which offers no tools, ends with a note saying so.
 
-    The note is a system prompt part at the end of the request, which reaches Ollama as a user
-    turn in `<system>` tags; it is for that request only and never joins the Conversation. Among
-    the instructions, before the reading, the model ignored it (docs/eval-2026-10-29.md): in eval
-    run 20261029T191529Z-94e980b it called a tool on all 8 last requests; replayed with the note
-    last, 23 of 24 were answered.
+    The note is a system prompt part at the end of the request, after all the model has read,
+    which reaches Ollama as a user turn in `<system>` tags; it is for that request only and
+    never joins the Conversation. Among the instructions, before the reading, the model ignored
+    it (docs/eval-2026-10-29.md): in eval run 20261029T191529Z-94e980b it called a tool on all 8
+    last requests; replayed with the note last, 23 of 24 were answered. Reading the whole Seed,
+    the request's closing turn holds its note instead (`QUESTION_LABEL`).
     """
-
-    whole_seed: bool
 
     async def before_model_request(
         self, ctx: RunContext[SeedTools], request_context: ModelRequestContext
     ) -> ModelRequestContext:
-        """Add the note to this request's last message, the Question or the tools' results."""
-        if self.whole_seed:
-            note = NO_TOOLS
-        elif ctx.run_step >= REQUEST_LIMIT:
-            note = LAST_REQUEST
-        else:
+        """Add the note to the last request's last message, the tools' results."""
+        if ctx.run_step < REQUEST_LIMIT:
             return request_context
+        note = LAST_REQUEST
         *earlier, last = request_context.messages
         if not isinstance(last, ModelRequest):
             return request_context
         # A new message, not the history's own: the note stays out of the Conversation.
         noted = replace(last, parts=[*last.parts, SystemPromptPart(note)])
         return replace(request_context, messages=[*earlier, noted])
+
+
+@dataclass
+class _ThinkingOnlyWithTools(AbstractCapability[SeedTools]):
+    """A request that offers no tools must answer: it runs without thinking, unless `thinking`.
+
+    Thinking off there also closes the way thinking leaked into Answers (chat-template tokens
+    and monologue, eval of 2026-10-29); `DraftCut` stays as a guard.
+    """
+
+    thinking: bool
+
+    async def before_model_request(
+        self, ctx: RunContext[SeedTools], request_context: ModelRequestContext
+    ) -> ModelRequestContext:
+        """Turn thinking off for this request if it offers no tools."""
+        if self.thinking or request_context.model_request_parameters.function_tools:
+            return request_context
+        settings = merge_model_settings(request_context.model_settings, _WITHOUT_THINKING)
+        return replace(request_context, model_settings=settings)
 
 
 async def _no_tools_on_the_last_request(
@@ -378,6 +512,16 @@ def _with_draft(messages: list[ModelMessage], draft: str) -> list[ModelMessage]:
         return messages
     kept = [p for p in last.parts if not isinstance(p, TextPart)]
     return [*earlier, replace(last, parts=[*kept, TextPart(draft)])]
+
+
+def _with_question(messages: list[ModelMessage], at: int, question: str) -> list[ModelMessage]:
+    """The messages with the bare Question at `at`: the closing turn was for the request only."""
+    request = messages[at]
+    assert isinstance(request, ModelRequest), "the Question's request is not where it was put"
+    parts = [
+        replace(p, content=question) if isinstance(p, UserPromptPart) else p for p in request.parts
+    ]
+    return [*messages[:at], replace(request, parts=parts), *messages[at + 1 :]]
 
 
 def _without_thinking(messages: list[ModelMessage]) -> list[ModelMessage]:

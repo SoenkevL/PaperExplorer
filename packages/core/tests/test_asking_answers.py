@@ -5,9 +5,11 @@ product of their counts of distinct content words (stop words such as "the", "wa
 out). Every test resolves at `THRESHOLD`, so a sentence is close where that share clears it.
 """
 
+import json
 import random
 import re
 import unicodedata
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -462,3 +464,32 @@ def test_no_quote_is_exact_unless_the_authors_printed_its_words_at_its_place() -
             )
             assert _letters(_printed(holder, quote)) == _letters(_quoted(answer.text, quote)), draft
     assert exact >= 100  # the guard saw real matches, not only misses
+
+
+# The handle forms core and web both read, each rebuilt around a form an eval run recorded.
+HANDLE_FORMS = json.loads(
+    (Path(__file__).parents[3] / "tests" / "fixtures" / "handle-forms.json").read_text("utf-8")
+)["forms"]
+
+
+@pytest.mark.parametrize("form", HANDLE_FORMS, ids=lambda form: form["name"])
+def test_regression_eval_handle_forms_are_read_with_every_number_they_carry(
+    form: dict[str, object],
+) -> None:
+    """Eval runs 20261029T191529Z-94e980b and 20261029T202214Z-2b41752, the traces named.
+
+    The model wrote handles in parentheses, braces and angle brackets, nested, with ranges and
+    with `#` as a separator; read as `[#n]` only, they stayed in the text and gave no Pointer.
+    Groups without a `#` are the Seed's own markers and stay text.
+    """
+    draft, numbers, text = str(form["draft"]), form["handles"], str(form["text"])
+
+    unknown = resolve_answer(draft, {}, [], FakeEmbedder(), THRESHOLD)
+    tied = resolve_answer(
+        draft, {n: METHODS for n in unknown.unknown_handles}, [METHODS], FakeEmbedder(), THRESHOLD
+    )
+
+    assert unknown.unknown_handles == numbers
+    assert unknown.text == text
+    # Every sentence of a draft with handles carries one here, and gets its Pointer.
+    assert [bool(s.pointers) for s in tied.sentences] == [bool(numbers)] * len(tied.sentences)

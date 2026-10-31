@@ -778,3 +778,151 @@ def test_a_reading_set_on_the_context_is_used_whatever_the_seeds_size(
 
     answered = events[-1]
     assert isinstance(answered, AnsweredEvent) and answered.reading is reading
+
+
+def deltas(events: Sequence[AnswerEvent]) -> list[str]:
+    return [e.text for e in events if isinstance(e, DeltaEvent)]
+
+
+def last_response_text(conversation: Conversation) -> list[str]:
+    """The text parts of the Conversation's last response: what later Questions see of it."""
+    response = next(m for m in reversed(conversation.messages) if isinstance(m, ModelResponse))
+    return [p.content for p in response.parts if isinstance(p, TextPart)]
+
+
+def test_regression_eval_5e96992b6d5b49ce00d6d8a715afddf4_answer_ends_at_a_leaked_channel_token(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    """Eval run 20261029T202214Z-2b41752, trace 5e96992b6d5b49ce00d6d8a715afddf4 (baseline).
+
+    After its Answer the model wrote gemma's `<channel|>`, then talked about the reader, then
+    wrote more Answer-like lines, each run ending in `<channel|>` again. The reader saw it all.
+    The Answer ends at the first control token, and so does the draft as it streams.
+    """
+    script = Script(
+        [
+            "The replication found the same rise in entropy. [#1]\n",
+            "<channel|>The reader may want the numbers too.\n\n",
+            "It did not report them. <channel|>The replication found it again.\n\n",
+            "<channel|>",
+        ]
+    )
+
+    events = turn(context(store_db, script, reading=Reading.WHOLE_SEED), conversation, QUESTION)
+
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent)
+    assert answered.answer.text == "The replication found the same rise in entropy."
+    assert "".join(deltas(events)) == "The replication found the same rise in entropy. [#1]\n"
+    # Later Questions see the Answer as cut, not what followed it.
+    assert last_response_text(conversation) == [
+        "The replication found the same rise in entropy. [#1]"
+    ]
+
+
+def test_regression_eval_c5b7289409b2182cea0d01e18bdb38f6_a_token_split_across_deltas_ends_it(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    """Eval run 20261029T202214Z-2b41752, trace c5b7289409b2182cea0d01e18bdb38f6 (baseline).
+
+    The Answer was followed by seven lines, each opening with `<channel|>`. A token may arrive
+    in pieces; none of it reaches the draft.
+    """
+    script = Script(
+        [
+            "Entropy was computed from each EEG recording. [#3]\n<cha",
+            "nnel|>Then the reader asks about it again.\n",
+            "<channel|>And once more.\n",
+            "<channel|>ok",
+        ]
+    )
+
+    events = turn(context(store_db, script, reading=Reading.WHOLE_SEED), conversation, QUESTION)
+
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent)
+    assert answered.answer.text == "Entropy was computed from each EEG recording."
+    assert deltas(events) == ["Entropy was computed from each EEG recording. [#3]\n"]
+
+
+def test_regression_eval_49f2a82d3fa6f54df59cc780a76aaa08_a_token_inside_a_delta_cuts_the_rest(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    """Eval run 20261029T191529Z-94e980b, trace 49f2a82d3fa6f54df59cc780a76aaa08 (retrieval).
+
+    `<channel|>` stood right after a full stop, mid-delta, and the model's monologue followed.
+    """
+    script = Script(
+        ["Two studies found no link with intensity.<channel|>So the reader also wants the dose."]
+    )
+
+    events = turn(context(store_db, script), conversation, QUESTION)
+
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent)
+    assert answered.answer.text == "Two studies found no link with intensity."
+    assert deltas(events) == ["Two studies found no link with intensity."]
+
+
+def test_regression_eval_fcb19996a0a8c2aca5129fb9fe75b646_a_token_alone_is_no_answer(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    """Eval run 20261029T191529Z-94e980b, trace fcb19996a0a8c2aca5129fb9fe75b646 (retrieval).
+
+    The whole Answer was gemma's `<|tool_response>`, and the turn counted as answered. Cut at
+    the token nothing is left: the turn fails and the Conversation stays as it was.
+    """
+    tracing, exporter, _ = in_memory_tracing()
+    script = Script(["<|tool_response>"])
+
+    events = turn(context(store_db, script, tracing=tracing), conversation, QUESTION)
+    tracing.flush()
+
+    assert [type(e) for e in events] == [StepEvent, ErrorEvent]
+    failed = events[-1]
+    assert isinstance(failed, ErrorEvent)
+    assert failed.message == "The model gave no Answer."
+    assert failed.reading is Reading.RETRIEVAL
+    [root] = [s for s in exporter.get_finished_spans() if s.name == "question"]
+    assert root.context is not None and failed.trace_id == format(root.context.trace_id, "032x")
+    assert (conversation.messages, conversation.questions) == ([], 0)
+
+
+def test_regression_eval_18ba564618a1ffce1b5033df85a5712e_an_echoed_system_block_is_left_out(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    """Eval run 20261029T191529Z-94e980b, trace 18ba564618a1ffce1b5033df85a5712e (baseline).
+
+    The Answer opened by echoing a `<system>` note in its tags, and it ended on a lone `<`, the
+    start of a token never finished. The block goes, the text around it stays.
+    """
+    script = Script(
+        [
+            "<system>Answer in plain",
+            " text.</system>The recordings were made in the afternoon.",
+            " They lasted an hour.<",
+        ]
+    )
+
+    events = turn(context(store_db, script, reading=Reading.WHOLE_SEED), conversation, QUESTION)
+
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent)
+    expected = "The recordings were made in the afternoon. They lasted an hour."
+    assert answered.answer.text == expected
+    assert "".join(deltas(events)) == expected
+    assert last_response_text(conversation) == [expected]
+
+
+def test_angle_brackets_that_start_no_token_stay_in_the_answer(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    text = "Entropy fell when p < 0.05 and x<y held, a <b> tag aside."
+    script = Script(["Entropy fell when p <", " 0.05 and x<", "y held, a <b", "> tag aside."])
+
+    events = turn(context(store_db, script, reading=Reading.WHOLE_SEED), conversation, QUESTION)
+
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent)
+    assert answered.answer.text == text
+    assert "".join(deltas(events)) == text

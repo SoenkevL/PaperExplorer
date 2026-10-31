@@ -9,6 +9,7 @@ import json
 import re
 from collections import Counter
 from collections.abc import AsyncIterator, Mapping
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -495,6 +496,26 @@ def test_without_the_retrieval_mode_a_seed_read_whole_runs_no_hit_at_8(
 
     assert (bar["hit@8"].value, bar["hit@8"].met) == (None, None)
     assert bar["Pointer coverage"].met is True
+
+
+def test_regression_eval_fcb19996a0a8c2aca5129fb9fe75b646_a_turn_with_no_answer_has_failed(
+    store_db: Conn, small_seed: Work, questions_file: Path
+) -> None:
+    """Eval run 20261029T191529Z-94e980b, trace fcb19996a0a8c2aca5129fb9fe75b646 (retrieval).
+
+    An Answer that was only gemma's `<|tool_response>` counted as answered. It is no Answer.
+    """
+    model = scripted({COVERED: "<|tool_response>", UNCOVERED: UNCOVERED_DRAFT})
+    ctx = replace(context(store_db), model=model)
+    questions = load_questions(questions_file)
+
+    report = asyncio.run(run_eval(ctx, small_seed, questions, info(small_seed), [Mode.LIVE]))
+
+    covered = report.questions[0]
+    turn = covered.turns[Mode.LIVE]
+    assert (turn.answer, turn.error) == (None, "The model gave no Answer.")
+    assert covered.metrics[Mode.LIVE]["answered"] is False
+    assert summarize(report).modes[Mode.LIVE].failed == 1
 
 
 def test_the_committed_summaries_of_earlier_runs_still_read() -> None:

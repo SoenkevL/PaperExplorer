@@ -14,7 +14,8 @@ from paperexplorer_api.schemas import Answer, Pointer, Quote
 # The handle grammar `asking` reads (design-asking.md, Answers), written again here since the web
 # app cannot import core; tests/fixtures/handle-forms.json holds the forms both are tested with.
 # A group in `[]`, `()`, `{}` or `<>`, nested one deep, of numbers apart by commas, semicolons,
-# spaces or `#`, at least one with a `#`; a range `#5-#7` (any dash) reads as its two ends.
+# spaces, middle dots or `#`, at least one with a `#`; a range `#5-#7` (any dash) reads as its
+# two ends.
 _NUMBER = r"#*\d+"
 _ITEM = rf"{_NUMBER}(?:[ \t]*[-\u2010-\u2014][ \t]*{_NUMBER})?"
 _BRACKETS = {"[": "]", "(": ")", "{": "}", "<": ">"}
@@ -22,7 +23,7 @@ _BRACKETS = {"[": "]", "(": ")", "{": "}", "<": ">"}
 
 def _group(item: str) -> str:
     """A bracketed group of `item`s; without a separator, the next starts with `#` or a bracket."""
-    items = rf"(?:{item})(?:(?:[ \t,;]+|(?=[#\[({{<]))(?:{item}))*"
+    items = rf"(?:{item})(?:(?:[ \t,;·]+|(?=[#\[({{<]))(?:{item}))*"
     return "|".join(
         rf"{re.escape(o)}[ \t]*{items}[ \t]*{re.escape(c)}" for o, c in _BRACKETS.items()
     )
@@ -30,7 +31,7 @@ def _group(item: str) -> str:
 
 _HANDLE = re.compile(_group(rf"{_group(_ITEM)}|{_ITEM}"))
 # What a handle is written with; any other character ends the hope that a group is one.
-_HANDLE_CHARS = frozenset("#0123456789 \t,;-\u2010\u2011\u2012\u2013\u2014[](){}<>")
+_HANDLE_CHARS = frozenset("#0123456789 \t,;\u00b7-\u2010\u2011\u2012\u2013\u2014[](){}<>")
 
 
 class DraftPiece(BaseModel):

@@ -15,7 +15,7 @@ Before resolution and Sources, the reader can ask the Seed Questions in a sideba
 ## Answers
 - Natural prose from the Seed alone. When the Seed does not cover a Question, the Answer says so (ADR 0008).
 - **Handles.** The model ties a sentence to a Chunk by writing its handle, `[#n]`, shaped unlike the Seed's own `[12]` or `(Smith, 2019)`. A Chunk keeps its handle for the whole Conversation; unknown handles are dropped. A sentence without a handle stays unmarked.
-  - **Every form with a `#` is read** (eval of 2026-10-29: the model also wrote `(#5)`, `{#92}`, `[<#3><#4>]`, `[#59##60]`, `[#5, 6]` and ranges, and those Answers lost their Pointers). A handle is any `[]`, `()`, `{}` or `<>` group, nested one deep, holding only numbers, at least one of them with a `#`; the numbers stand apart by commas, semicolons, spaces or `#`.
+  - **Every form with a `#` is read** (eval of 2026-10-29: the model also wrote `(#5)`, `{#92}`, `[<#3><#4>]`, `[#59##60]`, `[#65·66]`, `[#5, 6]` and ranges, and those Answers lost their Pointers). A handle is any `[]`, `()`, `{}` or `<>` group, nested one deep, holding only numbers, at least one of them with a `#`; the numbers stand apart by commas, semicolons, spaces, middle dots (`·`) or `#`.
   - A range `#5–#7`, with any dash, reads as its two ends only: in retrieval, handles number Chunks in the order they were first shown, not in reading order.
   - A group without a `#`, such as `[74]` or `(5)`, stays the Seed's own marker, in the text.
   - The web app's draft reads the same grammar for its placeholder chips; `tests/fixtures/handle-forms.json` holds the forms both are tested with.

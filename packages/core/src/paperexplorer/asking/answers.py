@@ -16,9 +16,9 @@ logger = logging.getLogger(__name__)
 
 # A handle ties a sentence to a Chunk (design-asking.md, Answers): a group in `[]`, `()`, `{}`
 # or `<>`, nested one deep (`[<#3><#4>]`), holding only numbers, at least one with a `#`. They
-# stand apart by commas, semicolons, spaces or `#` (`[#5, 6]`, `[#59##60]`). A range `#5-#7`,
-# any dash, reads as its two ends: handles number Chunks in the order first shown, not in
-# reading order.
+# stand apart by commas, semicolons, spaces, middle dots or `#` (`[#5, 6]`, `[#65·66]`,
+# `[#59##60]`). A range `#5-#7`, any dash, reads as its two ends: handles number Chunks in the
+# order first shown, not in reading order.
 # A group without `#`, `[74]` or `(5)`, is the Seed's own marker. The web app reads the same
 # grammar; tests/fixtures/handle-forms.json holds the forms both are tested with.
 _NUMBER = r"#*\d+"
@@ -28,7 +28,7 @@ _BRACKETS = ("[]", "()", "{}", "<>")
 
 def _group(item: str) -> str:
     """A bracketed group of `item`s; without a separator, the next starts with `#` or a bracket."""
-    items = rf"(?:{item})(?:(?:[ \t,;]+|(?=[#\[({{<]))(?:{item}))*"
+    items = rf"(?:{item})(?:(?:[ \t,;·]+|(?=[#\[({{<]))(?:{item}))*"
     return "|".join(rf"{re.escape(o)}[ \t]*{items}[ \t]*{re.escape(c)}" for o, c in _BRACKETS)
 
 

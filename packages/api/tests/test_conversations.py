@@ -18,6 +18,7 @@ from pydantic_ai.messages import ModelMessage
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from starlette.types import Message
 
+from paperexplorer.asking import Reading
 from paperexplorer.domain import Vector
 from paperexplorer.embedding import FakeEmbedder
 from paperexplorer.store import StoredChunk, Works
@@ -168,6 +169,22 @@ def test_a_question_streams_its_steps_draft_and_answer_as_server_sent_events(
         block[quote["block_start"] : quote["block_end"]]
         == answer["text"][quote["start"] : quote["end"]]
     )
+
+
+def test_a_question_about_a_work_that_fits_streams_its_draft_and_answer_with_no_step(
+    make_app: AppFactory, villiger: Stored
+) -> None:
+    script = Script(["The therapists took part in a training. [#1]"])
+    client = TestClient(make_app(script.model(), reading=Reading.AUTO))
+    conversation_id = start(client, villiger.work)
+
+    response = client.post(f"/conversations/{conversation_id}/questions", json={"text": QUESTION})
+
+    events = sse(response.text)
+    # The whole Work is in context: no search runs, so the draft is the first event.
+    assert [name for name, _ in events] == ["delta", "answer"]
+    [sentence] = events[-1][1]["answer"]["sentences"]
+    assert len(sentence["pointers"]) == 1
 
 
 def test_the_next_question_continues_the_conversation(

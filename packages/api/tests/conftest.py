@@ -19,7 +19,7 @@ from pydantic_ai.messages import ModelMessage
 from pydantic_ai.models import Model
 from pydantic_ai.models.function import AgentInfo, DeltaToolCall, FunctionModel
 
-from paperexplorer.asking import AskingContext
+from paperexplorer.asking import AskingContext, Reading
 from paperexplorer.chunking import chunk
 from paperexplorer.citations import CitationGraph, extract
 from paperexplorer.config import Settings
@@ -107,18 +107,24 @@ class AppFactory(Protocol):
         *,
         embedder: Embedder | None = None,
         conversations: Conversations | None = None,
+        reading: Reading = Reading.RETRIEVAL,
     ) -> FastAPI: ...
 
 
 @pytest.fixture
 def make_app(store_db: Conn) -> AppFactory:
-    """An app whose Questions the given chat model answers, over the test database."""
+    """An app whose Questions the given chat model answers, over the test database.
+
+    Its Questions search the Work, unless `reading` says otherwise: the fixture Works would fit
+    whole, and most tests here are of the turn's steps.
+    """
 
     def build(
         model: Model,
         *,
         embedder: Embedder | None = None,
         conversations: Conversations | None = None,
+        reading: Reading = Reading.RETRIEVAL,
     ) -> FastAPI:
         settings = Settings(_env_file=None)  # pyright: ignore[reportCallIssue]
         fake = embedder or FakeEmbedder()
@@ -126,7 +132,12 @@ def make_app(store_db: Conn) -> AppFactory:
             lambda: nullcontext(store_db),
             Asking(
                 contexts=lambda conn: AskingContext(
-                    conn=conn, embedder=fake, model=model, settings=settings, tracing=Tracing.off()
+                    conn=conn,
+                    embedder=fake,
+                    model=model,
+                    settings=settings,
+                    tracing=Tracing.off(),
+                    reading=reading,
                 ),
                 conversations=conversations or Conversations.from_settings(settings),
             ),

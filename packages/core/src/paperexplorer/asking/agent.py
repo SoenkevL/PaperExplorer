@@ -1,8 +1,10 @@
-"""The answering agent: one Question of a Conversation answered from the Seed (ADR 0008, 0009).
+"""The answering agent: one Question of a Conversation answered from the Seed (ADR 0008-0010).
 
-`design-asking.md` (The agent) and `architecture.md` (Tracing) give the shape: the system prompt
-and the Seed's map in context, a forced first search, five tools, at most `REQUEST_LIMIT` model
-requests, the model's thinking traced but never shown, one `question` trace per Question.
+`design-asking.md` (The agent) and `architecture.md` (Tracing) give the shape. A Seed that fits
+`PE_WHOLE_SEED_MAX_TOKENS` is read whole: the system prompt and every Chunk in context, one
+request, no tools. A larger one is searched: the Seed's map in context, a forced first search,
+five tools, at most `REQUEST_LIMIT` model requests. The model's thinking is traced but never
+shown; each Question is one `question` trace.
 """
 
 import asyncio
@@ -51,6 +53,7 @@ from paperexplorer.asking.events import (
     ErrorEvent,
     StepEvent,
 )
+from paperexplorer.asking.reading import Reading
 from paperexplorer.asking.tools import SeedTools
 from paperexplorer.config import Settings
 from paperexplorer.domain import Answer
@@ -66,7 +69,7 @@ LAST_REQUEST = (
     "This is your last request for this Question: no tools are left. Answer now from what you"
     " have read, and where it does not settle the Question, say what the Seed does not say."
 )
-# The eval's baseline (design-asking.md, Eval) reads the whole Seed instead of searching it.
+# A Seed that fits is read whole instead of searched (ADR 0010): the eval's baseline, unchanged.
 WHOLE_SEED = (
     "For this Question you have no tools, and no search has run: the Seed's whole text is below,"
     " every Chunk under its handle. What is said above about searching and reading with tools"
@@ -86,8 +89,9 @@ PROMPT_VERSION = hashlib.sha256(
 class AskingContext:
     """What answering works with: the store, the Embedder, the chat model, settings and tracing.
 
-    `tags` go on every Question's trace beside its own (the eval's run id). `whole_seed` is the
-    eval's baseline: the whole Seed in context, every Chunk with its handle, and no tools.
+    `tags` go on every Question's trace beside its own (the eval's run id). `reading` is how a
+    Question reads the Seed: `auto`, the whole Seed when it fits `PE_WHOLE_SEED_MAX_TOKENS` and
+    retrieval otherwise; the eval sets one or the other.
     """
 
     conn: psycopg.Connection[TupleRow]
@@ -96,7 +100,7 @@ class AskingContext:
     settings: Settings
     tracing: Tracing
     tags: tuple[str, ...] = ()
-    whole_seed: bool = False
+    reading: Reading = Reading.AUTO
 
 
 def chat_model(settings: Settings) -> Model:
@@ -142,8 +146,27 @@ async def _turn(
     question: str,
     emit: Callable[[AnswerEvent | None], None],
 ) -> None:
+    try:
+        await _answer_turn(ctx, conversation, question, emit)
+    finally:
+        emit(None)
+
+
+async def _answer_turn(
+    ctx: AskingContext,
+    conversation: Conversation,
+    question: str,
+    emit: Callable[[AnswerEvent | None], None],
+) -> None:
     started = time.monotonic()
     position = conversation.questions + 1
+    try:
+        tools = SeedTools(ctx.conn, ctx.embedder, conversation)
+    except Exception as error:
+        logger.exception("Question %d of Conversation %s found no Seed", position, conversation.id)
+        emit(ErrorEvent(message=f"The Seed could not be read: {error}"))
+        return
+    reading = ctx.reading.for_seed(tools.tokens(), ctx.settings.whole_seed_max_tokens)
     work = conversation.work
     key = work.zotero_key or str(work.id)
     metadata = {
@@ -153,51 +176,62 @@ async def _turn(
         "prompt_version": PROMPT_VERSION,
         "model": ctx.model.model_name,
         "num_ctx": str(ctx.settings.chat_num_ctx),
+        "reading": reading.value,
     }
-    tags = ["asking", f"work:{key}", *(["whole-seed"] if ctx.whole_seed else []), *ctx.tags]
-    try:
-        with ctx.tracing.trace(
-            "question", tags=tags, session_id=conversation.id, metadata=metadata
-        ) as trace_id:
-            try:
-                answer, messages, usage = await _answer(ctx, conversation, question, emit)
-            except UsageLimitExceeded:
-                logger.warning("No Answer within %d model requests", REQUEST_LIMIT)
-                emit(
-                    ErrorEvent(
-                        message=f"The model did not answer within {REQUEST_LIMIT} requests.",
-                        trace_id=trace_id,
-                    )
+    whole = ["whole-seed"] if reading is Reading.WHOLE_SEED else []
+    tags = ["asking", f"work:{key}", *whole, *ctx.tags]
+    with ctx.tracing.trace(
+        "question", tags=tags, session_id=conversation.id, metadata=metadata
+    ) as trace_id:
+        try:
+            answer, messages, usage = await _answer(
+                ctx, tools, reading, conversation, question, emit
+            )
+        except UsageLimitExceeded:
+            logger.warning("No Answer within %d model requests", REQUEST_LIMIT)
+            emit(
+                ErrorEvent(
+                    message=f"The model did not answer within {REQUEST_LIMIT} requests.",
+                    trace_id=trace_id,
+                    reading=reading,
                 )
-                return
-            except Exception as error:
-                logger.exception("Question %d of Conversation %s failed", position, conversation.id)
-                emit(ErrorEvent(message=f"The model could not answer: {error}", trace_id=trace_id))
-                return
-            conversation.messages = _without_thinking(messages)
-            conversation.questions = position
-            _score(ctx.tracing, answer, usage, time.monotonic() - started)
-        logger.info(
-            "Answered Question %d of Conversation %s in %d requests, %.1f s",
-            position,
-            conversation.id,
-            usage.requests,
-            time.monotonic() - started,
-        )
-        emit(AnsweredEvent(answer=answer, trace_id=trace_id))
-    finally:
-        emit(None)
+            )
+            return
+        except Exception as error:
+            logger.exception("Question %d of Conversation %s failed", position, conversation.id)
+            emit(
+                ErrorEvent(
+                    message=f"The model could not answer: {error}",
+                    trace_id=trace_id,
+                    reading=reading,
+                )
+            )
+            return
+        conversation.messages = _without_thinking(messages)
+        conversation.questions = position
+        _score(ctx.tracing, answer, usage, time.monotonic() - started)
+    logger.info(
+        "Answered Question %d of Conversation %s (%s) in %d requests, %.1f s",
+        position,
+        conversation.id,
+        reading.value,
+        usage.requests,
+        time.monotonic() - started,
+    )
+    emit(AnsweredEvent(answer=answer, trace_id=trace_id, reading=reading))
 
 
 async def _answer(
     ctx: AskingContext,
+    tools: SeedTools,
+    reading: Reading,
     conversation: Conversation,
     question: str,
     emit: Callable[[AnswerEvent | None], None],
 ) -> tuple[Answer, list[ModelMessage], RunUsage]:
     """Run the agent on the Question and resolve its draft into the Answer."""
-    tools = SeedTools(ctx.conn, ctx.embedder, conversation)
-    if ctx.whole_seed:
+    whole = reading is Reading.WHOLE_SEED
+    if whole:
         instructions = f"{SYSTEM_PROMPT.strip()}\n\n{WHOLE_SEED}\n\n{tools.whole_seed()}"
         history: list[ModelMessage] = [
             *conversation.messages,
@@ -212,10 +246,10 @@ async def _answer(
         deps_type=SeedTools,
         name="asking",
         instructions=instructions,
-        tools=[] if ctx.whole_seed else _TOOLS,
+        tools=[] if whole else _TOOLS,
         capabilities=[
             PrepareTools(_no_tools_on_the_last_request),
-            _NoteAfterReading(whole_seed=ctx.whole_seed),
+            _NoteAfterReading(whole_seed=whole),
             Instrumentation(
                 settings=InstrumentationSettings(tracer_provider=ctx.tracing.tracer_provider)
             ),

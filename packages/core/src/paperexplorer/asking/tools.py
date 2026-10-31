@@ -97,6 +97,10 @@ class SeedTools:
         """The Seed's title and every Chunk in reading order, each with its handle: all read."""
         return f"{self._title()}\n\nIts whole text, in reading order:\n\n{self._show(self._chunks)}"
 
+    def tokens(self) -> int:
+        """The Seed's size as `whole_seed` shows it: the sum of its Chunks' (bge-m3) tokens."""
+        return sum(c.chunk.tokens for c in self._chunks)
+
     def search(self, query: str, k: int = 8) -> str:
         """The `k` Chunks of the Seed that best match `query`, best first."""
         k = max(1, min(k, SEARCH_K_MAX))

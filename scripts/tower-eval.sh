@@ -7,11 +7,13 @@
 # embedded with bge-m3 in the compose database, and Ollama serving bge-m3 and paperexplorer-chat.
 #
 # Every Question of evals/seed-questions.yaml is asked of the Seed twice, each in a fresh
-# Conversation: as the reader asks it (retrieval: the forced search, then the model's tools) and
-# with the whole Seed in context (the baseline, no tools). Each turn is a `question` trace in
-# Langfuse's `eval` environment, tagged `run:<run id>`. 22 Questions in two modes take a while,
-# and the tower has no tmux: start a full run detached, so a dropped SSH connection does not
-# stop it (detached, it does not offer the commit).
+# Conversation: as the reader asks it (live: the whole Seed in context when it fits
+# PE_WHOLE_SEED_MAX_TOKENS, no tools; ADR 0010) and by retrieval, forced (the forced search, then
+# the model's tools: the fallback for larger Seeds). The bar is checked on live; hit@8 comes
+# from retrieval's forced search. Each turn is a `question` trace in Langfuse's `eval`
+# environment, tagged `run:<run id>`, and `whole-seed` when it read the whole Seed. 22 Questions
+# in two modes take a while, and the tower has no tmux: start a full run detached, so a dropped
+# SSH connection does not stop it (detached, it does not offer the commit).
 #
 # Writes:
 #   data/eval/<run id>/            the full report: report.json and answers.md hold the Answers
@@ -24,7 +26,7 @@
 #   git fetch && git switch <branch> && git pull --ff-only && scripts/tower-eval.sh
 #   setsid nohup scripts/tower-eval.sh < /dev/null > data/eval/run.out 2>&1 &   # detached
 # Arguments go to `paperexplorer eval`, e.g. one Question as the reader asks it:
-#   scripts/tower-eval.sh --only uncovered-heart-rate --no-baseline
+#   scripts/tower-eval.sh --only uncovered-heart-rate --no-retrieval
 # The last lines print the command that copies the full report to the Mac.
 
 # Sourced, its `set -e` and `exit` would close the caller's shell, and an SSH session with it.

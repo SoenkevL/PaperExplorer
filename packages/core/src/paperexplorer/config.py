@@ -1,9 +1,9 @@
 """Typed application settings, read from the environment and `.env`."""
 
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
@@ -44,6 +44,15 @@ class Settings(BaseSettings):
         default=73728,
         ge=1,
         description="The chat model's context in tokens, as its Modelfile sets it; on every trace.",
+    )
+    # A Seed this small is read whole, in context, rather than searched (ADR 0010). Counted in
+    # bge-m3 tokens, the sum of its Chunks'; the rest of the chat context is left for gemma
+    # counting more tokens than bge-m3, the system prompt, the Conversation, the model's thinking
+    # and its Answer. The Seed of the eval of 2026-10-29 is about 18k.
+    whole_seed_max_tokens: int = Field(
+        default=40000,
+        ge=0,
+        description="A Seed of at most this many tokens is answered from whole, else searched.",
     )
     # Ollama sends nothing while it loads the model and reads the prompt (about 30 s for the
     # whole Seed, cold); a stream silent much longer has stalled (eval 2026-10-29).
@@ -107,6 +116,16 @@ class Settings(BaseSettings):
     def _empty_is_unset(cls, value: object) -> object:
         """`.env.example` leaves optional values empty; empty means unset (for folders, not cwd)."""
         return None if value == "" else value
+
+    @model_validator(mode="after")
+    def _whole_seed_fits_the_context(self) -> Self:
+        if self.whole_seed_max_tokens >= self.chat_num_ctx:
+            raise ValueError(
+                f"PE_WHOLE_SEED_MAX_TOKENS ({self.whole_seed_max_tokens}) must stay below"
+                f" PE_CHAT_NUM_CTX ({self.chat_num_ctx}): the whole Seed would leave no room for"
+                " the prompt, the Conversation and the Answer"
+            )
+        return self
 
     @property
     def cache_dir(self) -> Path:

@@ -4,6 +4,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, JsonValue
 
+from paperexplorer.asking.reading import Reading
 from paperexplorer.domain import Answer
 
 
@@ -25,20 +26,26 @@ class DeltaEvent(BaseModel):
 class AnsweredEvent(BaseModel):
     """The resolved Answer, with its Pointers and Quotes; the turn's last event.
 
-    `trace_id` is the Question's `question` trace (None with tracing off), for scores added later.
+    `trace_id` is the Question's `question` trace (None with tracing off), for scores added later;
+    `reading` is how the turn read the Seed, whole or by retrieval.
     """
 
     type: Literal["answer"] = "answer"
     answer: Answer
     trace_id: str | None = None
+    reading: Reading
 
 
 class ErrorEvent(BaseModel):
-    """The turn failed and ends here; the Conversation stays as it was before the Question."""
+    """The turn failed and ends here; the Conversation stays as it was before the Question.
+
+    `reading` is how the turn read the Seed, None when it failed before it chose.
+    """
 
     type: Literal["error"] = "error"
     message: str
     trace_id: str | None = None
+    reading: Reading | None = None
 
 
 type AnswerEvent = Annotated[

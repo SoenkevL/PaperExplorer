@@ -179,21 +179,37 @@ def test_ask_streams_the_draft_then_lists_the_answers_pointers_and_quotes(
 
     assert result.exit_code == 0, result.output
     lines = result.stdout.splitlines()
-    assert lines[:6] == [
-        '→ search {"query": "How was entropy measured?"}',
+    # The Seed fits the budget, so it is read whole: no search, and the draft comes first.
+    assert lines[:5] == [
         draft,
         "",
         "Answer",
         'Sample entropy was measured "in every participant".',
         "",
     ]
-    assert lines[6] == "Pointers"
-    assert lines[7].split() == ["s1", "close", "0.91", "p4", "2", "Methods", ">", "2.3", "EEG"]
-    assert lines[8].strip() == MEASURED
-    assert lines[9:11] == ["Quotes", '  "in every participant"  exact  p4']
-    assert lines[11].startswith("summary: sentences 1, substantive 1, pointer coverage 1.00,")
-    assert "close 1, weak 0, quotes exact 1, not exact 0, unknown handles 0" in lines[11]
-    assert "model requests 1, tool calls 0, latency " in lines[11]
+    assert lines[5] == "Pointers"
+    assert lines[6].split() == ["s1", "close", "0.91", "p4", "2", "Methods", ">", "2.3", "EEG"]
+    assert lines[7].strip() == MEASURED
+    assert lines[8:10] == ["Quotes", '  "in every participant"  exact  p4']
+    assert lines[10].startswith("summary: whole_seed, sentences 1, substantive 1,")
+    assert "close 1, weak 0, quotes exact 1, not exact 0, unknown handles 0" in lines[10]
+    assert "model requests 1, tool calls 0, latency " in lines[10]
+
+
+@pytest.mark.usefixtures("embedded_seed")
+def test_ask_searches_a_seed_over_the_whole_seed_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PE_WHOLE_SEED_MAX_TOKENS", "1")
+    monkeypatch.setattr(asking, "chat_model", _scripted("Sample entropy was measured. [#1]"))
+
+    result = CliRunner().invoke(app, ["ask", "YAAC9XCX", "How was entropy measured?"])
+
+    assert result.exit_code == 0, result.output
+    lines = result.stdout.splitlines()
+    assert lines[0] == '→ search {"query": "How was entropy measured?"}'
+    assert lines[-1].startswith("summary: retrieval, sentences 1,")
+    assert "model requests 1, tool calls 0, latency " in lines[-1]
 
 
 @pytest.mark.usefixtures("embedded_seed")
@@ -241,7 +257,7 @@ def eval_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 @pytest.mark.usefixtures("embedded_seed")
-def test_eval_asks_every_question_in_both_modes_and_writes_the_run(
+def test_eval_asks_every_question_live_and_by_retrieval_and_writes_the_run(
     monkeypatch: pytest.MonkeyPatch, eval_files: Path
 ) -> None:
     measured = "Sample entropy was measured in every participant. [#1]"
@@ -264,7 +280,7 @@ def test_eval_asks_every_question_in_both_modes_and_writes_the_run(
 
     assert result.exit_code == 0, result.output
     lines = result.stdout.splitlines()
-    assert lines[0] == "eval YAAC9XCX: 2 Questions, retrieval and baseline, run test-run"
+    assert lines[0] == "eval YAAC9XCX: 2 Questions, live and retrieval, run test-run"
     assert "hit@8 1.00 (≥ 0.80): met" in lines
     assert "Pointer coverage 1.00 (≥ 0.80): met" in lines
     assert "Quotes marked exact that are not 0 (0): met" in lines
@@ -275,11 +291,11 @@ def test_eval_asks_every_question_in_both_modes_and_writes_the_run(
     summary = json.loads((eval_files / "evals" / "runs" / "test-run.json").read_text())
     assert summary["run"]["langfuse_environment"] == "eval"
     assert summary["run"]["seed"] == "YAAC9XCX"
-    assert list(summary["modes"]) == ["retrieval", "baseline"]
+    assert list(summary["modes"]) == ["live", "retrieval"]
 
 
 @pytest.mark.usefixtures("embedded_seed")
-def test_eval_without_the_baseline_asks_only_as_the_reader_does(
+def test_eval_without_retrieval_asks_only_as_the_reader_does(
     monkeypatch: pytest.MonkeyPatch, eval_files: Path
 ) -> None:
     monkeypatch.setattr(asking, "chat_model", _scripted("Measured. [#1]"))
@@ -293,14 +309,14 @@ def test_eval_without_the_baseline_asks_only_as_the_reader_does(
             str(eval_files / "questions.yaml"),
             "--summary-dir",
             str(eval_files / "evals" / "runs"),
-            "--no-baseline",
+            "--no-retrieval",
             "--only",
             "method-entropy",
         ],
     )
 
     assert result.exit_code == 0, result.output
-    assert ": 1 Question, retrieval, run " in result.stdout.splitlines()[0]
+    assert ": 1 Question, live, run " in result.stdout.splitlines()[0]
 
 
 @pytest.mark.usefixtures("embedded_seed")

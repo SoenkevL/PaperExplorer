@@ -41,11 +41,12 @@ from paperexplorer.asking import (
     Conversation,
     DeltaEvent,
     ErrorEvent,
+    Reading,
     StepEvent,
     ask,
     chat_model,
 )
-from paperexplorer.asking.agent import LAST_REQUEST, NO_TOOLS
+from paperexplorer.asking.agent import LAST_REQUEST, NO_TOOLS, WHOLE_SEED
 from paperexplorer.config import Settings
 from paperexplorer.domain import Work
 from paperexplorer.embedding import Embedder, FakeEmbedder, OpenAICompatibleEmbedder
@@ -105,14 +106,22 @@ class Script:
 
 
 def context(
-    conn: Conn, script: Script, *, tracing: Tracing | None = None, embedder: Embedder | None = None
+    conn: Conn,
+    script: Script,
+    *,
+    tracing: Tracing | None = None,
+    embedder: Embedder | None = None,
+    reading: Reading = Reading.RETRIEVAL,
+    settings: Settings | None = None,
 ) -> AskingContext:
+    """The turn's context. The small Seed would fit whole; most tests here are of its tools."""
     return AskingContext(
         conn=conn,
         embedder=embedder or FakeEmbedder(),
         model=script.model(),
-        settings=Settings(_env_file=None),  # pyright: ignore[reportCallIssue]
+        settings=settings or Settings(_env_file=None),  # pyright: ignore[reportCallIssue]
         tracing=tracing or Tracing.off(),
+        reading=reading,
     )
 
 
@@ -379,7 +388,7 @@ def test_regression_eval_whole_seed_model_calls_a_tool_it_was_never_offered(
         return [Call("Read", {"handle": f"[#{n}]"}) for n in (27, 48, 52, 53)]
 
     script = Script(then=recorded)
-    ctx = replace(context(store_db, script), whole_seed=True)
+    ctx = context(store_db, script, reading=Reading.WHOLE_SEED)
 
     events = turn(ctx, conversation, QUESTION)
 
@@ -443,7 +452,7 @@ def test_regression_eval_a_stalled_stream_ends_the_turn_at_the_chat_timeout(
             model=chat_model(settings),
             settings=settings,
             tracing=Tracing.off(),
-            whole_seed=True,
+            reading=Reading.WHOLE_SEED,
         )
 
         async def collect() -> list[AnswerEvent]:
@@ -566,6 +575,7 @@ def test_one_question_is_one_trace_holding_every_model_tool_and_embedding_call(
         "prompt_version": PROMPT_VERSION,
         "model": "paperexplorer-chat",
         "num_ctx": "73728",
+        "reading": "retrieval",
     }
 
     def parent(span: ReadableSpan) -> str:
@@ -601,20 +611,18 @@ def test_one_question_is_one_trace_holding_every_model_tool_and_embedding_call(
 
 
 @pytest.mark.parametrize(
-    ("whole_seed", "tags"),
+    ("reading", "tags"),
     [
-        (False, ("asking", "work:SEED0001", "run:R1")),
-        (True, ("asking", "work:SEED0001", "whole-seed", "run:R1")),
+        (Reading.RETRIEVAL, ("asking", "work:SEED0001", "run:R1")),
+        (Reading.WHOLE_SEED, ("asking", "work:SEED0001", "whole-seed", "run:R1")),
     ],
 )
 def test_the_answer_names_its_trace_which_carries_the_callers_tags(
-    store_db: Conn, conversation: Conversation, whole_seed: bool, tags: tuple[str, ...]
+    store_db: Conn, conversation: Conversation, reading: Reading, tags: tuple[str, ...]
 ) -> None:
     tracing, exporter, _ = in_memory_tracing()
     script = Script(["Entropy was computed from each EEG recording."])
-    ctx = replace(
-        context(store_db, script, tracing=tracing), tags=("run:R1",), whole_seed=whole_seed
-    )
+    ctx = replace(context(store_db, script, tracing=tracing, reading=reading), tags=("run:R1",))
 
     events = turn(ctx, conversation, QUESTION)
     tracing.flush()
@@ -660,7 +668,7 @@ def test_the_whole_seed_mode_shows_every_chunk_with_its_handle_and_no_tools(
         return f'The authors write that "The sample was small". [#{handle}]'
 
     script = Script([draft])
-    ctx = replace(context(store_db, script), whole_seed=True)
+    ctx = context(store_db, script, reading=Reading.WHOLE_SEED)
 
     events = turn(ctx, conversation, "How large was the sample?")
 
@@ -690,7 +698,83 @@ def test_the_whole_seed_mode_shows_every_chunk_with_its_handle_and_no_tools(
     assert conversation.questions == 1
 
 
-def test_the_live_mode_is_the_default(store_db: Conn) -> None:
-    ctx = context(store_db, Script())
+def test_a_question_reads_the_whole_seed_when_it_fits_by_default(store_db: Conn) -> None:
+    settings = Settings(_env_file=None)  # pyright: ignore[reportCallIssue]
 
-    assert (ctx.tags, ctx.whole_seed) == ((), False)
+    ctx = AskingContext(store_db, FakeEmbedder(), Script().model(), settings, Tracing.off())
+
+    assert (ctx.tags, ctx.reading) == ((), Reading.AUTO)
+    assert settings.whole_seed_max_tokens == 40000
+
+
+def _metadata(span: ReadableSpan) -> dict[str, str]:
+    return {
+        key.removeprefix("langfuse.trace.metadata."): json.loads(str(value))
+        for key, value in (span.attributes or {}).items()
+        if key.startswith("langfuse.trace.metadata.")
+    }
+
+
+def test_auto_reads_a_seed_that_fits_whole_with_no_tools_and_no_search(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    tracing, exporter, _ = in_memory_tracing()
+    script = Script(["Entropy was computed from each EEG recording."])
+    ctx = context(store_db, script, tracing=tracing, reading=Reading.AUTO)
+
+    events = turn(ctx, conversation, QUESTION)
+    tracing.flush()
+
+    # No forced search: the draft is the first thing the turn streams.
+    assert [type(e) for e in events] == [DeltaEvent, AnsweredEvent]
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent)
+    assert answered.reading is Reading.WHOLE_SEED
+    [(messages, info)] = script.requests
+    assert info.function_tools == []
+    assert info.instructions is not None
+    assert info.instructions.startswith(f"{SYSTEM_PROMPT.strip()}\n\n{WHOLE_SEED}\n\n")
+    assert NO_TOOLS in (trailing_note(messages) or "")
+    [root] = [s for s in exporter.get_finished_spans() if s.name == "question"]
+    tags = ("asking", "work:SEED0001", "whole-seed")
+    assert (root.attributes or {})["langfuse.trace.tags"] == tags
+    assert _metadata(root)["reading"] == "whole_seed"
+
+
+@pytest.mark.parametrize(("spare", "reading"), [(0, Reading.WHOLE_SEED), (-1, Reading.RETRIEVAL)])
+def test_auto_searches_a_seed_whose_chunks_hold_more_tokens_than_the_budget(
+    store_db: Conn,
+    small_seed: Work,
+    conversation: Conversation,
+    spare: int,
+    reading: Reading,
+) -> None:
+    tokens = sum(c.chunk.tokens for c in Chunks(store_db).for_work(small_seed.id))
+    settings = Settings(_env_file=None, whole_seed_max_tokens=tokens + spare)  # pyright: ignore[reportCallIssue]
+    script = Script(["Entropy was computed from each EEG recording."])
+    ctx = context(store_db, script, reading=Reading.AUTO, settings=settings)
+
+    events = turn(ctx, conversation, QUESTION)
+
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent)
+    assert answered.reading is reading
+    [(_, info)] = script.requests
+    searched = reading is Reading.RETRIEVAL
+    assert (events[0] == StepEvent(tool="search", args={"query": QUESTION})) is searched
+    assert len(info.function_tools) == (5 if searched else 0)
+
+
+@pytest.mark.parametrize("reading", [Reading.RETRIEVAL, Reading.WHOLE_SEED])
+def test_a_reading_set_on_the_context_is_used_whatever_the_seeds_size(
+    store_db: Conn, conversation: Conversation, reading: Reading
+) -> None:
+    settings = Settings(_env_file=None, whole_seed_max_tokens=1)  # pyright: ignore[reportCallIssue]
+    script = Script(["Entropy was computed from each EEG recording."])
+
+    events = turn(
+        context(store_db, script, reading=reading, settings=settings), conversation, QUESTION
+    )
+
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent) and answered.reading is reading

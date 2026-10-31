@@ -111,3 +111,16 @@ def test_turns_without_a_verdict_or_on_another_trace_are_named(verdicts: Verdict
     assert "method-lzc-vs-shannon (retrieval)" not in missing
     assert "measurement-table-1-studies (retrieval)" in missing
     assert len(missing) == 2 * len(summary.questions) - 3
+
+
+def test_verdicts_on_repeated_turns_are_keyed_by_repeat_and_shared_per_repeat(
+    verdicts: Verdicts,
+) -> None:
+    again = verdicts.verdicts[0].model_copy(
+        update={"repeat": 2, "trace_id": "0" * 32, "grounded": False}
+    )
+    repeated = verdicts.model_copy(update={"verdicts": [*verdicts.verdicts, again]})
+
+    assert repeated.share(Mode.RETRIEVAL) == 1 / 3
+    assert repeated.share(Mode.RETRIEVAL, repeat=1) == 0.5
+    assert repeated.share(Mode.RETRIEVAL, repeat=2) == 0.0

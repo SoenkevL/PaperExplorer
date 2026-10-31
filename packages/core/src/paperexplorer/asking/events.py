@@ -36,13 +36,15 @@ class AnsweredEvent(BaseModel):
     """The resolved Answer, with its Pointers and Quotes; the turn's last event.
 
     `trace_id` is the Question's `question` trace (None with tracing off), for scores added later;
-    `reading` is how the turn read the Seed, whole or by retrieval.
+    `reading` is how the turn read the Seed, whole or by retrieval; `redrafted` says the Answer is
+    the draft written again with handles (a redraft that failed leaves the first standing).
     """
 
     type: Literal["answer"] = "answer"
     answer: Answer
     trace_id: str | None = None
     reading: Reading
+    redrafted: bool = False
 
 
 class ErrorEvent(BaseModel):

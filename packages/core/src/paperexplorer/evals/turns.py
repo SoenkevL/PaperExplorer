@@ -69,11 +69,12 @@ def says_not_covered(text: str) -> bool:
 
 
 async def ask_turn(
-    ctx: asking.AskingContext, work: Work, question: str, blocks: Sequence[str]
+    ctx: asking.AskingContext, work: Work, question: str, blocks: Sequence[str], repeat: int = 1
 ) -> Turn:
     """Ask `question` of the Seed in a fresh Conversation and record what the turn produced.
 
-    The mode follows `ctx.reading`; the turn says how it read the Seed. `blocks` are the Seed's
+    The mode follows `ctx.reading`; the turn says how it read the Seed, and which `repeat` of
+    the Question it is. `blocks` are the Seed's
     block texts, for the places Pointers and Quotes land on. A turn that read by retrieval has
     its forced search run once more outside its trace, as `retrieval.search(question, k=8)`,
     the same call with the same result.
@@ -96,9 +97,10 @@ async def ask_turn(
                 if first_delta is None:
                     first_delta = time.monotonic() - started
             case asking.RedraftEvent():
-                redrafted = True
+                pass  # the Answer says whether the redraft stood
             case asking.AnsweredEvent():
                 answer, trace_id, reading = event.answer, event.trace_id, event.reading
+                redrafted = event.redrafted
             case asking.ErrorEvent():
                 error, trace_id, reading = event.message, event.trace_id, event.reading
     latency = time.monotonic() - started
@@ -126,6 +128,7 @@ async def ask_turn(
     )
     return Turn(
         mode=mode,
+        repeat=repeat,
         reading=reading,
         question=question,
         conversation_id=conversation.id,

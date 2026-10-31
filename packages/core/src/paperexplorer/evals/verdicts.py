@@ -33,10 +33,14 @@ class PointerReading(BaseModel):
 
 
 class Verdict(BaseModel):
-    """One turn judged: whether the Answer is grounded and correct, and why, in a short note."""
+    """One turn judged: whether the Answer is grounded and correct, and why, in a short note.
+
+    A turn is its Question, mode and `repeat` (1 in runs that asked each Question once).
+    """
 
     question: str
     mode: Mode
+    repeat: int = 1
     trace_id: str
     grounded: bool
     correct: bool
@@ -53,9 +57,12 @@ class Verdicts(BaseModel):
     correct: str
     verdicts: list[Verdict]
 
-    def share(self, mode: Mode) -> float:
-        """The share of the mode's turns judged both grounded and correct; a failed turn is not."""
-        judged = [v for v in self.verdicts if v.mode is mode]
+    def share(self, mode: Mode, repeat: int | None = None) -> float:
+        """The share of the mode's turns judged both grounded and correct; a failed turn is not.
+
+        All the mode's turns pooled, or those of one `repeat`.
+        """
+        judged = [v for v in self.verdicts if v.mode is mode and repeat in (None, v.repeat)]
         return sum(v.grounded and v.correct for v in judged) / len(judged)
 
 
@@ -65,13 +72,17 @@ def load_verdicts(path: Path) -> Verdicts:
 
 
 def unjudged(verdicts: Verdicts, summary: EvalSummary) -> list[str]:
-    """Each turn of the run with no verdict on its trace, as `<question> (<mode>)`."""
-    judged = {(v.question, v.mode, v.trace_id) for v in verdicts.verdicts}
+    """Each turn of the run with no verdict on its trace, as `<question> (<mode>)`.
+
+    A mode asked more than once names the repeat too: `<question> (<mode>, repeat <n>)`.
+    """
+    judged = {(v.question, v.mode, v.repeat, v.trace_id) for v in verdicts.verdicts}
     return [
-        f"{q.name} ({mode})"
+        f"{q.name} ({mode})" if len(turns) == 1 else f"{q.name} ({mode}, repeat {turn.repeat})"
         for q in summary.questions
-        for mode, turn in q.turns.items()
-        if (q.name, mode, turn.trace_id) not in judged
+        for mode, turns in q.turns.items()
+        for turn in turns
+        if (q.name, mode, turn.repeat, turn.trace_id) not in judged
     ]
 
 

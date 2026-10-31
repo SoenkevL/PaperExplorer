@@ -254,7 +254,7 @@ async def _answer_turn(
         usage.requests,
         time.monotonic() - started,
     )
-    emit(AnsweredEvent(answer=answer, trace_id=trace_id, reading=reading))
+    emit(AnsweredEvent(answer=answer, trace_id=trace_id, reading=reading, redrafted=redrafted))
 
 
 async def _answer(
@@ -402,8 +402,9 @@ async def _redraft(
     with ctx.tracing.span("redraft", input=first) as span:
         try:
             result = await _run(agent, tools, history, 1, emit)
-        except Exception:
+        except Exception as error:
             logger.warning("Asked again for its handles, the model failed", exc_info=True)
+            span.update(output=f"failed: {error}")
             return None
         draft = answer_draft(result.output)
         span.update(output=draft)

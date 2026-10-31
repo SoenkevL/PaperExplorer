@@ -21,6 +21,7 @@ from pydantic_ai.messages import ModelMessage, ModelRequest, ToolReturnPart, Use
 from pydantic_ai.models.function import AgentInfo, DeltaToolCall, FunctionModel
 
 from paperexplorer.asking import AskingContext, Reading
+from paperexplorer.asking.agent import REDRAFT
 from paperexplorer.config import Settings
 from paperexplorer.domain import Answer, AnswerSentence, ChunkId, Pointer, Support, Work
 from paperexplorer.embedding import FakeEmbedder
@@ -38,12 +39,15 @@ from paperexplorer.evals import (
     Turn,
     eval_settings,
     load_questions,
+    load_verdicts,
     metrics,
     new_run_id,
     render_summary,
     run_eval,
+    run_info,
     says_not_covered,
     summarize,
+    unjudged,
     unknown_places,
     write_run,
 )
@@ -361,7 +365,7 @@ def test_a_run_asks_every_question_live_and_by_retrieval_each_in_a_fresh_convers
     assert report.modes == [Mode.LIVE, Mode.RETRIEVAL]
     assert [q.name for q in report.questions] == ["method-entropy", "uncovered-caffeine"]
     covered, uncovered = report.questions
-    live, retrieval = covered.turns[Mode.LIVE], covered.turns[Mode.RETRIEVAL]
+    [live], [retrieval] = covered.turns[Mode.LIVE], covered.turns[Mode.RETRIEVAL]
     # The small Seed fits the budget, so the live mode reads it whole and searches nothing.
     assert (live.reading, retrieval.reading) == (Reading.WHOLE_SEED, Reading.RETRIEVAL)
     assert retrieval.search is not None and len(retrieval.search) == 5
@@ -381,11 +385,13 @@ def test_a_run_asks_every_question_live_and_by_retrieval_each_in_a_fresh_convers
             ("each EEG recording", True, RECORDING_PLACE, True)
         ]
         assert (turn.model_requests, turn.tool_calls, turn.tools) == (1, 0, [])
-    assert covered.metrics[Mode.RETRIEVAL]["hit_at_8"] is True
-    assert covered.metrics[Mode.RETRIEVAL]["pointers_on_expected"] == 0.5
-    assert "hit_at_8" not in covered.metrics[Mode.LIVE]
-    assert uncovered.metrics[Mode.LIVE]["says_not_covered"] is True
-    conversations = [t.conversation_id for q in report.questions for t in q.turns.values()]
+    assert covered.metrics[Mode.RETRIEVAL][1]["hit_at_8"] is True
+    assert covered.metrics[Mode.RETRIEVAL][1]["pointers_on_expected"] == 0.5
+    assert "hit_at_8" not in covered.metrics[Mode.LIVE][1]
+    assert uncovered.metrics[Mode.LIVE][1]["says_not_covered"] is True
+    conversations = [
+        t.conversation_id for q in report.questions for ts in q.turns.values() for t in ts
+    ]
     assert len(set(conversations)) == 4
 
 
@@ -404,7 +410,7 @@ def test_each_turn_is_a_question_trace_tagged_with_the_run_and_named_in_the_repo
         if s.context
     }
     run_tag = "run:20261029T120000Z-abc1234"
-    turns = [t for q in report.questions for t in q.turns.values()]
+    turns = [t for q in report.questions for ts in q.turns.values() for t in ts]
     assert {t.trace_id for t in turns} == set(tags)
     for t in turns:
         assert t.trace_id is not None
@@ -452,12 +458,12 @@ def test_the_summary_carries_metrics_and_trace_ids_but_no_seed_or_answer_text(
     assert loaded["run"]["run_id"] == "20261029T120000Z-abc1234"
     [covered, uncovered] = loaded["questions"]
     assert covered["question"] == COVERED and uncovered["question"] == UNCOVERED
-    assert covered["turns"]["retrieval"]["trace_id"] is None
-    assert covered["turns"]["live"]["reading"] == "whole_seed"
-    assert covered["turns"]["retrieval"]["reading"] == "retrieval"
-    assert [p["similarity"] for p in covered["turns"]["retrieval"]["pointers"]] == [
+    assert covered["turns"]["retrieval"][0]["trace_id"] is None
+    assert covered["turns"]["live"][0]["reading"] == "whole_seed"
+    assert covered["turns"]["retrieval"][0]["reading"] == "retrieval"
+    assert [p["similarity"] for p in covered["turns"]["retrieval"][0]["pointers"]] == [
         pytest.approx(p.similarity, abs=1e-4)
-        for p in report.questions[0].turns[Mode.RETRIEVAL].pointers
+        for p in report.questions[0].turns[Mode.RETRIEVAL][0].pointers
     ]
 
 
@@ -516,9 +522,9 @@ def test_regression_eval_fcb19996a0a8c2aca5129fb9fe75b646_a_turn_with_no_answer_
     report = asyncio.run(run_eval(ctx, small_seed, questions, info(small_seed), [Mode.LIVE]))
 
     covered = report.questions[0]
-    turn = covered.turns[Mode.LIVE]
+    [turn] = covered.turns[Mode.LIVE]
     assert (turn.answer, turn.error) == (None, "The model gave no Answer.")
-    assert covered.metrics[Mode.LIVE]["answered"] is False
+    assert covered.metrics[Mode.LIVE][1]["answered"] is False
     assert summarize(report).modes[Mode.LIVE].failed == 1
 
 
@@ -529,7 +535,7 @@ def test_the_committed_summaries_of_runs_before_adr_0010_still_read(run_id: str)
     summary = EvalSummary.model_validate_json(path.read_text())
 
     assert set(summary.modes) == {Mode.RETRIEVAL, Mode.BASELINE}
-    assert all(t.reading is None for q in summary.questions for t in q.turns.values())
+    assert all(t.reading is None for q in summary.questions for ts in q.turns.values() for t in ts)
     assert all(m.readings == {} for m in summary.modes.values())
 
 
@@ -582,3 +588,110 @@ def test_regression_eval_448b0aa1b3b3490eb24f1a310c12392f_a_tool_name_with_answe
         text = path.read_text()
         assert "Entropy rose" not in text and "channel" not in text, path.name
     assert "(withheld" in written.committed[0].read_text()
+
+
+# Repeats
+
+
+def test_a_run_asks_each_question_live_as_often_as_it_repeats_and_by_retrieval_once(
+    store_db: Conn, small_seed: Work, questions_file: Path
+) -> None:
+    questions = load_questions(questions_file)
+    repeated = info(small_seed).model_copy(update={"repeat": 3})
+
+    report = asyncio.run(run_eval(context(store_db), small_seed, questions, repeated))
+
+    covered, _ = report.questions
+    assert [t.repeat for t in covered.turns[Mode.LIVE]] == [1, 2, 3]
+    assert [t.repeat for t in covered.turns[Mode.RETRIEVAL]] == [1]
+    assert sorted(covered.metrics[Mode.LIVE]) == [1, 2, 3]
+    conversations = [
+        t.conversation_id for q in report.questions for ts in q.turns.values() for t in ts
+    ]
+    assert len(set(conversations)) == 2 * (3 + 1)
+    summary = summarize(report)
+    live = summary.modes[Mode.LIVE]
+    assert (live.repeats, live.answered, live.failed) == (3, 6, 0)
+    assert summary.modes[Mode.RETRIEVAL].repeats == 1
+    assert [r.repeat for r in live.by_repeat] == [1, 2, 3]
+    assert [r.pointer_coverage for r in live.by_repeat] == [1.0, 1.0, 1.0]
+    bar = {b.name: b for b in summary.bar}
+    # The bar pools every live turn; each repeat's value and their spread stand beside it.
+    coverage = bar["Pointer coverage"]
+    assert (coverage.value, coverage.per_repeat, coverage.spread) == (1.0, [1.0, 1.0, 1.0], 0.0)
+    # The live mode read the Seed whole: hit@8 is the retrieval mode's single pass.
+    assert (bar["hit@8"].value, bar["hit@8"].per_repeat) == (1.0, [])
+    [turns] = [q.turns[Mode.LIVE] for q in summary.questions[:1]]
+    assert [t.repeat for t in turns] == [1, 2, 3]
+    markdown = render_summary(summary)
+    assert (
+        "| Pointer coverage | 1.00 | ≥ 0.80 | met | 1.00 / 1.00 / 1.00 (spread 0.00) |" in markdown
+    )
+    assert "| Answered | 6 of 6 | 2 of 2 |" in markdown
+    assert "Live asked 3 times per Question" in markdown
+
+
+def test_a_turn_records_that_it_was_redrafted_and_the_request_it_took(
+    store_db: Conn, small_seed: Work, questions_file: Path
+) -> None:
+    async def stream(messages: list[ModelMessage], info: AgentInfo) -> AsyncIterator[str]:
+        last = messages[-1]
+        asked_again = isinstance(last, ModelRequest) and any(
+            isinstance(p, UserPromptPart) and str(p.content) == REDRAFT for p in last.parts
+        )
+        recording = "Entropy was computed from each EEG recording."
+        yield f"{recording} [#3]" if asked_again else recording
+
+    ctx = replace(
+        context(store_db),
+        model=FunctionModel(stream_function=stream, model_name="paperexplorer-chat"),
+    )
+    questions = load_questions(questions_file)
+    questions.cases = questions.cases[:1]
+
+    report = asyncio.run(run_eval(ctx, small_seed, questions, info(small_seed), [Mode.LIVE]))
+
+    [turn] = report.questions[0].turns[Mode.LIVE]
+    assert (turn.redrafted, turn.model_requests) == (True, 2)
+    assert turn.answer is not None and turn.pointers
+    summary = summarize(report)
+    assert summary.modes[Mode.LIVE].redrafted == 1
+    assert summary.questions[0].turns[Mode.LIVE][0].redrafted is True
+    assert "| Redrafted (turns) | 1 |" in render_summary(summary)
+
+
+def test_a_run_records_the_chat_settings_and_how_often_live_repeats(
+    small_seed: Work, questions_file: Path
+) -> None:
+    settings = Settings(_env_file=None, chat_temperature=0.3)  # pyright: ignore[reportCallIssue]
+
+    recorded = run_info(
+        settings,
+        small_seed,
+        questions_file,
+        embedding_model="fake-bag-of-words",
+        git_sha="abc1234",
+        tracing_host=None,
+        started=datetime(2026, 10, 31, 12, tzinfo=UTC),
+        repeat=3,
+    )
+
+    assert (recorded.temperature, recorded.answer_thinking, recorded.repeat) == (0.3, False, 3)
+
+
+def test_the_committed_summary_and_verdicts_of_one_pass_read_as_repeat_1() -> None:
+    runs = QUESTION_SET.parent / "runs"
+    summary = EvalSummary.model_validate_json((runs / "20261031T140751Z-a758bbc.json").read_text())
+    verdicts = load_verdicts(runs / "20261031T140751Z-a758bbc.verdicts.yaml")
+
+    turns = [t for q in summary.questions for ts in q.turns.values() for t in ts]
+    assert len(turns) == 44
+    assert {(t.repeat, t.redrafted) for t in turns} == {(1, False)}
+    assert {m.repeats for m in summary.modes.values()} == {1}
+    assert (summary.run.repeat, summary.run.temperature, summary.run.answer_thinking) == (
+        1,
+        None,
+        None,
+    )
+    assert {v.repeat for v in verdicts.verdicts} == {1}
+    assert unjudged(verdicts, summary) == []

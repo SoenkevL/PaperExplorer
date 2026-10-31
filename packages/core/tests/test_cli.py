@@ -341,6 +341,40 @@ def test_eval_without_retrieval_asks_only_as_the_reader_does(
 
 
 @pytest.mark.usefixtures("embedded_seed")
+def test_eval_repeats_each_question_live_as_often_as_asked_and_retrieval_once(
+    monkeypatch: pytest.MonkeyPatch, eval_files: Path
+) -> None:
+    measured = "Sample entropy was measured in every participant. [#1]"
+    monkeypatch.setattr(asking, "chat_model", _scripted(measured, measured, measured))
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "eval",
+            "YAAC9XCX",
+            "--questions",
+            str(eval_files / "questions.yaml"),
+            "--summary-dir",
+            str(eval_files / "evals" / "runs"),
+            "--only",
+            "method-entropy",
+            "--repeat",
+            "2",
+            "--run-id",
+            "test-run",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    lines = result.stdout.splitlines()
+    assert lines[0] == "eval YAAC9XCX: 1 Question, live 2 times and retrieval, run test-run"
+    summary = json.loads((eval_files / "evals" / "runs" / "test-run.json").read_text())
+    assert summary["run"]["repeat"] == 2
+    assert (summary["modes"]["live"]["repeats"], summary["modes"]["retrieval"]["repeats"]) == (2, 1)
+    assert [t["repeat"] for t in summary["questions"][0]["turns"]["live"]] == [1, 2]
+
+
+@pytest.mark.usefixtures("embedded_seed")
 def test_eval_refuses_places_the_seed_does_not_have(eval_files: Path) -> None:
     questions = eval_files / "questions.yaml"
     questions.write_text(EVAL_QUESTIONS.replace("page: 4", "page: 9"))

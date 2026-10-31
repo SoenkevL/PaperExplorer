@@ -1012,6 +1012,7 @@ def test_regression_eval_7f32813a3ef4cd52aca983d0e0ad660e_an_answer_is_asked_for
     assert deltas(events) == [first, second]
     answered = events[-1]
     assert isinstance(answered, AnsweredEvent)
+    assert answered.redrafted is True
     assert answered.answer.text == first
     assert [len(s.pointers) for s in answered.answer.sentences] == [1, 1]
     # The second request reads the first draft as the model's own response, then a note.
@@ -1046,6 +1047,7 @@ def test_regression_eval_70cf08933dac78bcf79873edbada5a1e_without_a_redraft_the_
     assert [e.type for e in events][:2] == ["delta", "redraft"]
     answered = events[-1]
     assert isinstance(answered, AnsweredEvent)
+    assert answered.redrafted is False
     assert answered.answer.text == first
     assert all(s.pointers == [] for s in answered.answer.sentences)
     assert last_response_text(conversation) == [first]

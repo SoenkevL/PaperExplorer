@@ -6,14 +6,15 @@
 # It assumes what tower-check and setup-tower set up: the Seed fetched, parsed, chunked and
 # embedded with bge-m3 in the compose database, and Ollama serving bge-m3 and paperexplorer-chat.
 #
-# Every Question of evals/seed-questions.yaml is asked of the Seed twice, each in a fresh
+# Every Question of evals/seed-questions.yaml is asked of the Seed, each time in a fresh
 # Conversation: as the reader asks it (live: the whole Seed in context when it fits
-# PE_WHOLE_SEED_MAX_TOKENS, no tools; ADR 0010) and by retrieval, forced (the forced search, then
-# the model's tools: the fallback for larger Seeds). The bar is checked on live; hit@8 comes
-# from retrieval's forced search. Each turn is a `question` trace in Langfuse's `eval`
+# PE_WHOLE_SEED_MAX_TOKENS, no tools; ADR 0010), `--repeat N` times (1 by default), and by
+# retrieval, forced, once (the forced search, then the model's tools: the fallback for larger
+# Seeds). The bar is checked on the live turns pooled, each repeat's values beside them; hit@8
+# comes from retrieval's forced search. Each turn is a `question` trace in Langfuse's `eval`
 # environment, tagged `run:<run id>`, and `whole-seed` when it read the whole Seed. 22 Questions
-# in two modes take a while, and the tower has no tmux: start a full run detached, so a dropped
-# SSH connection does not stop it (detached, it does not offer the commit).
+# in two modes take a while, more with repeats, and the tower has no tmux: start a full run
+# detached, so a dropped SSH connection does not stop it (detached, it does not offer the commit).
 #
 # Writes:
 #   data/eval/<run id>/            the full report: report.json and answers.md hold the Answers
@@ -25,6 +26,7 @@
 # Run it on the tower, from the repo; never source it:
 #   git fetch && git switch <branch> && git pull --ff-only && scripts/tower-eval.sh
 #   setsid nohup scripts/tower-eval.sh < /dev/null > data/eval/run.out 2>&1 &   # detached
+#   setsid nohup scripts/tower-eval.sh --repeat 3 < /dev/null > data/eval/run.out 2>&1 &
 # Arguments go to `paperexplorer eval`, e.g. one Question as the reader asks it:
 #   scripts/tower-eval.sh --only uncovered-heart-rate --no-retrieval
 # The last lines print the command that copies the full report to the Mac.
@@ -33,6 +35,9 @@
 (return 0 2>/dev/null) && { echo "Run ${BASH_SOURCE[0]}, don't source it." >&2; return 1; }
 
 set -euo pipefail
+
+# A non-interactive SSH session has no ~/.local/bin on its PATH, where uv lives (eval 2026-10-31).
+export PATH="$HOME/.local/bin:$PATH"
 
 SEED="YAAC9XCX"  # the Seed's Zotero item
 MODELS=(bge-m3 paperexplorer-chat)

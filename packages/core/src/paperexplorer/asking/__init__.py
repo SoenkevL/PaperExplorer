@@ -10,6 +10,7 @@ from paperexplorer.asking.agent import (
 )
 from paperexplorer.asking.answers import resolve_answer
 from paperexplorer.asking.conversation import Conversation
+from paperexplorer.asking.draft import DraftPiece, HandlePiece, TextPiece
 from paperexplorer.asking.events import (
     AnsweredEvent,
     AnswerEvent,
@@ -30,11 +31,14 @@ __all__ = [
     "AskingContext",
     "Conversation",
     "DeltaEvent",
+    "DraftPiece",
     "ErrorEvent",
+    "HandlePiece",
     "Reading",
     "RedraftEvent",
     "SeedTools",
     "StepEvent",
+    "TextPiece",
     "ask",
     "chat_model",
     "resolve_answer",

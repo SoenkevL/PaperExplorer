@@ -1,9 +1,10 @@
-"""What `ask` streams while it answers a Question: steps, draft text, then an Answer or an error."""
+"""What `ask` streams while it answers a Question: steps, the draft, then an Answer or an error."""
 
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, JsonValue
 
+from paperexplorer.asking.draft import DraftPiece
 from paperexplorer.asking.reading import Reading
 from paperexplorer.domain import Answer
 
@@ -17,10 +18,10 @@ class StepEvent(BaseModel):
 
 
 class DeltaEvent(BaseModel):
-    """More of the model's draft, handles and all; never its thinking."""
+    """More of the model's draft, cut into text and handles (`DraftCut`); never its thinking."""
 
     type: Literal["delta"] = "delta"
-    text: str
+    pieces: list[DraftPiece]
 
 
 class RedraftEvent(BaseModel):

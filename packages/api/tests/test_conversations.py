@@ -140,7 +140,10 @@ def test_a_question_streams_its_steps_draft_and_answer_as_server_sent_events(
     assert all(data["type"] == name for name, data in events)
     assert events[0][1] == {"type": "step", "tool": "search", "args": {"query": QUESTION}}
     assert events[1][1] == {"type": "step", "tool": "read_around", "args": {"handle": 1}}
-    assert "".join(data["text"] for name, data in events if name == "delta") == draft()
+    pieces = [piece for name, data in events if name == "delta" for piece in data["pieces"]]
+    assert {"handle": 1} in pieces
+    shown = "".join(p["text"] if "text" in p else f"[#{p['handle']}]" for p in pieces)
+    assert shown == draft()
     answer = events[-1][1]["answer"]
     [(cited, text)] = drafts
     sentence = cited.chunk.sentences[0]

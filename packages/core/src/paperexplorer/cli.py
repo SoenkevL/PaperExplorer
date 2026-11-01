@@ -343,7 +343,10 @@ async def _stream_answer(
                     typer.echo()
                 typer.echo(f"→ {tool} {json.dumps(args, ensure_ascii=False)}")
                 line_open = False
-            case asking.DeltaEvent(text=text):
+            case asking.DeltaEvent(pieces=pieces):
+                text = "".join(
+                    p.text if isinstance(p, asking.TextPiece) else f"[#{p.handle}]" for p in pieces
+                )
                 typer.echo(text, nl=False)
                 line_open = not text.endswith("\n")
             case asking.RedraftEvent():

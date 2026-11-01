@@ -114,7 +114,7 @@ async def ask_turn(
             Hit(rank=i, chunk_id=r.id, place=Place.of(r.chunk), rrf=r.rrf)
             for i, r in enumerate(forced_search, start=1)
         ]
-    forced = len(steps) - tool_calls  # the forced search's step, when it ran
+    forced = 1 if reading is asking.Reading.RETRIEVAL else 0  # the forced search's step
     chunks = {c.id: c for c in conversation.handles.values()}
     logger.info(
         "Asked %r (%s, %s) in %.1f s: %s",

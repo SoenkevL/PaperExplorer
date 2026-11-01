@@ -12,7 +12,7 @@ import yaml
 from pydantic import BaseModel
 
 from paperexplorer.evals.models import Mode
-from paperexplorer.evals.runs import EvalSummary
+from paperexplorer.evals.summaries import EvalSummary
 from paperexplorer.tracing import Tracing
 
 

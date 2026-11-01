@@ -1,0 +1,1066 @@
+# Verdicts on eval run 20261031T192037Z-f349d1e, live asked three times per Question and
+# retrieval once, after stage 10a (the Question last, temperature 0.5, no thinking on requests
+# without tools, bare [n] handles, a redraft for handles; docs/eval-2026-10-31b.md). No words of
+# the Seed or of the Answers: notes are the judge's own. Each verdict is also posted to Langfuse as
+# judge.grounded and judge.correct on its trace. A Pointer's `apt`: apt (its place says what the
+# sentence says), partly (it bears out part of the sentence, or a nearby sentence would do better),
+# not (it does not bear the sentence out). Where parsing lost words (2.5, pages 5-6), an Answer is
+# judged by the Chunk as stored, which is what the model read: the user's rule. A redrafted Answer
+# is judged as shown, the redraft; its note says whether the redraft changed a claim.
+run_id: 20261031T192037Z-f349d1e
+judge: Claude (stage 10b), each Answer read against the Seed's 105 Chunks as stored on the tower
+grounded: >-
+  Every claim the Answer makes is borne out by the Seed: by the Chunks its Pointers lead to, and,
+  for sentences without a Pointer, by the Chunks the model read (the whole Seed, when it read the
+  whole Seed). One claim the Seed does not make, or contradicts, makes the Answer ungrounded.
+  Unpointed but true sentences are not held against it here: Pointer coverage measures those.
+  For an uncovered Question, saying the Seed does not cover it is grounded when that is so; saying
+  so of a covered Question is a claim the Seed contradicts. Where parsing lost words, the Chunk as
+  stored is the Seed. A failed turn has no Answer and is neither grounded nor correct.
+correct: >-
+  The Answer answers the Question rightly per the Seed: its substance is what the Seed says on
+  the point asked. A wrong detail off the point asked does not make it incorrect (it makes it
+  ungrounded); a wrong or invented statement on the point asked does, and so does an Answer
+  that misses the point asked or answers another Question. An Answer with no content is
+  incorrect. Leaked template tokens, stray words in other languages and garbled words are noted,
+  not held against correctness.
+verdicts:
+  - question: measurement-table-1-studies
+    mode: live
+    repeat: 1
+    trace_id: 8f1a8a354ddf0f448aa3320baca60bf5
+    grounded: true
+    correct: true
+    note: >-
+      18 studies, the four compounds with their counts, three multi-drug: right. Redrafted: handles
+      added, wording unchanged.
+    pointers:
+      - {sentence: 0, similarity: 0.5995, apt: apt}
+      - {sentence: 1, similarity: 0.9514, apt: apt}
+  - question: measurement-table-1-studies
+    mode: live
+    repeat: 2
+    trace_id: b757a52106c5cadd64f6dc9ec9d1c180
+    grounded: true
+    correct: true
+    note: >-
+      18 studies and the four compounds with their counts: right and pointed.
+    pointers:
+      - {sentence: 0, similarity: 0.5995, apt: apt}
+      - {sentence: 1, similarity: 0.8812, apt: apt}
+  - question: measurement-table-1-studies
+    mode: live
+    repeat: 3
+    trace_id: c47972de3417fa661f54144917393bfa
+    grounded: true
+    correct: true
+    note: >-
+      18 studies, compounds with counts, three multi-drug: right. Redraft failed: no Pointers.
+  - question: measurement-table-1-studies
+    mode: retrieval
+    trace_id: 6936a175d796f5f639376ac93f90a871
+    grounded: true
+    correct: true
+    note: >-
+      18 studies to October 2024, compounds with counts, three multi-drug: right; the opening line
+      unpointed.
+    pointers:
+      - {sentence: 1, similarity: 0.9623, apt: apt}
+  - question: measurement-tagliazucchi-motifs
+    mode: live
+    repeat: 1
+    trace_id: 6231fa86ea2556eae0ff8cff851fd9b8
+    grounded: true
+    correct: true
+    note: >-
+      FC motifs between the four nodes, Shannon entropy of the motif sequence, higher under
+      psilocybin: right; the definition sentence is unpointed; leaves out the 64 motifs.
+    pointers:
+      - {sentence: 1, similarity: 0.9468, apt: apt}
+  - question: measurement-tagliazucchi-motifs
+    mode: live
+    repeat: 2
+    trace_id: 4e3efc39dffaa762c406d739c5d277e5
+    grounded: true
+    correct: true
+    note: >-
+      Nodes, thresholding, six links and 64 motifs, higher entropy under psilocybin: right; only the
+      last sentence pointed.
+    pointers:
+      - {sentence: 3, similarity: 1.0, apt: apt}
+  - question: measurement-tagliazucchi-motifs
+    mode: live
+    repeat: 3
+    trace_id: 152171c31c8598f6c835ee99d8560a34
+    grounded: true
+    correct: true
+    note: >-
+      Nodes, thresholding, 64 motifs, higher entropy under psilocybin: right; only the last sentence
+      pointed.
+    pointers:
+      - {sentence: 3, similarity: 1.0, apt: apt}
+  - question: measurement-tagliazucchi-motifs
+    mode: retrieval
+    trace_id: f30103ed4163c04b57a84e8a2f777cce
+    grounded: true
+    correct: true
+    note: >-
+      Four regions, six thresholded links, 64 motifs, higher entropy under psilocybin: right and
+      pointed.
+    pointers:
+      - {sentence: 0, similarity: 0.8112, apt: partly}
+      - {sentence: 1, similarity: 0.9628, apt: apt}
+  - question: measurement-intensity-correlation
+    mode: live
+    repeat: 1
+    trace_id: e3dd65cd5506fd01c4a6166d97f34fc8
+    grounded: false
+    correct: false
+    note: >-
+      Opens with a yes the authors do not give (3.4: the evidence does not strongly support it) and
+      leaves out the low-dose LSD null; gives the connectome-harmonics study's metric as temporal
+      LZC. It credits the eyes-closed association to the low-dose LSD study, as the Chunk reads past
+      the 2.5 parse gap: by the user's rule, not held against it. Redraft failed (tool call), no
+      Pointers (uncertain: read leniently, a yes with its caveats is right, and the Answer correct).
+  - question: measurement-intensity-correlation
+    mode: live
+    repeat: 2
+    trace_id: 02dff7f4c0e86cfb14fad056a837f902
+    grounded: false
+    correct: true
+    note: >-
+      Mixed, the psilocybin and LSD results, the low-dose LSD null: right and pointed; gives the
+      harmonics study's metric as temporal LZC. The eyes-closed association credited to the low-dose
+      LSD study follows the Chunk past the parse gap (user's rule), so the Answer reads as
+      contradicting itself. Redrafted: handles added, wording unchanged.
+    pointers:
+      - {sentence: 0, similarity: 0.7364, apt: partly}
+      - {sentence: 1, similarity: 0.9996, apt: apt}
+      - {sentence: 2, similarity: 0.864, apt: apt}
+      - {sentence: 3, similarity: 0.9324, apt: apt}
+      - {sentence: 4, similarity: 0.8607, apt: apt}
+  - question: measurement-intensity-correlation
+    mode: live
+    repeat: 3
+    trace_id: c88aab7afb5b7356d5fb64651354672c
+    grounded: true
+    correct: true
+    note: >-
+      Mixed: psilocybin and LSD, the eyes-closed association (credited as the Chunk reads past the
+      parse gap), DMT's two studies with their own metrics, the low-dose LSD null: right. Redraft
+      failed: no Pointers.
+  - question: measurement-intensity-correlation
+    mode: retrieval
+    trace_id: b3fae38208495aa89d863b2f86b53a61
+    grounded: true
+    correct: true
+    note: >-
+      Mixed: psilocybin and LSD, DMT's two studies with their own metrics, the low-dose LSD null,
+      and the eyes-closed association credited as the Chunk reads past the parse gap: right and
+      pointed.
+    pointers:
+      - {sentence: 1, similarity: 0.9826, apt: apt}
+      - {sentence: 2, similarity: 0.9941, apt: apt}
+      - {sentence: 3, similarity: 0.8463, apt: apt}
+      - {sentence: 4, similarity: 0.829, apt: apt}
+  - question: measurement-mcculloch-replication
+    mode: live
+    repeat: 1
+    trace_id: f04ca5ddbc2986c812e15cc00610e494
+    grounded: true
+    correct: true
+    note: >-
+      13 metrics, five confirmed and two partly, uncorrelated, four negative pairs: right. Redraft
+      failed (tool call): no Pointers.
+  - question: measurement-mcculloch-replication
+    mode: live
+    repeat: 2
+    trace_id: 2e45878151c58faf2a58279cab2c5a02
+    grounded: true
+    correct: true
+    note: >-
+      13 metrics, five confirmed and two partly, five up and eight null: right. Redrafted: handles
+      added, wording unchanged.
+    pointers:
+      - {sentence: 0, similarity: 0.7443, apt: apt}
+      - {sentence: 1, similarity: 0.6036, apt: apt}
+  - question: measurement-mcculloch-replication
+    mode: live
+    repeat: 3
+    trace_id: 66e323690a167033aef164126801f3a6
+    grounded: true
+    correct: true
+    note: >-
+      Five of twelve confirmed and two partly, uncorrelated metrics, four negative pairs: right.
+      Redrafted: handles added, wording unchanged.
+    pointers:
+      - {sentence: 0, similarity: 0.8043, apt: partly}
+      - {sentence: 1, similarity: 0.9321, apt: apt}
+  - question: measurement-mcculloch-replication
+    mode: retrieval
+    trace_id: e6d83b38f21a3e78426deb5bf7c0e1e4
+    grounded: true
+    correct: true
+    note: >-
+      Five confirmed and two partly, uncorrelated metrics, four negative pairs, the alertness
+      reading: right and pointed.
+    pointers:
+      - {sentence: 0, similarity: 0.932, apt: apt}
+      - {sentence: 1, similarity: 0.9067, apt: apt}
+      - {sentence: 2, similarity: 0.7637, apt: apt}
+  - question: method-brain-entropy-definition
+    mode: live
+    repeat: 1
+    trace_id: 1adf225cc8321be6abc18997b39d00cc
+    grounded: true
+    correct: true
+    note: >-
+      Working definition, its Shannon basis, the need to choose states with examples: right and
+      pointed.
+    pointers:
+      - {sentence: 0, similarity: 0.9184, apt: apt}
+      - {sentence: 1, similarity: 0.8263, apt: partly}
+      - {sentence: 1, similarity: 0.797, apt: partly}
+      - {sentence: 2, similarity: 0.8107, apt: partly}
+  - question: method-brain-entropy-definition
+    mode: live
+    repeat: 2
+    trace_id: caf375601986987eaf5e47451995826a
+    grounded: true
+    correct: true
+    note: >-
+      Definition, Shannon basis, states at different grains and spatial or temporal: right and
+      pointed.
+    pointers:
+      - {sentence: 0, similarity: 0.9184, apt: apt}
+      - {sentence: 1, similarity: 0.9351, apt: apt}
+      - {sentence: 1, similarity: 0.7362, apt: partly}
+      - {sentence: 2, similarity: 0.7773, apt: partly}
+  - question: method-brain-entropy-definition
+    mode: live
+    repeat: 3
+    trace_id: f162e3fddc373ac50aff00384c04df4a
+    grounded: true
+    correct: true
+    note: >-
+      Definition, Shannon basis, states, spatial or temporal, discretising, sample entropy and LZC:
+      right and pointed.
+    pointers:
+      - {sentence: 0, similarity: 0.9184, apt: apt}
+      - {sentence: 1, similarity: 0.8326, apt: apt}
+      - {sentence: 2, similarity: 0.974, apt: apt}
+      - {sentence: 3, similarity: 0.9773, apt: apt}
+      - {sentence: 4, similarity: 0.95, apt: apt}
+      - {sentence: 5, similarity: 0.836, apt: apt}
+      - {sentence: 6, similarity: 0.9241, apt: apt}
+      - {sentence: 7, similarity: 0.8705, apt: partly}
+      - {sentence: 8, similarity: 0.7525, apt: apt}
+  - question: method-brain-entropy-definition
+    mode: retrieval
+    trace_id: f2460ce834893ccebfaba28128a75421
+    grounded: true
+    correct: true
+    note: >-
+      The working definition, the hypothesis's framing, the abstract's gloss: right and pointed.
+    pointers:
+      - {sentence: 0, similarity: 0.9369, apt: apt}
+      - {sentence: 1, similarity: 0.797, apt: partly}
+      - {sentence: 2, similarity: 0.7052, apt: apt}
+  - question: method-lzc-vs-shannon
+    mode: live
+    repeat: 1
+    trace_id: ed633c0a8eb73379c3d2ae1731fe571f
+    grounded: true
+    correct: true
+    note: >-
+      Distribution vs order, compressibility, equal Shannon entropy with different LZC: right.
+      Redraft failed: no Pointers.
+  - question: method-lzc-vs-shannon
+    mode: live
+    repeat: 2
+    trace_id: 57384824a3ae2b92f11110e1426b049b
+    grounded: true
+    correct: true
+    note: >-
+      Order, compressibility, the oscillating example, algorithmic complexity: right. Redraft failed
+      (tool call with an invented name): no Pointers.
+  - question: method-lzc-vs-shannon
+    mode: live
+    repeat: 3
+    trace_id: 2ed0c02dadc965bb1fb10723458cdbf1
+    grounded: true
+    correct: true
+    note: >-
+      Order, compressibility, equal distributions with different LZC: right. Redraft failed: no
+      Pointers.
+  - question: method-lzc-vs-shannon
+    mode: retrieval
+    trace_id: 698509307b3ef90bca9ef7f2de44ea9d
+    grounded: true
+    correct: true
+    note: >-
+      Distribution vs order, compressibility, equal proportions with different LZC: right; two of
+      its Pointers weak but apt.
+    pointers:
+      - {sentence: 1, similarity: 0.6976, apt: apt}
+      - {sentence: 2, similarity: 0.7544, apt: apt}
+      - {sentence: 3, similarity: 0.7605, apt: apt}
+      - {sentence: 4, similarity: 0.6866, apt: apt}
+  - question: method-sample-entropy-parameters
+    mode: live
+    repeat: 1
+    trace_id: db227afd443b1fa12d8157fd8068460e
+    grounded: true
+    correct: true
+    note: >-
+      m and r, results depend on them: right; ties the figure's regular-signal example to the
+      parameters, a loose reading. Redraft failed: no Pointers.
+  - question: method-sample-entropy-parameters
+    mode: live
+    repeat: 2
+    trace_id: 2376f2341183012b2d229325e4c849b3
+    grounded: true
+    correct: true
+    note: >-
+      m and r and that results depend on them: right; ties the figure's example to the parameters,
+      loosely. Redrafted: handles added, and the second sentence was reworded and split in two, with
+      the figure's name dropped; no claim changed.
+    pointers:
+      - {sentence: 0, similarity: 0.9683, apt: apt}
+      - {sentence: 1, similarity: 0.8915, apt: apt}
+      - {sentence: 2, similarity: 0.9026, apt: apt}
+  - question: method-sample-entropy-parameters
+    mode: live
+    repeat: 3
+    trace_id: 8c88b5879299f3eb98b5867ad2b8008c
+    grounded: true
+    correct: true
+    note: >-
+      m and r, results depend on them: right; the figure's example tied to the parameters, loosely.
+      Redraft failed: no Pointers.
+  - question: method-sample-entropy-parameters
+    mode: retrieval
+    trace_id: b716759fe8b8a8479ecfc126d52eb61e
+    grounded: true
+    correct: true
+    note: >-
+      m and r, results depend on them: right and pointed; four calls to `reference` on the way, all
+      six requests.
+    pointers:
+      - {sentence: 0, similarity: 0.9811, apt: apt}
+      - {sentence: 1, similarity: 0.9605, apt: apt}
+  - question: method-study-selection
+    mode: live
+    repeat: 1
+    trace_id: e47053e055c28311c9e21a19994331df
+    grounded: true
+    correct: true
+    note: >-
+      18 resting-state studies to October 2024, counts per compound, within-subject comparison:
+      right. Redrafted: handles added, wording unchanged.
+    pointers:
+      - {sentence: 0, similarity: 0.9008, apt: apt}
+      - {sentence: 1, similarity: 0.9238, apt: apt}
+      - {sentence: 2, similarity: 0.8952, apt: apt}
+  - question: method-study-selection
+    mode: live
+    repeat: 2
+    trace_id: f19965e3388d5d31a44c96f7fcb33b02
+    grounded: true
+    correct: true
+    note: >-
+      Count, compounds, October 2024 resting state, within-subject and pre-post without placebo:
+      right and pointed.
+    pointers:
+      - {sentence: 0, similarity: 0.9258, apt: apt}
+      - {sentence: 1, similarity: 0.8879, apt: apt}
+      - {sentence: 2, similarity: 0.9085, apt: apt}
+      - {sentence: 3, similarity: 0.8306, apt: apt}
+  - question: method-study-selection
+    mode: live
+    repeat: 3
+    trace_id: d56c699e0ecd31e923d23de3a6ec14ed
+    grounded: true
+    correct: true
+    note: >-
+      18 resting-state studies to October 2024, all eighteen named, within-subject and pre-post:
+      right; every name pointed at the table's first part, though half sit in its second.
+    pointers:
+      - {sentence: 0, similarity: 0.8366, apt: apt}
+      - {sentence: 1, similarity: 0.614, apt: partly}
+      - {sentence: 2, similarity: 0.8693, apt: apt}
+      - {sentence: 3, similarity: 0.8819, apt: apt}
+  - question: method-study-selection
+    mode: retrieval
+    trace_id: 6a437e507c761ccb99b3b18fdbedfa8d
+    grounded: true
+    correct: true
+    note: >-
+      All resting-state studies to October 2024, 18 with their compounds, within-subject and pre-
+      post: right; the opening line unpointed.
+    pointers:
+      - {sentence: 1, similarity: 0.9628, apt: apt}
+      - {sentence: 2, similarity: 0.8768, apt: apt}
+  - question: shortcoming-main-limitations
+    mode: live
+    repeat: 1
+    trace_id: 6f412dbd094a283abbecc0e29ad44e73
+    grounded: true
+    correct: true
+    note: >-
+      The four themes with their evidence: right and pointed.
+    pointers:
+      - {sentence: 1, similarity: 0.8131, apt: partly}
+      - {sentence: 1, similarity: 0.7977, apt: partly}
+      - {sentence: 1, similarity: 0.8088, apt: partly}
+      - {sentence: 2, similarity: 0.7289, apt: partly}
+      - {sentence: 2, similarity: 0.866, apt: partly}
+      - {sentence: 2, similarity: 0.7156, apt: partly}
+      - {sentence: 2, similarity: 0.7168, apt: partly}
+      - {sentence: 3, similarity: 0.7649, apt: partly}
+      - {sentence: 3, similarity: 0.7608, apt: partly}
+      - {sentence: 4, similarity: 0.7096, apt: partly}
+      - {sentence: 4, similarity: 0.8189, apt: partly}
+      - {sentence: 4, similarity: 0.8294, apt: partly}
+  - question: shortcoming-main-limitations
+    mode: live
+    repeat: 2
+    trace_id: b79ebe5498d8a8065d4a14c3f007e90f
+    grounded: false
+    correct: true
+    note: >-
+      The four themes, right; but it lists patients with disorders of consciousness among the states
+      where entropy rises, where the Seed names psychiatric disorders (the DOC cases are drug
+      effects). Redrafted: handles added, wording unchanged.
+    pointers:
+      - {sentence: 0, similarity: 0.7987, apt: apt}
+      - {sentence: 1, similarity: 0.7885, apt: partly}
+      - {sentence: 1, similarity: 0.7368, apt: partly}
+      - {sentence: 1, similarity: 0.7072, apt: partly}
+      - {sentence: 2, similarity: 0.7614, apt: partly}
+      - {sentence: 3, similarity: 0.7901, apt: partly}
+      - {sentence: 4, similarity: 0.7195, apt: partly}
+      - {sentence: 4, similarity: 0.722, apt: partly}
+  - question: shortcoming-main-limitations
+    mode: live
+    repeat: 3
+    trace_id: 06fc50342747ebe71528b1ad02889504
+    grounded: true
+    correct: true
+    note: >-
+      The four themes with their evidence, the DOC case: right and pointed.
+    pointers:
+      - {sentence: 1, similarity: 0.8197, apt: partly}
+      - {sentence: 1, similarity: 0.7736, apt: partly}
+      - {sentence: 1, similarity: 0.7057, apt: partly}
+      - {sentence: 1, similarity: 0.8094, apt: partly}
+      - {sentence: 2, similarity: 0.8051, apt: apt}
+      - {sentence: 3, similarity: 0.7366, apt: partly}
+      - {sentence: 3, similarity: 0.7085, apt: partly}
+      - {sentence: 3, similarity: 0.8195, apt: partly}
+      - {sentence: 4, similarity: 0.828, apt: partly}
+      - {sentence: 4, similarity: 0.7502, apt: partly}
+  - question: shortcoming-main-limitations
+    mode: retrieval
+    trace_id: 26fe1eff853576ff475855c435e8c9d7
+    grounded: true
+    correct: true
+    note: >-
+      The four themes, right and pointed; the fourth given as subjective impressions against
+      objective change, from 3.2.
+    pointers:
+      - {sentence: 1, similarity: 0.8362, apt: partly}
+      - {sentence: 1, similarity: 0.7046, apt: partly}
+      - {sentence: 2, similarity: 0.8295, apt: apt}
+      - {sentence: 3, similarity: 0.7492, apt: partly}
+      - {sentence: 4, similarity: 0.761, apt: partly}
+  - question: shortcoming-specificity
+    mode: live
+    repeat: 1
+    trace_id: bd88fe0b39f7c59c57f1feaf6bbf8a36
+    grounded: false
+    correct: false
+    note: >-
+      Opens by saying the Seed does not say whether the rise is specific, on the very question 3.1
+      settles (it is not); the evidence it then lists (caffeine, ketamine, midazolam, stimulation,
+      disorders) is right and pointed (uncertain: read leniently, the evidence it lists answers the
+      Question, and the Answer is correct).
+    pointers:
+      - {sentence: 1, similarity: 0.7551, apt: partly}
+      - {sentence: 2, similarity: 0.8068, apt: apt}
+      - {sentence: 2, similarity: 0.7503, apt: partly}
+  - question: shortcoming-specificity
+    mode: live
+    repeat: 2
+    trace_id: 817d9ed9f87a52228e1d905980a0ebd0
+    grounded: false
+    correct: false
+    note: >-
+      Again opens by saying the Seed does not say; then says entropy rises in deep sleep and
+      anesthesia, which the Seed says lower it. The drugs, stimulants, midazolam and disorders are
+      right (uncertain: read leniently, the evidence it lists answers the Question, and the Answer
+      is correct).
+    pointers:
+      - {sentence: 1, similarity: 0.7309, apt: not}
+      - {sentence: 1, similarity: 0.7952, apt: partly}
+      - {sentence: 2, similarity: 0.7768, apt: partly}
+      - {sentence: 3, similarity: 0.7629, apt: apt}
+      - {sentence: 4, similarity: 0.8528, apt: apt}
+      - {sentence: 5, similarity: 0.8038, apt: apt}
+  - question: shortcoming-specificity
+    mode: live
+    repeat: 3
+    trace_id: ef4efe85e973e798bc33370a3645b76d
+    grounded: false
+    correct: false
+    note: >-
+      Opens again by saying the Seed does not say; the drugs, stimulation, tasks and disorders it
+      lists are right and pointed (uncertain: read leniently, the evidence it lists answers the
+      Question, and the Answer is correct).
+    pointers:
+      - {sentence: 1, similarity: 0.7827, apt: partly}
+      - {sentence: 2, similarity: 0.7424, apt: partly}
+      - {sentence: 2, similarity: 0.7757, apt: partly}
+  - question: shortcoming-specificity
+    mode: retrieval
+    trace_id: 88faac908530cdb1d2b0dffe65583e49
+    grounded: true
+    correct: true
+    note: >-
+      Not specific; the other sources, the alertness reading, the resting-state problem, the
+      unverified equivalence: right and pointed.
+    pointers:
+      - {sentence: 1, similarity: 0.718, apt: partly}
+      - {sentence: 2, similarity: 0.7805, apt: apt}
+      - {sentence: 3, similarity: 0.8024, apt: apt}
+      - {sentence: 4, similarity: 0.828, apt: apt}
+  - question: shortcoming-scalar-measure
+    mode: live
+    repeat: 1
+    trace_id: 62a160fd2c60d31e194de052ca3a65be
+    grounded: true
+    correct: true
+    note: >-
+      Several dimensions rather than one axis, the figure's scalar vs multidimensional panel,
+      bidirectional task findings: right and pointed; the last sentence brings in metric
+      disagreement from 3.3, true but off the point.
+    pointers:
+      - {sentence: 0, similarity: 0.7589, apt: partly}
+      - {sentence: 0, similarity: 0.7581, apt: apt}
+      - {sentence: 1, similarity: 0.7922, apt: apt}
+      - {sentence: 2, similarity: 0.7012, apt: partly}
+      - {sentence: 2, similarity: 0.7432, apt: partly}
+      - {sentence: 2, similarity: 0.8153, apt: apt}
+      - {sentence: 3, similarity: 0.8329, apt: apt}
+  - question: shortcoming-scalar-measure
+    mode: live
+    repeat: 2
+    trace_id: 78f906162a303ea4a7974d5b23493b67
+    grounded: true
+    correct: true
+    note: >-
+      Several dimensions, the sleep and sedation example: right and pointed; the entropy-vs-
+      complexity divergence is true but off the point; leaves out gains and losses under
+      psychedelics.
+    pointers:
+      - {sentence: 1, similarity: 0.9728, apt: apt}
+      - {sentence: 3, similarity: 0.8316, apt: apt}
+  - question: shortcoming-scalar-measure
+    mode: live
+    repeat: 3
+    trace_id: de91b3220a9a9417dc6297e1f70e8a06
+    grounded: false
+    correct: true
+    note: >-
+      Several dimensions, no hierarchy, the sleep and sedation example, bidirectional effects: right
+      and pointed; but says spatial working memory is impaired, where the Seed reports a sharpened
+      spatial tuning in monkeys and impaired capacity (lenient: working memory in general)
+      (uncertain: read as working memory in general, it is grounded).
+    pointers:
+      - {sentence: 1, similarity: 0.9057, apt: apt}
+      - {sentence: 2, similarity: 0.7384, apt: partly}
+      - {sentence: 2, similarity: 0.7883, apt: partly}
+      - {sentence: 3, similarity: 0.7737, apt: partly}
+  - question: shortcoming-scalar-measure
+    mode: retrieval
+    trace_id: 96110d4311d19b235632ed3408f6f6e0
+    grounded: true
+    correct: true
+    note: >-
+      Multidimensionality with gains and losses, right and pointed; it also gives the many state
+      definitions and fMRI's secondary measures as reasons, points the Seed makes elsewhere: true,
+      framed loosely.
+    pointers:
+      - {sentence: 1, similarity: 0.8629, apt: apt}
+      - {sentence: 1, similarity: 0.7528, apt: apt}
+      - {sentence: 2, similarity: 0.8332, apt: partly}
+      - {sentence: 3, similarity: 0.7597, apt: partly}
+      - {sentence: 3, similarity: 0.7286, apt: partly}
+      - {sentence: 4, similarity: 0.8266, apt: partly}
+  - question: shortcoming-fmri
+    mode: live
+    repeat: 1
+    trace_id: c134ba40c6323b0c18815f749ff1eee3
+    grounded: false
+    correct: true
+    note: >-
+      Firing not measured, secondary measures, lost interpretability: right and pointed; but the
+      last sentence turns fMRI's high anatomical resolution, which the Seed offers as a possible
+      strength, into a limitation, and merges in the novel-information test from 3.4.
+    pointers:
+      - {sentence: 1, similarity: 0.933, apt: apt}
+      - {sentence: 2, similarity: 0.8556, apt: apt}
+      - {sentence: 3, similarity: 0.6833, apt: apt}
+      - {sentence: 4, similarity: 0.7633, apt: apt}
+      - {sentence: 5, similarity: 0.7963, apt: partly}
+  - question: shortcoming-fmri
+    mode: live
+    repeat: 2
+    trace_id: 7d631c5cb31cb58af200fc88160cc47c
+    grounded: true
+    correct: true
+    note: >-
+      Firing, secondary measures, inflated entropy from elaborate states, the resolution point with
+      its mixed support, region ordering: right and pointed.
+    pointers:
+      - {sentence: 1, similarity: 0.9025, apt: apt}
+      - {sentence: 2, similarity: 0.8978, apt: apt}
+      - {sentence: 3, similarity: 0.9093, apt: apt}
+      - {sentence: 4, similarity: 0.886, apt: apt}
+      - {sentence: 5, similarity: 0.749, apt: apt}
+  - question: shortcoming-fmri
+    mode: live
+    repeat: 3
+    trace_id: 33bb3874debda237b5c1ccdfab801934
+    grounded: true
+    correct: true
+    note: >-
+      Firing, secondary measures, interpretability, the resolution point, EEG and MEG: right and
+      pointed; calls the resolution point an issue and adds a comparison with derivative measures
+      the Seed does not draw.
+    pointers:
+      - {sentence: 1, similarity: 0.9045, apt: apt}
+      - {sentence: 2, similarity: 0.8571, apt: apt}
+      - {sentence: 3, similarity: 0.8219, apt: apt}
+      - {sentence: 4, similarity: 0.8558, apt: partly}
+      - {sentence: 5, similarity: 0.8205, apt: apt}
+  - question: shortcoming-fmri
+    mode: retrieval
+    trace_id: 6dde73addf7014fd1773f770f6c00ec9
+    grounded: true
+    correct: true
+    note: >-
+      Firing, secondary measures, no guidelines, the replication and uncorrelated metrics: right and
+      pointed; leaves out the resolution point.
+    pointers:
+      - {sentence: 1, similarity: 0.9045, apt: apt}
+      - {sentence: 2, similarity: 0.8999, apt: apt}
+      - {sentence: 3, similarity: 0.8413, apt: apt}
+      - {sentence: 4, similarity: 0.8318, apt: partly}
+      - {sentence: 5, similarity: 0.9205, apt: apt}
+  - question: shortcoming-own-scope
+    mode: live
+    repeat: 1
+    trace_id: d75536e5dcfeefc6a6f86c3e4f81bddd
+    grounded: true
+    correct: true
+    note: >-
+      The focus on serotonergic psychedelics and the states beyond its scope: right and pointed.
+    pointers:
+      - {sentence: 1, similarity: 0.8265, apt: apt}
+  - question: shortcoming-own-scope
+    mode: live
+    repeat: 2
+    trace_id: 050caf0b66ad77ccf5ed611318b8e435
+    grounded: true
+    correct: true
+    note: >-
+      The full spectrum of states not evaluated, the focus on serotonergic psychedelics: right.
+      Redraft failed: no Pointers.
+  - question: shortcoming-own-scope
+    mode: live
+    repeat: 3
+    trace_id: e8814a8921f1513251cd4fc882005e0e
+    grounded: false
+    correct: true
+    note: >-
+      Opens by denying that the Seed covers its own omissions, then names them rightly from the
+      conclusions, pointed (uncertain: the opening line is wrong of the Seed, but the rest answers
+      rightly).
+    pointers:
+      - {sentence: 1, similarity: 0.7561, apt: apt}
+  - question: shortcoming-own-scope
+    mode: retrieval
+    trace_id: e68555de8b855cf262f6942e4be51298
+    grounded: true
+    correct: false
+    note: >-
+      Answers another Question: four limitations of the field (questionnaires, intensity,
+      definition, intrinsic limits), each true and pointed, but not the review's own scope.
+    pointers:
+      - {sentence: 1, similarity: 0.8381, apt: partly}
+      - {sentence: 2, similarity: 0.7988, apt: partly}
+      - {sentence: 3, similarity: 0.8075, apt: apt}
+      - {sentence: 4, similarity: 0.8874, apt: apt}
+  - question: follow-up-study-designs
+    mode: live
+    repeat: 1
+    trace_id: 230b11861739c64d7381e4b8a373324a
+    grounded: true
+    correct: true
+    note: >-
+      Multi-drug within-subject designs, stimulant comparisons, precise definitions, continuous
+      tracking, questionnaires, activation measures, broader practice, the multi-site study: right
+      and pointed.
+    pointers:
+      - {sentence: 1, similarity: 0.9341, apt: apt}
+      - {sentence: 2, similarity: 0.8668, apt: apt}
+      - {sentence: 3, similarity: 0.7971, apt: apt}
+      - {sentence: 4, similarity: 0.7989, apt: partly}
+      - {sentence: 5, similarity: 0.7582, apt: partly}
+      - {sentence: 5, similarity: 0.7686, apt: partly}
+      - {sentence: 6, similarity: 0.7929, apt: partly}
+      - {sentence: 7, similarity: 0.8187, apt: apt}
+  - question: follow-up-study-designs
+    mode: live
+    repeat: 2
+    trace_id: fdfcd1d8004e155a5c38de07ae070d59
+    grounded: true
+    correct: true
+    note: >-
+      Multi-drug designs, active placebos, stimulant comparisons, regional metrics, tasks, the
+      multi-site study: right and pointed.
+    pointers:
+      - {sentence: 1, similarity: 0.9085, apt: apt}
+      - {sentence: 2, similarity: 0.8164, apt: partly}
+      - {sentence: 3, similarity: 0.767, apt: partly}
+      - {sentence: 3, similarity: 0.8309, apt: partly}
+      - {sentence: 4, similarity: 0.7943, apt: partly}
+  - question: follow-up-study-designs
+    mode: live
+    repeat: 3
+    trace_id: 9c5574320ea1bbcbda32f3801b65ec86
+    grounded: true
+    correct: true
+    note: >-
+      Ten designs from 3.2, 3.4 and the conclusions, each pointed: right.
+    pointers:
+      - {sentence: 1, similarity: 0.8961, apt: apt}
+      - {sentence: 2, similarity: 0.9145, apt: apt}
+      - {sentence: 3, similarity: 0.8925, apt: apt}
+      - {sentence: 4, similarity: 0.9253, apt: apt}
+      - {sentence: 5, similarity: 0.9169, apt: apt}
+      - {sentence: 6, similarity: 0.7773, apt: apt}
+      - {sentence: 7, similarity: 0.7992, apt: apt}
+      - {sentence: 8, similarity: 0.8388, apt: apt}
+      - {sentence: 9, similarity: 0.8639, apt: apt}
+      - {sentence: 10, similarity: 0.8521, apt: apt}
+  - question: follow-up-study-designs
+    mode: retrieval
+    trace_id: e21bda7ddb0853cf72685897b36b9a50
+    grounded: true
+    correct: true
+    note: >-
+      Controls beyond placebo, tasks, broader practice, the multi-site study, subsystems: right and
+      pointed.
+    pointers:
+      - {sentence: 1, similarity: 0.8929, apt: apt}
+      - {sentence: 2, similarity: 0.8108, apt: apt}
+      - {sentence: 3, similarity: 0.816, apt: partly}
+      - {sentence: 4, similarity: 0.8009, apt: partly}
+  - question: follow-up-alertness-controls
+    mode: live
+    repeat: 1
+    trace_id: a2b6f22e21f6720e6483390fa3f9e2f6
+    grounded: true
+    correct: true
+    note: >-
+      Active placebos and stimulant comparisons: right and pointed.
+    pointers:
+      - {sentence: 0, similarity: 0.9257, apt: apt}
+      - {sentence: 1, similarity: 0.9238, apt: apt}
+  - question: follow-up-alertness-controls
+    mode: live
+    repeat: 2
+    trace_id: f1f60d786af8d916c3437dbc1c0700af
+    grounded: true
+    correct: true
+    note: >-
+      Active placebos, stimulant comparisons, multi-drug studies: right and pointed.
+    pointers:
+      - {sentence: 0, similarity: 0.9257, apt: apt}
+      - {sentence: 1, similarity: 0.7261, apt: partly}
+      - {sentence: 1, similarity: 0.8659, apt: partly}
+  - question: follow-up-alertness-controls
+    mode: live
+    repeat: 3
+    trace_id: 22590a7f4473a13b1d87e1c8fb916a12
+    grounded: true
+    correct: true
+    note: >-
+      Active placebos, stimulant comparisons, the multi-site study's alertness controls: right and
+      pointed.
+    pointers:
+      - {sentence: 0, similarity: 0.9257, apt: apt}
+      - {sentence: 1, similarity: 0.9663, apt: apt}
+      - {sentence: 2, similarity: 0.8968, apt: apt}
+  - question: follow-up-alertness-controls
+    mode: retrieval
+    trace_id: 69a6dac7e451fb9b08221b6f411b27c5
+    grounded: true
+    correct: true
+    note: >-
+      Active placebos, stimulant comparisons, the multi-site study's controls: right and pointed.
+    pointers:
+      - {sentence: 0, similarity: 0.9257, apt: apt}
+      - {sentence: 1, similarity: 0.8449, apt: partly}
+      - {sentence: 1, similarity: 0.8074, apt: partly}
+      - {sentence: 2, similarity: 0.7981, apt: partly}
+  - question: follow-up-phenomenal-richness
+    mode: live
+    repeat: 1
+    trace_id: 09d8388ec33f0dac14a3bac4ca8c78f0
+    grounded: true
+    correct: true
+    note: >-
+      Questionnaires, continuous tracking, multi-drug comparisons, comparison with connectivity and
+      spectral markers: right and pointed; leaves out the task-based testing of perceptual domains.
+    pointers:
+      - {sentence: 1, similarity: 0.8649, apt: apt}
+      - {sentence: 2, similarity: 0.7904, apt: apt}
+      - {sentence: 3, similarity: 0.8763, apt: apt}
+      - {sentence: 4, similarity: 0.9261, apt: apt}
+  - question: follow-up-phenomenal-richness
+    mode: live
+    repeat: 2
+    trace_id: f885455cec9145c109597e4eb8805a79
+    grounded: true
+    correct: true
+    note: >-
+      Questionnaires, continuous tracking, multi-drug comparisons, tasks, other markers: right and
+      pointed.
+    pointers:
+      - {sentence: 1, similarity: 0.8575, apt: apt}
+      - {sentence: 2, similarity: 0.786, apt: apt}
+      - {sentence: 3, similarity: 0.8418, apt: apt}
+      - {sentence: 3, similarity: 0.7666, apt: partly}
+      - {sentence: 4, similarity: 0.9216, apt: apt}
+  - question: follow-up-phenomenal-richness
+    mode: live
+    repeat: 3
+    trace_id: 777d0a1040793892d3c0531c6b0bd814
+    grounded: true
+    correct: true
+    note: >-
+      Questionnaires, continuous tracking, multi-drug comparisons, other markers: right and pointed.
+    pointers:
+      - {sentence: 1, similarity: 0.8394, apt: apt}
+      - {sentence: 2, similarity: 0.7661, apt: apt}
+      - {sentence: 3, similarity: 0.7734, apt: partly}
+      - {sentence: 3, similarity: 0.8794, apt: apt}
+      - {sentence: 3, similarity: 0.7224, apt: partly}
+  - question: follow-up-phenomenal-richness
+    mode: retrieval
+    trace_id: 7ffc18231f6b676545c3b8d578b25bc2
+    grounded: true
+    correct: true
+    note: >-
+      Multi-drug designs, precise definitions, activation measures, questionnaires, continuous
+      tracking, task domains: right and pointed.
+    pointers:
+      - {sentence: 1, similarity: 0.9123, apt: apt}
+      - {sentence: 2, similarity: 0.8196, apt: partly}
+      - {sentence: 2, similarity: 0.8248, apt: partly}
+      - {sentence: 3, similarity: 0.8015, apt: apt}
+      - {sentence: 4, similarity: 0.77, apt: partly}
+      - {sentence: 4, similarity: 0.8154, apt: partly}
+  - question: follow-up-metric-choice
+    mode: live
+    repeat: 1
+    trace_id: 9151cd0b51e82354ae544c825f96e763
+    grounded: true
+    correct: true
+    note: >-
+      Define from activity, specify, justify and preregister, assess within subsystems: right and
+      pointed.
+    pointers:
+      - {sentence: 0, similarity: 0.9591, apt: apt}
+      - {sentence: 1, similarity: 0.9161, apt: apt}
+      - {sentence: 2, similarity: 0.8247, apt: apt}
+  - question: follow-up-metric-choice
+    mode: live
+    repeat: 2
+    trace_id: 85e67a200d37d0518219b75d663c8d47
+    grounded: true
+    correct: true
+    note: >-
+      Specify, justify, preregister, define from activity, regional entropy; the last sentence adds
+      study-design advice, true but off the point. Redraft failed: no Pointers.
+  - question: follow-up-metric-choice
+    mode: live
+    repeat: 3
+    trace_id: d91431864c3e9b74ccfc31d3643c6127
+    grounded: true
+    correct: true
+    note: >-
+      Specify, justify, preregister, define from activity, check across modalities, compare with
+      other markers: right; only the last sentence pointed.
+    pointers:
+      - {sentence: 2, similarity: 0.7605, apt: partly}
+  - question: follow-up-metric-choice
+    mode: retrieval
+    trace_id: be41918ca8692b675066f1af6bfb10f3
+    grounded: false
+    correct: true
+    note: >-
+      Define from activity, specify, justify and preregister, check across modalities: right and
+      pointed; but it opens by telling studies to favour the robust candidates as shown across
+      compounds and modalities, where the Seed calls them promising, all from fMRI and one from a
+      single study (uncertain: a fair inference from the Seed's praise of those metrics, not the
+      authors' words).
+    pointers:
+      - {sentence: 0, similarity: 0.7797, apt: partly}
+      - {sentence: 1, similarity: 0.9475, apt: apt}
+      - {sentence: 2, similarity: 0.7753, apt: apt}
+      - {sentence: 3, similarity: 0.8313, apt: partly}
+  - question: uncovered-depression-dose
+    mode: live
+    repeat: 1
+    trace_id: 30806a36a0cd478e910246db3dbe6660
+    grounded: true
+    correct: true
+    note: Says the Seed gives no dose, and what it covers.
+  - question: uncovered-depression-dose
+    mode: live
+    repeat: 2
+    trace_id: 1a49f74ed9bd3b086ea1bf084dd89ee0
+    grounded: false
+    correct: true
+    note: >-
+      Says there is no dose; but says psilocybin was trialled for major depression, where the Seed
+      names psychedelics in general (uncertain: a lenient reading takes psilocybin for the
+      psychedelics the Seed names).
+  - question: uncovered-depression-dose
+    mode: live
+    repeat: 3
+    trace_id: 6d757e737594358f2d83f794952fedda
+    grounded: true
+    correct: true
+    note: Says there is no dose; what it covers instead is right.
+  - question: uncovered-depression-dose
+    mode: retrieval
+    trace_id: 3f436a55892516050d5dfdedf5bf2cb8
+    grounded: true
+    correct: true
+    note: Says there is no dose; the clinical studies it names are right.
+  - question: uncovered-own-experiment
+    mode: live
+    repeat: 1
+    trace_id: 59fc23a9bef41966d8bcc4e775ef4070
+    grounded: true
+    correct: true
+    note: Says there is no experiment of its own.
+  - question: uncovered-own-experiment
+    mode: live
+    repeat: 2
+    trace_id: 0b9e88e87ffaa52453d270c9260fc1ac
+    grounded: true
+    correct: true
+    note: Says there is no experiment of its own.
+  - question: uncovered-own-experiment
+    mode: live
+    repeat: 3
+    trace_id: c845cfb9e730d4f04750ad60ec85911b
+    grounded: true
+    correct: true
+    note: Says there is no experiment of its own.
+  - question: uncovered-own-experiment
+    mode: retrieval
+    trace_id: a682baddf20bced68ee9bdbe06a6e1bc
+    grounded: true
+    correct: true
+    note: Says there is no experiment of its own, being a review of 18 studies.
+  - question: uncovered-heart-rate
+    mode: live
+    repeat: 1
+    trace_id: 8bca20409dc1fce279525fd699a3c8d8
+    grounded: true
+    correct: true
+    note: Says the Seed does not cover it.
+  - question: uncovered-heart-rate
+    mode: live
+    repeat: 2
+    trace_id: 585b96bba83377282d28f34f3f9ee728
+    grounded: true
+    correct: true
+    note: Says the Seed does not cover it.
+  - question: uncovered-heart-rate
+    mode: live
+    repeat: 3
+    trace_id: 2e74602eff9cb5020aa066a1d153d364
+    grounded: true
+    correct: true
+    note: Says the Seed does not cover it.
+  - question: uncovered-heart-rate
+    mode: retrieval
+    trace_id: 14eef86261378b4f6ab70dc1f5bbc10a
+    grounded: true
+    correct: true
+    note: Says the Seed does not cover it and what it covers.
+    pointers:
+      - {sentence: 1, similarity: 0.743, apt: partly}
+      - {sentence: 1, similarity: 0.7753, apt: apt}
+  - question: uncovered-analysis-software
+    mode: live
+    repeat: 1
+    trace_id: 9a0d20deecee269089d1a3e59719fb79
+    grounded: true
+    correct: true
+    note: Says the Seed names no software.
+  - question: uncovered-analysis-software
+    mode: live
+    repeat: 2
+    trace_id: 6c42639334cf317ecf6990850b8f6a2f
+    grounded: true
+    correct: true
+    note: Says the Seed names no software.
+  - question: uncovered-analysis-software
+    mode: live
+    repeat: 3
+    trace_id: 10d720ad5bef54d340702848eabb4a55
+    grounded: true
+    correct: true
+    note: Says the Seed names no software.
+  - question: uncovered-analysis-software
+    mode: retrieval
+    trace_id: dccd88a4acc6dab8dc6f6345eaa38319
+    grounded: true
+    correct: true
+    note: Says the Seed names no software.
+  - question: uncovered-eu-regulation
+    mode: live
+    repeat: 1
+    trace_id: a9f9c0a6959cac9a283d6d992e5eb41f
+    grounded: true
+    correct: true
+    note: Says the Seed does not cover regulation, and what it covers.
+  - question: uncovered-eu-regulation
+    mode: live
+    repeat: 2
+    trace_id: 0ffc57a437597b432a5999faa5fbab92
+    grounded: true
+    correct: true
+    note: Says the Seed does not cover regulation.
+  - question: uncovered-eu-regulation
+    mode: live
+    repeat: 3
+    trace_id: 43059d916a25827d3e3abfa91399eec0
+    grounded: true
+    correct: true
+    note: Says the Seed does not cover regulation.
+  - question: uncovered-eu-regulation
+    mode: retrieval
+    trace_id: ee7b26a5a87c7093ca61856634322ed7
+    grounded: true
+    correct: true
+    note: Says the Seed does not cover regulation and what it covers.

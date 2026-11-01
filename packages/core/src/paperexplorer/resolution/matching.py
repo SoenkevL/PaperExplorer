@@ -12,6 +12,8 @@ from paperexplorer.parsing import Reference
 
 # Until calibrated live on fixture References that print a DOI (design-resolution.md).
 NEAR_TITLE = 0.9
+# Words a title cut short must keep to agree with a DOI's record that it opens.
+PREFIX_WORDS = 4
 
 
 class Candidate(BaseModel):
@@ -57,13 +59,14 @@ def normalize_title(title: str) -> str:
 def agrees(ref: Reference, c: Candidate) -> bool:
     """Whether a DOI hit is the Work the Reference prints, allowing slips and a dropped subtitle.
 
-    Titles agree when near or when their main titles are equal; without both titles, the first
+    Titles agree when near, when their main titles are equal, or when one opens the other (at
+    least `PREFIX_WORDS` whole words: a title cut short); without both titles, the first
     surname or the year must agree. A Reference that prints only its DOI has nothing to disagree.
     """
     if ref.title and c.title and normalize_title(ref.title):
         ours, theirs = normalize_title(ref.title), normalize_title(c.title)
         near = difflib.SequenceMatcher(None, ours, theirs).ratio() >= NEAR_TITLE
-        return near or _main(ref.title) == _main(c.title)
+        return near or _main(ref.title) == _main(c.title) or _opens(ours, theirs)
     if ref.surnames or ref.year:
         return _surname_agrees(ref, c) or _year_agrees(ref, c)
     return True
@@ -147,6 +150,12 @@ def _title_match(ref: Reference, title: str, c: Candidate, i: int) -> tuple[floa
             candidate=i, level=Level.LOW, evidence=["near_title"], confidence=similarity
         )
     return None
+
+
+def _opens(ours: str, theirs: str) -> bool:
+    """Whether one normalized title is the other's first words, enough of them to count."""
+    short, long = sorted((ours.split(), theirs.split()), key=len)
+    return len(short) >= PREFIX_WORDS and long[: len(short)] == short
 
 
 def _main(title: str) -> str:

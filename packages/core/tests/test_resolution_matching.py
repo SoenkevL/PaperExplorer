@@ -197,3 +197,22 @@ def test_a_title_matchs_confidence_is_the_titles_similarity() -> None:
 
     assert isinstance(found, Match)
     assert 0.9 <= found.confidence < 1
+
+
+def test_a_title_cut_short_still_agrees_with_its_doi() -> None:
+    # GROBID can stop a title early, without a colon to mark the subtitle.
+    ref = _ref(title="Deep residual learning for", doi="10.5555/resnet")
+
+    assert match(ref, [UNRELATED]) == Match(candidate=0, level=Level.CERTAIN, evidence=["doi"])
+
+
+def test_a_prefix_of_three_words_is_too_short_to_agree() -> None:
+    ref = _ref(title="Deep residual learning", doi="10.5555/resnet")
+
+    assert match(ref, [UNRELATED]) == DoiConflict(candidate=0)
+
+
+def test_a_prefix_must_end_at_a_word() -> None:
+    ref = _ref(title="Deep residual learning for ima", doi="10.5555/resnet")
+
+    assert match(ref, [UNRELATED]) == DoiConflict(candidate=0)

@@ -17,6 +17,7 @@ from paperexplorer.domain import (
 )
 from paperexplorer.parsing import Reference
 from paperexplorer.resolution.matching import Candidate, DoiConflict, match
+from paperexplorer.resolution.verification import unregistered
 from paperexplorer.store import Works
 
 logger = logging.getLogger(__name__)
@@ -28,10 +29,21 @@ def resolve(
     """One Resolution per Reference of `citing`, from the Library Items the store holds.
 
     Candidates are the Work that stands for the printed DOI and the Works whose title is near
-    the printed one; a match to a Duplicate Item goes to its Standing Item.
+    the printed one; a match to a Duplicate Item goes to its Standing Item. A Reference whose
+    DOI is an Unregistered DOI is matched as if it printed none (ADR 0012).
     """
     works = Works(conn)
-    return [_resolve_one(works, citing, ref) for ref in refs]
+    unknown = unregistered(conn, [r.doi for r in refs if r.doi])
+    resolved: list[Resolution] = []
+    for ref in refs:
+        if ref.doi and normalize_doi(ref.doi) in unknown:
+            found = _resolve_one(works, citing, ref.model_copy(update={"doi": None}))
+            note = f"unregistered DOI {normalize_doi(ref.doi)}"
+            found = found.model_copy(update={"evidence": [*found.evidence, note]})
+        else:
+            found = _resolve_one(works, citing, ref)
+        resolved.append(found)
+    return resolved
 
 
 def _resolve_one(works: Works, citing: WorkId, ref: Reference) -> Resolution:

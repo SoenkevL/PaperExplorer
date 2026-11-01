@@ -19,6 +19,7 @@ from paperexplorer.embedding import FakeEmbedder, OpenAICompatibleEmbedder
 from paperexplorer.library import InMemoryLibrary
 from paperexplorer.parsing import ParsedWork
 from paperexplorer.pipeline import StageContext, StageError, run_stage
+from paperexplorer.resolution import InMemoryDoiRegistry
 from paperexplorer.store import (
     Chunks,
     CitationGraphs,
@@ -54,6 +55,7 @@ def ctx(
         library=library,
         embedder=FakeEmbedder(),
         tracing=Tracing.off(),
+        doi_registry=InMemoryDoiRegistry(offline=True),
     )
 
 

@@ -8,6 +8,7 @@ from psycopg.rows import TupleRow
 from paperexplorer.citations import extract
 from paperexplorer.domain import LibraryItem
 from paperexplorer.parsing import ParsedWork
+from paperexplorer.resolution import InMemoryDoiRegistry, verify
 from paperexplorer.store import CitationGraphs, Works, WorkTexts
 
 from .conftest import Stored
@@ -53,6 +54,7 @@ def test_a_citation_gives_its_reference_and_the_link_to_it(
         "year": reference.year,
         "title": reference.title,
         "doi": reference.doi,
+        "doi_registration": None,
     }
 
 
@@ -72,6 +74,24 @@ def test_an_unlinked_citation_has_neither_link_nor_reference(
     assert first["confidence_level"] == "unlinked"
     assert detail["link"] is None
     assert detail["reference"] is None
+
+
+def test_a_reference_says_whether_doi_org_has_its_doi(
+    api: TestClient, store_db: Conn, villiger: Stored
+) -> None:
+    refs = {r.id: r for r in villiger.parsed.references}
+    index, ref = next(
+        (i, refs[c.link.reference_id])
+        for i, c in enumerate(villiger.graph.citations)
+        if c.link and refs[c.link.reference_id].doi
+    )
+    # A registry that knows none of the DOIs it is asked about.
+    verify(store_db, InMemoryDoiRegistry(), [ref])
+    span = _citations(api, villiger.work)[index]
+
+    detail = api.get(f"/citations/{span['id']}").json()
+
+    assert detail["reference"]["doi_registration"] == "unregistered"
 
 
 def test_an_unknown_citation_is_not_found(api: TestClient) -> None:

@@ -129,6 +129,7 @@ class StageName(StrEnum):
     CHUNK = "chunk"
     EMBED = "embed"
     EXTRACT_CITATIONS = "extract_citations"
+    VERIFY_DOIS = "verify_dois"
     RESOLVE = "resolve"
 
 
@@ -152,6 +153,7 @@ def run_command(
                 library=ZoteroLibrary.from_settings(settings),
                 embedder=wiring.embedder,
                 tracing=wiring.tracing,
+                doi_registry=resolution.DoiOrgRegistry.from_settings(settings),
             )
             result = pipeline.run_stage(stage_ctx, stage.value, work_id)
         except Exception as e:

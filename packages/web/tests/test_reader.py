@@ -75,8 +75,8 @@ def _summary(work: WorkText) -> WorkSummary:
     return WorkSummary.model_validate(work.model_dump(exclude={"blocks"}))
 
 
-def _reader(work: WorkText = WORK) -> TestClient:
-    citations = {c.id: c for c in (SMITH, UNLINKED)}
+def _reader(work: WorkText = WORK, smith: CitationDetail = SMITH) -> TestClient:
+    citations = {c.id: c for c in (smith, UNLINKED)}
 
     def api(request: httpx.Request) -> httpx.Response:
         path = request.url.path
@@ -136,6 +136,20 @@ def test_every_citation_opens_the_panel_and_shows_its_confidence() -> None:
     targets = [html.unescape(url) for _, url, _ in links]
     assert targets[0] == "/works/7/panel?c=11"
     assert targets[3] == "/works/7/panel?c=14&c=15"
+
+
+def test_the_panel_marks_whether_doi_org_has_the_doi() -> None:
+    assert SMITH.reference is not None
+    marks: dict[str | None, str | None] = {
+        "registered": "DOI registered", "unregistered": "Unregistered DOI", None: None,
+    }  # fmt: skip
+    for registration, mark in marks.items():
+        reference = SMITH.reference.model_copy(update={"doi_registration": registration})
+        detail = SMITH.model_copy(update={"reference": reference})
+        panel = _reader(smith=detail).get("/works/7/panel", params={"c": 11}).text
+
+        shown = [m for m in ("DOI registered", "Unregistered DOI") if m in panel]
+        assert shown == ([mark] if mark else [])
 
 
 def test_the_panel_shows_the_reference_as_printed_and_the_link() -> None:

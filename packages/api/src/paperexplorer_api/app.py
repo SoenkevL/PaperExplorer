@@ -9,11 +9,9 @@ import psycopg
 from fastapi import FastAPI
 
 from paperexplorer import __version__
-from paperexplorer.asking import AskingContext, chat_model
 from paperexplorer.config import Settings
-from paperexplorer.embedding import OpenAICompatibleEmbedder
 from paperexplorer.logs import configure_logging
-from paperexplorer.tracing import configure_tracing
+from paperexplorer.wiring import Wiring
 from paperexplorer_api.asking_thread import AskingContexts, AskingThread
 from paperexplorer_api.conversations import Conversations
 from paperexplorer_api.routes import Connections, citations, works
@@ -65,13 +63,11 @@ def app_from_env() -> FastAPI:
     """
     settings = Settings()
     configure_logging(settings.log_level, settings.log_format)
-    tracing = configure_tracing(settings)
-    embedder = OpenAICompatibleEmbedder.from_settings(settings, tracing)
-    model = chat_model(settings)
+    wiring = Wiring.from_settings(settings)
     return create_app(
         lambda: psycopg.connect(settings.database_url, autocommit=True),
         Asking(
-            contexts=lambda conn: AskingContext(conn, embedder, model, settings, tracing),
+            contexts=wiring.asking,
             conversations=Conversations.from_settings(settings),
         ),
     )

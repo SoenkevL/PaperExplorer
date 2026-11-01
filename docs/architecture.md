@@ -79,6 +79,8 @@ Then:    embed_citing_sentences → report
 
 Sources reuse the Seed's stage functions; going one level deeper later is the same chain on another Work.
 
+The `resolve` Stage syncs the Library first (`library.sync`), then resolves every Reference locally. `paperexplorer sync [--full]` forces a sync; `paperexplorer duplicates [--use <key>] [--merge <keep> <other>]` lists the DOIs two Library Items hold, the standing one first, chooses one, or merges the pair in Zotero after asking, moving Resolutions to the kept Work; `paperexplorer resolutions <zotero_key> [--low]` lists each Reference's level, Work and DOI Conflict.
+
 ## Retrieval
 
 `retrieval.search` embeds the text once and hands the Vector to `Chunks.search`, one hand-written query of CTEs (ADR 0003):

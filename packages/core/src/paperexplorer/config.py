@@ -89,6 +89,15 @@ class Settings(BaseSettings):
         description="Local Zotero `storage/` folder, read-only; else Web API download.",
     )
 
+    # The registries a Registry Check asks (design-resolution.md). Without these the limiters
+    # run at the keyless and public rates; filling them changes no code.
+    crossref_mailto: str | None = Field(
+        default=None, description="An email for Crossref's polite pool (3 list queries a second)."
+    )
+    openalex_api_key: SecretStr | None = Field(
+        default=None, description="OpenAlex API key: 1,000 title searches a day instead of 100."
+    )
+
     grobid_url: str = "http://localhost:8070"
     tessdata_dir: Path | None = Field(
         default=None,
@@ -121,6 +130,8 @@ class Settings(BaseSettings):
         "langfuse_secret_key",
         "langfuse_base_url",
         "langfuse_release",
+        "crossref_mailto",
+        "openalex_api_key",
         mode="before",
     )
     @classmethod

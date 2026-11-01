@@ -41,6 +41,16 @@ def test_an_optional_folder_left_empty_in_env_is_unset(monkeypatch: pytest.Monke
     assert settings.tessdata_dir is None
 
 
+def test_the_registry_settings_left_empty_are_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PE_CROSSREF_MAILTO", "")
+    monkeypatch.setenv("PE_OPENALEX_API_KEY", "")
+
+    settings = Settings(_env_file=None)  # pyright: ignore[reportCallIssue]
+
+    assert settings.crossref_mailto is None
+    assert settings.openalex_api_key is None
+
+
 def test_json_logging_emits_one_parseable_line(capsys: pytest.CaptureFixture[str]) -> None:
     configure_logging("INFO", "json")
 

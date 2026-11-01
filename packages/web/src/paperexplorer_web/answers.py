@@ -1,7 +1,7 @@
 """Cut a resolved Answer into the runs the Conversation sidebar renders.
 
 Every offset of an Answer counts code points of its `text` (Python `str` indices), so the
-cutting happens here, in Python, and the browser receives the pieces already cut. The draft
+cutting happens here, in Python, and the browser receives the runs already cut. The Draft
 comes from the API already cut into text and handles (`DeltaEvent.pieces`).
 """
 

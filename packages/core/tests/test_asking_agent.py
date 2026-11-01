@@ -1019,7 +1019,7 @@ def test_the_draft_streams_as_pieces_its_bare_handles_shown_and_unknown_ones_dro
     # The Seed cites by author and year, so a bare `[3]` is a handle; no Chunk has handle 99.
     assert [e.pieces for e in events if isinstance(e, DeltaEvent)] == [
         [TextPiece(text="Entropy was computed from each EEG recording ")],
-        [HandlePiece(handle=3), TextPiece(text=". The sample was small .")],
+        [HandlePiece(handle=3), TextPiece(text=". The sample was small.")],
     ]
     answered = events[-1]
     assert isinstance(answered, AnsweredEvent)

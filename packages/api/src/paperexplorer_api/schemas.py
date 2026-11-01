@@ -180,19 +180,19 @@ class StepEvent(BaseModel):
 
 
 class TextPiece(BaseModel):
-    """A run of the draft's text."""
+    """A run of the Draft's text."""
 
     text: str
 
 
 class HandlePiece(BaseModel):
-    """One handle of the draft, by its number; its Pointer comes with the Answer."""
+    """One handle of the Draft, by its number; its Pointer comes with the Answer."""
 
     handle: int
 
 
 type DraftPiece = TextPiece | HandlePiece
-"""A piece of the draft: `{"text": ...}` or `{"handle": n}`, one per number a handle carries."""
+"""A piece of the Draft: `{"text": ...}` or `{"handle": n}`, one per number a handle carries."""
 
 
 class DeltaEvent(BaseModel):

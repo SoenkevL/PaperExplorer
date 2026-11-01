@@ -18,7 +18,7 @@ class StepEvent(BaseModel):
 
 
 class DeltaEvent(BaseModel):
-    """More of the model's draft, cut into text and handles (`DraftCut`); never its thinking."""
+    """More of the model's Draft, cut into text and handles (`DraftCut`); never its thinking."""
 
     type: Literal["delta"] = "delta"
     pieces: list[DraftPiece]

@@ -163,5 +163,10 @@ def test_text_that_only_starts_like_a_handle_is_cut_at_once() -> None:
     assert pieces == [TextPiece(text=text)]
 
 
-def test_the_text_around_a_dropped_handle_is_one_piece() -> None:
-    assert DraftCut({3}).add("It rose [#9] and fell.") == [TextPiece(text="It rose  and fell.")]
+def test_a_dropped_handle_takes_the_spaces_before_it_and_leaves_one_piece() -> None:
+    # As `resolve_answer` drops it, so the Draft shows no gap the Answer will not have.
+    assert DraftCut({3}).add("It rose [#9] and [#3] [#99] fell.") == [
+        TextPiece(text="It rose and "),
+        HandlePiece(handle=3),
+        TextPiece(text=" fell."),
+    ]

@@ -29,23 +29,23 @@ def answer_draft(draft: str) -> str:
 
 
 class TextPiece(BaseModel):
-    """A run of the draft's text."""
+    """A run of the Draft's text."""
 
     text: str
 
 
 class HandlePiece(BaseModel):
-    """One handle of the draft, by its number; its Pointer comes with the Answer."""
+    """One handle of the Draft, by its number; its Pointer comes with the Answer."""
 
     handle: int
 
 
 type DraftPiece = TextPiece | HandlePiece
-"""A piece of the draft as it streams: a run of text, or one handle."""
+"""A piece of the Draft as it streams: a run of text, or one handle."""
 
 
 class DraftCut:
-    """A draft as it streams, cut as `answer_draft` cuts it and cut at its handles.
+    """The Draft as it streams, cut as `answer_draft` cuts it and cut at its handles.
 
     Each delta gives the pieces that can be shown now: runs of text, and one `HandlePiece` per
     number a handle carries (a range gives its two ends). `handles` are the numbers the
@@ -53,6 +53,7 @@ class DraftCut:
     `bare_handles` reads a bare `[13]` as `[#13]`, for a Seed that numbers no Reference.
     Text that could still turn into a control token, a `<system>` block or a handle is held
     back until a later delta settles it; once a control token shows, nothing after it is shown.
+    Text still held when the stream ends is never shown: the Answer replaces the Draft.
     """
 
     def __init__(self, handles: Container[int], *, bare_handles: bool = False) -> None:
@@ -72,8 +73,11 @@ class DraftCut:
         for m in GROUP.finditer(text):
             if (numbers := handle_numbers(m.group(), bare=self._bare)) is None:
                 continue  # the Seed's own marker, such as [74]
-            _add_text(pieces, text[at : m.start()])
-            pieces += [HandlePiece(handle=n) for n in numbers if n in self._handles]
+            known = [HandlePiece(handle=n) for n in numbers if n in self._handles]
+            before = text[at : m.start()]
+            # A handle wholly dropped takes the spaces before it along, as in the Answer.
+            _add_text(pieces, before if known else before.rstrip(" \t"))
+            pieces += known
             at = m.end()
         _add_text(pieces, text[at:])
         return pieces

@@ -45,7 +45,7 @@ from pydantic_ai.models.openai import OpenAIChatModel, OpenAIChatModelSettings
 from pydantic_ai.providers.ollama import OllamaProvider
 from pydantic_ai.settings import ModelSettings, merge_model_settings
 from pydantic_ai.tools import ToolDefinition
-from pydantic_ai.usage import RunUsage, UsageLimits
+from pydantic_ai.usage import UsageLimits
 
 from paperexplorer.asking.answers import resolve_answer
 from paperexplorer.asking.conversation import Conversation
@@ -63,6 +63,7 @@ from paperexplorer.asking.tools import SeedTools
 from paperexplorer.config import Settings
 from paperexplorer.domain import Answer
 from paperexplorer.embedding import Embedder
+from paperexplorer.store import ScoredChunk
 from paperexplorer.tracing import Tracing
 
 logger = logging.getLogger(__name__)
@@ -125,6 +126,18 @@ class AskingContext:
     tracing: Tracing
     tags: tuple[str, ...] = ()
     reading: Reading = Reading.AUTO
+
+
+@dataclass
+class _Tally:
+    """What a turn has run so far: the model's requests and tool calls, and the forced search.
+
+    The forced search is the server's call, not the model's: it is neither a request nor a tool.
+    """
+
+    model_requests: int = 0
+    tool_calls: int = 0
+    forced_search: list[ScoredChunk] | None = None
 
 
 def chat_model(settings: Settings) -> Model:
@@ -209,52 +222,62 @@ async def _answer_turn(
     }
     whole = ["whole-seed"] if reading is Reading.WHOLE_SEED else []
     tags = ["asking", f"work:{key}", *whole, *ctx.tags]
+    tally = _Tally()
+
+    def failed(message: str, trace_id: str | None) -> ErrorEvent:
+        return ErrorEvent(
+            message=message,
+            trace_id=trace_id,
+            reading=reading,
+            model_requests=tally.model_requests,
+            tool_calls=tally.tool_calls,
+            forced_search=tally.forced_search,
+        )
+
     with ctx.tracing.trace(
         "question", tags=tags, session_id=conversation.id, metadata=metadata
     ) as trace_id:
         try:
-            answer, messages, usage, redrafted = await _answer(
-                ctx, tools, reading, conversation, question, emit
+            answer, messages, redrafted = await _answer(
+                ctx, tools, reading, conversation, question, tally, emit
             )
         except _NoAnswerError:
             logger.warning("The model's draft held no Answer once cut at its control tokens")
-            emit(ErrorEvent(message=NO_ANSWER, trace_id=trace_id, reading=reading))
+            emit(failed(NO_ANSWER, trace_id))
             return
         except UsageLimitExceeded:
             logger.warning("No Answer within %d model requests", REQUEST_LIMIT)
-            emit(
-                ErrorEvent(
-                    message=f"The model did not answer within {REQUEST_LIMIT} requests.",
-                    trace_id=trace_id,
-                    reading=reading,
-                )
-            )
+            emit(failed(f"The model did not answer within {REQUEST_LIMIT} requests.", trace_id))
             return
         except Exception as error:
             logger.exception("Question %d of Conversation %s failed", position, conversation.id)
-            emit(
-                ErrorEvent(
-                    message=f"The model could not answer: {error}",
-                    trace_id=trace_id,
-                    reading=reading,
-                )
-            )
+            emit(failed(f"The model could not answer: {error}", trace_id))
             return
         conversation.messages = _without_thinking(messages)
         conversation.questions = position
         if redrafted:
             ctx.tracing.add_metadata({"redrafted": "true"})
-        _score(ctx.tracing, answer, usage, time.monotonic() - started)
+        _score(ctx.tracing, answer, tally, time.monotonic() - started)
     logger.info(
         "Answered Question %d of Conversation %s (%s%s) in %d requests, %.1f s",
         position,
         conversation.id,
         reading.value,
         ", redrafted" if redrafted else "",
-        usage.requests,
+        tally.model_requests,
         time.monotonic() - started,
     )
-    emit(AnsweredEvent(answer=answer, trace_id=trace_id, reading=reading, redrafted=redrafted))
+    emit(
+        AnsweredEvent(
+            answer=answer,
+            trace_id=trace_id,
+            reading=reading,
+            redrafted=redrafted,
+            model_requests=tally.model_requests,
+            tool_calls=tally.tool_calls,
+            forced_search=tally.forced_search,
+        )
+    )
 
 
 async def _answer(
@@ -263,8 +286,9 @@ async def _answer(
     reading: Reading,
     conversation: Conversation,
     question: str,
+    tally: _Tally,
     emit: Callable[[AnswerEvent | None], None],
-) -> tuple[Answer, list[ModelMessage], RunUsage, bool]:
+) -> tuple[Answer, list[ModelMessage], bool]:
     """Run the agent on the Question and resolve its draft into the Answer; whether redrafted.
 
     Reading the whole Seed, an Answer with sentences to point at the Seed and no handle at all
@@ -281,7 +305,7 @@ async def _answer(
         ]
     else:
         instructions = f"{SYSTEM_PROMPT.strip()}\n\n{tools.seed_map()}"
-        forced = _forced_search(ctx, tools, conversation, question, emit)
+        forced = _forced_search(ctx, tools, conversation, question, tally, emit)
         history = [*conversation.messages, *forced]
     agent = Agent(
         ctx.model,
@@ -304,15 +328,15 @@ async def _answer(
     answer = _resolve(ctx, tools, conversation, draft)
     if not any(c.isalnum() for c in answer.text):
         raise _NoAnswerError
-    messages, usage, redrafted = _with_draft(result.all_messages(), draft), result.usage, False
+    messages, redrafted = _with_draft(result.all_messages(), draft), False
     if whole and _wants_handles(answer):
-        again = await _redraft(ctx, agent, tools, conversation, messages, draft, emit)
+        again = await _redraft(ctx, agent, tools, conversation, messages, draft, tally, emit)
         if again is not None:
-            answer, response, more = again
-            messages, usage, redrafted = [*messages[:-1], response], usage + more, True
+            answer, response = again
+            messages, redrafted = [*messages[:-1], response], True
     if whole:
         messages = _with_question(messages, asked, question)
-    return answer, messages, usage, redrafted
+    return answer, messages, redrafted
 
 
 async def _run(
@@ -321,6 +345,7 @@ async def _run(
     handles: Container[int],
     history: list[ModelMessage],
     request_limit: int,
+    tally: _Tally,
     emit: Callable[[AnswerEvent | None], None],
 ) -> AgentRunResult[str]:
     """Run the agent on `history`, streaming its steps and its draft as cut; its result.
@@ -339,6 +364,7 @@ async def _run(
             if Agent.is_model_request_node(node):
                 cut = DraftCut(handles, bare_handles=bare)
                 async with node.stream(run.ctx) as stream:
+                    tally.model_requests += 1  # sent: the request limit stops one before this
                     async for event in stream:
                         if (text := _draft(event)) and (pieces := cut.add(text)):
                             emit(DeltaEvent(pieces=pieces))
@@ -346,6 +372,7 @@ async def _run(
                 async with node.stream(run.ctx) as stream:
                     async for event in stream:
                         if isinstance(event, FunctionToolCallEvent):
+                            tally.tool_calls += 1
                             args = event.part.args_as_dict()
                             emit(StepEvent(tool=event.part.tool_name, args=args))
     result = run.result
@@ -395,8 +422,9 @@ async def _redraft(
     conversation: Conversation,
     messages: list[ModelMessage],
     first: str,
+    tally: _Tally,
     emit: Callable[[AnswerEvent | None], None],
-) -> tuple[Answer, ModelResponse, RunUsage] | None:
+) -> tuple[Answer, ModelResponse] | None:
     """Ask once more for the Answer, word for word with its handles: the Answer and its response.
 
     One request, without tools: the run's `messages`, which end with the `first` draft as the
@@ -420,7 +448,7 @@ async def _redraft(
         return None
     response = _with_draft(result.all_messages(), draft)[-1]
     assert isinstance(response, ModelResponse), "the redraft ended without a response"
-    return answer, response, result.usage
+    return answer, response
 
 
 class _NoAnswerError(Exception):
@@ -432,12 +460,13 @@ def _forced_search(
     tools: SeedTools,
     conversation: Conversation,
     question: str,
+    tally: _Tally,
     emit: Callable[[AnswerEvent | None], None],
 ) -> list[ModelMessage]:
     """Search the Seed for the Question: the Question, then the search as the model's own call."""
     emit(StepEvent(tool="search", args={"query": question}))
     with ctx.tracing.span("forced search", as_type="tool", input={"query": question}) as span:
-        found = tools.search(question)
+        tally.forced_search, found = tools.ranked_search(question)
         span.update(output=found)
     call = ToolCallPart(
         "search", {"query": question}, tool_call_id=f"forced-{conversation.questions + 1}"
@@ -540,13 +569,13 @@ def _without_thinking(messages: list[ModelMessage]) -> list[ModelMessage]:
     ]
 
 
-def _score(tracing: Tracing, answer: Answer, usage: RunUsage, latency_s: float) -> None:
-    """Score the `question` trace with the Answer's counts, the run's usage and its latency."""
+def _score(tracing: Tracing, answer: Answer, tally: _Tally, latency_s: float) -> None:
+    """Score the `question` trace with the Answer's counts, the turn's tally and its latency."""
     for name, value in answer.counts().model_dump().items():
         if value is not None:
             tracing.score(name, float(value))
-    tracing.score("tool_calls", usage.tool_calls)
-    tracing.score("model_requests", usage.requests)
+    tracing.score("tool_calls", tally.tool_calls)
+    tracing.score("model_requests", tally.model_requests)
     tracing.score("latency_s", round(latency_s, 3))
 
 

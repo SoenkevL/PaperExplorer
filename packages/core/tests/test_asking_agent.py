@@ -1080,6 +1080,8 @@ def test_regression_eval_70cf08933dac78bcf79873edbada5a1e_without_a_redraft_the_
     answered = events[-1]
     assert isinstance(answered, AnsweredEvent)
     assert answered.redrafted is False
+    # The redraft's request was made, though its Answer does not stand.
+    assert answered.model_requests == 2
     assert answered.answer.text == first
     assert all(s.pointers == [] for s in answered.answer.sentences)
     assert last_response_text(conversation) == [first]
@@ -1325,3 +1327,55 @@ def test_reading_the_whole_seed_only_the_question_asked_closes_with_the_note(
     messages, _ = script.requests[1]
     assert user_prompts(messages) == [QUESTION, f"{NO_TOOLS}\n\n{QUESTION_LABEL}\n{later}"]
     assert user_prompts(conversation.messages) == [QUESTION, later]
+
+
+def test_a_retrieval_turn_counts_the_models_requests_and_tools_not_the_forced_search(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    script = Script(
+        [Call("read_section", {"heading": "§2"})],
+        ["Entropy was computed from each EEG recording."],
+    )
+
+    events = turn(context(store_db, script), conversation, QUESTION)
+
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent)
+    assert (answered.model_requests, answered.tool_calls) == (2, 1)
+    # The forced search's Chunks, ranked as the model was shown them.
+    [(messages, _), _] = script.requests
+    [shown] = tool_returns(messages, "search")
+    assert answered.forced_search is not None
+    assert [c.chunk.text for c in answered.forced_search] == list(handles_shown(shown))
+
+
+def test_a_whole_seed_turn_counts_its_redraft_and_has_no_forced_search(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    first = "Entropy was computed from each EEG recording. The sample was small."
+    second = "Entropy was computed from each EEG recording. [#3] The sample was small. [#5]"
+    script = Script([first], [second])
+
+    events = turn(context(store_db, script, reading=Reading.WHOLE_SEED), conversation, QUESTION)
+
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent) and answered.redrafted
+    assert (answered.model_requests, answered.tool_calls) == (2, 0)
+    assert answered.forced_search is None
+
+
+def test_a_failed_retrieval_turn_keeps_its_counts_and_forced_search(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    script = Script(then=[Call("search", {"query": "again"})])
+
+    events = turn(context(store_db, script), conversation, QUESTION)
+
+    failed = events[-1]
+    assert isinstance(failed, ErrorEvent)
+    # Asked for the last time without tools, the model calls one anyway: it counts.
+    assert (failed.model_requests, failed.tool_calls) == (REQUEST_LIMIT, REQUEST_LIMIT)
+    [(messages, _), *_] = script.requests
+    [shown] = tool_returns(messages, "search")
+    assert failed.forced_search is not None
+    assert [c.chunk.text for c in failed.forced_search] == list(handles_shown(shown))

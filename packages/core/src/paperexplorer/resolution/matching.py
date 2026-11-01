@@ -93,6 +93,30 @@ def match(ref: Reference, candidates: Sequence[Candidate]) -> Match | DoiConflic
     )
 
 
+def bibliographic_match(ref: Reference, candidates: Sequence[Candidate]) -> Match | None:
+    """Crossref's guess from the printed string, at low.
+
+    The first candidate whose whole title is printed in it, with its first surname or its year.
+    """
+    printed = f" {normalize_title(ref.text)} "
+    for i, c in enumerate(candidates):
+        title = normalize_title(c.title or "")
+        if not title or f" {title} " not in printed:
+            continue
+        surname = normalize_title(c.surnames[0]) if c.surnames else ""
+        agreed = [
+            name
+            for name, agrees in (
+                ("surname", bool(surname) and f" {surname} " in printed),
+                ("year", c.year is not None and f" {c.year} " in printed),
+            )
+            if agrees
+        ]
+        if agreed:
+            return Match(candidate=i, level=Level.LOW, evidence=["bibliographic", *agreed])
+    return None
+
+
 def _best_title_match(
     ref: Reference, candidates: Sequence[Candidate], *, printed_doi: str | None
 ) -> Match | None:

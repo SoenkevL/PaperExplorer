@@ -93,6 +93,28 @@ class Layer(StrEnum):
     """What matched a Reference to its Work."""
 
     LIBRARY = "library"
+    CROSSREF = "crossref"
+    OPENALEX = "openalex"
+
+
+class RegistrySource(StrEnum):
+    """A registry and what it was asked: the key a cached response is kept under."""
+
+    CROSSREF_DOI = "crossref:doi"
+    OPENALEX_DOI = "openalex:doi"
+    OPENALEX_TITLE = "openalex:title"
+    CROSSREF_BIBLIOGRAPHIC = "crossref:bibliographic"
+
+
+class RegistryRecord(BaseModel):
+    """A Work as a registry describes it; creators are `Last, First`, as Zotero writes them."""
+
+    doi: str | None = None
+    openalex_id: str | None = None
+    title: str | None = None
+    creators: list[str] = []
+    year: int | None = None
+    kind: str | None = None  # Crossref's `type`: `posted-content` is a preprint, its own Version
 
 
 class Resolution(BaseModel):

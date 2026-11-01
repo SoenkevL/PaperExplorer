@@ -5,7 +5,7 @@ from collections.abc import Collection
 import psycopg
 from psycopg.rows import TupleRow, class_row
 
-from paperexplorer.domain import LibraryItem, Work, WorkId, normalize_doi
+from paperexplorer.domain import LibraryItem, RegistryRecord, Work, WorkId, normalize_doi
 
 _WORK = """
     SELECT id, zotero_key, title, creators, year, doi, synced_at, text_origin, added_at AS added,
@@ -58,6 +58,36 @@ class Works:
                 work,
             ),
         )
+
+    def record_registry_work(self, record: RegistryRecord) -> WorkId:
+        """The Work a registry record names, made from its metadata if no Work holds it yet.
+
+        That is the Work standing for its DOI, else the one holding its OpenAlex ID; a new one keeps
+        the registry's metadata, with no `synced_at`, until `catalog` gives it a Library Item.
+        """
+        doi = normalize_doi(record.doi) if record.doi else None
+        found = self.standing_item(doi) if doi else None
+        if found is None and record.openalex_id:
+            row = self._conn.execute(
+                "SELECT id FROM works WHERE openalex_id = %s", (record.openalex_id,)
+            ).fetchone()
+            found = WorkId(row[0]) if row else None
+        if found is not None:
+            if record.openalex_id:
+                self._conn.execute(
+                    "UPDATE works SET openalex_id = %(oa)s WHERE id = %(id)s"
+                    " AND openalex_id IS NULL"
+                    " AND NOT EXISTS (SELECT 1 FROM works WHERE openalex_id = %(oa)s)",
+                    {"oa": record.openalex_id, "id": found},
+                )
+            return found
+        row = self._conn.execute(
+            "INSERT INTO works (doi, openalex_id, title, creators, year)"
+            " VALUES (%s, %s, %s, %s, %s) RETURNING id",
+            (doi, record.openalex_id, record.title, record.creators, record.year),
+        ).fetchone()
+        assert row is not None
+        return WorkId(row[0])
 
     def get(self, work: WorkId) -> Work | None:
         """The Work with this id, if there is one."""

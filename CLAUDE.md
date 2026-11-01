@@ -9,6 +9,7 @@ A reader for following a paper's citations into the cited Works' own words. Text
 - `docs/adr/`: decisions that are hard to reverse. Reversing one is the user's call.
 - `docs/design-v1.md`: v1 scope and its definition of done.
 - `docs/design-asking.md`: asking the Seed Questions (Pointers, Quotes, the agent, tracing, eval). Read it before touching `asking`, `tracing` or the Conversation routes.
+- `docs/design-resolution.md`: resolving References (Library sync, Registry Checks, limits, cache). Read it before touching `resolution`, `library` sync or the Check routes.
 
 ## Workflow
 

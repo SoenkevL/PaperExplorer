@@ -7,10 +7,10 @@ The goal is a local-first tool for reading a paper and following its citations i
 ## v1 scope and definition of done
 One seed paper plus one level of sources. Notes come after v1; asking the Seed Questions is in v1 and comes before resolution ([design-asking.md](design-asking.md), 2026-10-28). v1 is done when:
 1. `paperexplorer explore <zoteroItemKey>` runs every stage for the seed paper and can be restarted safely.
-2. The Exploration's Zotero collection holds every resolved source, tagged `pe:fullText` / `pe:abstractOnly` / `pe:noSource`, and no duplicates were created.
+2. The Exploration's Zotero collection holds every source resolved from the Library or by a Registry Check ([design-resolution.md](design-resolution.md)), tagged `pe:fullText` / `pe:abstractOnly` / `pe:noSource`, and no duplicates were created.
 3. Open-access PDFs are attached in Zotero, and the sources' full texts are chunked and embedded.
 4. The seed paper renders in the browser on the Mac. Every `[n]` and APA citation is clickable and opens a side panel with the top 5 chunks, their scores, and a Scope toggle (cited Work / whole Exploration).
-5. A report lists unmatched and low-confidence references.
+5. A report lists Unchecked, Unresolved and low-confidence References.
 6. A sidebar beside the Seed answers Questions about it; every Pointer leads back to the sentence it rests on, and the eval meets the bar in `design-asking.md`.
 
 The seed paper is "A critical review of brain entropy as a biomarker of the psychedelic state", from your Zotero library.
@@ -18,15 +18,15 @@ The seed paper is "A critical review of brain entropy as a biomarker of the psyc
 ## Settled decisions
 **Ingest**
 - Parsing (ADR 0006, superseding the tool choice of ADR 0002): GROBID (CRF image, local service) finds headings, paragraphs, sentences, References and Citation markers; the PDF's own text layer, read with pdfium, gives their text exactly as printed and the PDF's internal link targets. Scans are read by LiteParse's OCR and marked as OCR Text.
-- References: GROBID splits the bibliography into entries (an entry merged across a hanging indent is split again); for scans, rules split it by labels or hanging indent. Each entry is resolved with Crossref `query.bibliographic`, then enriched from OpenAlex.
+- References: GROBID splits the bibliography into entries (an entry merged across a hanging indent is split again); for scans, rules split it by labels or hanging indent. Each entry is resolved first against the Library and cached responses; a Registry Check, on the reader's request, asks Crossref and OpenAlex by DOI, OpenAlex by title, then Crossref `query.bibliographic` ([design-resolution.md](design-resolution.md), 2026-11-01).
 - Inline citations: numbered `[12]` style and author-year. Each Citation Link to a Reference carries a confidence and its evidence: the PDF's exact link target (certain), GROBID and a rule agreeing (high), or one source alone (reported as low confidence).
-- Resolving sources: OpenAlex first, including Unpaywall open-access links and abstracts, then arXiv as a fallback.
+- Resolving sources: OpenAlex supplies open-access links (Unpaywall) and abstracts; there is no arXiv fallback.
 - When no full text is available, the source's abstract is indexed instead, and it still gets a proper Zotero item tagged `abstractOnly` or `noSource`.
 
 **Zotero and storage**
 - Zotero is the record of truth for metadata, PDFs (premium plan, 2 GB) and collections, and the code reaches it through the Web API with `pyzotero`.
 - There is one flat collection per exploration, with the Seed tagged `pe:seed`; an item can sit in several collections without being duplicated. Preprint and published versions are separate Works; the published one is preferred when a reference is ambiguous.
-- Duplicate check: a Postgres `works` table maps DOI, arXiv ID and OpenAlex ID to the Zotero key. It is filled from your library once, and a Zotero search runs as a final check before any item is created.
+- Duplicate check: a Postgres `works` table maps DOI, arXiv ID and OpenAlex ID to the Zotero key. Every Library Item is a Work row, kept current by an incremental sync, and a Zotero search runs as a final check before any item is created.
 - PDFs are read from the optional `ZOTERO_STORAGE_DIR` setting (a read-only mount of the Zotero data folder on the tower). If that's missing, PDFs are downloaded via the Web API into `data/cache/pdfs/`.
 - LiteParse output is cached in `data/cache/parsed/`. The whole cache can be deleted and rebuilt.
 - Postgres holds only derived data (chunks, embeddings, references, citations, retrieval runs, pipeline status), plus a metadata snapshot with a `synced_at` time used for filtering. When the two disagree, Zotero wins, and a `sync` command refreshes the snapshot.

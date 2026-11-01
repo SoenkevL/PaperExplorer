@@ -204,7 +204,7 @@ Every model call, chat and embedding alike, runs inside a Langfuse trace and nev
 
 Fake what we don't own, run what we do.
 
-- **Pure modules** (`citations`, `chunking`, `parsing`): tests through the interface with fixture PDFs / `ParsedWork`s. Fixtures are CC BY papers (`tests/fixtures/README.md`), plus a synthetic scan and Tesseract's fast English model so OCR runs offline.
+- **Pure modules** (`citations`, `chunking`, `parsing`): tests through the interface with fixture PDFs / `ParsedWork`s. The eval's `summaries` and `rendering` are tested without Postgres over hand-built reports, and the newest committed summary must render as committed. Fixtures are CC BY papers (`tests/fixtures/README.md`), plus a synthetic scan and Tesseract's fast English model so OCR runs offline.
 - **GROBID**: a service we run, but slow to start, so `parsing` tests read GROBID output recorded per fixture PDF (`scripts/record_grobid_fixtures.py`); one live test per run starts the pinned image with testcontainers and checks fresh output keeps the recorded structure.
 - **Postgres**: always real. testcontainers starts a throwaway `pgvector` container on Mac and tower alike, or `PE_TEST_DATABASE_URL` points at an existing empty database; each test runs in a rolled-back transaction (ADR 0005). The fixtures live in the root `conftest.py`, shared by every package and `tests/e2e/`; code that commits (the CLI) gets a scratch database of its own.
 - **Zotero, Embedder**: in-memory adapters at the `Library` and `Embedder` seams.

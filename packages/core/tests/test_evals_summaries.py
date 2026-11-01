@@ -47,6 +47,7 @@ SEARCH = [
 
 
 def info(repeat: int = 1) -> RunInfo:
+    """What the hand-built run ran against, asking live `repeat` times."""
     return RunInfo(
         run_id="20261029T120000Z-abc1234",
         started_at=datetime(2026, 10, 29, 12, tzinfo=UTC),
@@ -66,10 +67,14 @@ def info(repeat: int = 1) -> RunInfo:
     )
 
 
-def live(repeat: int = 1, pointers: list[PointerCheck] = POINTED, **changes: object) -> Turn:
+def live(repeat: int = 1, pointers: list[PointerCheck] | None = None, **changes: object) -> Turn:
     """A covered live turn that read the Seed whole, so searched nothing."""
     turn = make_turn(
-        mode=Mode.LIVE, repeat=repeat, reading=Reading.WHOLE_SEED, pointers=pointers, quotes=[QUOTE]
+        mode=Mode.LIVE,
+        repeat=repeat,
+        reading=Reading.WHOLE_SEED,
+        pointers=POINTED if pointers is None else pointers,
+        quotes=[QUOTE],
     )
     return turn.model_copy(update=changes)
 
@@ -101,6 +106,7 @@ def question(name: str, meta: QuestionMeta, turns: list[Turn]) -> QuestionRun:
 
 
 def report(covered: list[Turn], uncovered: list[Turn], repeat: int = 1) -> EvalReport:
+    """A run of one covered and one uncovered Question, its modes those of the turns."""
     modes = list(dict.fromkeys(t.mode for t in covered + uncovered))
     return EvalReport(
         run=info(repeat),
@@ -113,6 +119,7 @@ def report(covered: list[Turn], uncovered: list[Turn], repeat: int = 1) -> EvalR
 
 
 def both_modes() -> EvalReport:
+    """A run asking each Question once live (the whole Seed) and once by retrieval."""
     return report(
         [live(), by_retrieval()],
         [said(Mode.LIVE, Reading.WHOLE_SEED), said(Mode.RETRIEVAL, Reading.RETRIEVAL)],
@@ -167,20 +174,29 @@ def test_the_bar_is_the_live_modes_with_hit_at_8_from_the_forced_search() -> Non
         "Quotes marked exact that are not": (0, True),
         "Answers judged grounded and correct": (None, None),
     }
-    one = summary.modes[Mode.LIVE]
-    assert (one.answered, one.failed, one.covered, one.uncovered, one.uncovered_said) == (
+    live_mode = summary.modes[Mode.LIVE]
+    assert (
+        live_mode.answered,
+        live_mode.failed,
+        live_mode.covered,
+        live_mode.uncovered,
+        live_mode.uncovered_said,
+    ) == (
         2,
         0,
         1,
         1,
         1,
     )
-    assert one.hit_at_8 is None
-    assert one.readings == {Reading.WHOLE_SEED: 2}
-    assert (one.pointers_close, one.pointers_weak) == (2, 1)
-    assert one.pointers_on_expected == pytest.approx(2 / 3)
-    assert one.similarity.count == 3
-    assert [(b.low, b.close, b.weak) for b in one.similarity.buckets if b.close or b.weak] == [
+    assert live_mode.hit_at_8 is None
+    assert live_mode.readings == {Reading.WHOLE_SEED: 2}
+    assert summary.modes[Mode.RETRIEVAL].readings == {Reading.RETRIEVAL: 2}
+    assert (live_mode.pointers_close, live_mode.pointers_weak) == (2, 1)
+    assert live_mode.pointers_on_expected == pytest.approx(2 / 3)
+    assert live_mode.similarity.count == 3
+    assert [
+        (b.low, b.close, b.weak) for b in live_mode.similarity.buckets if b.close or b.weak
+    ] == [
         (0.55, 0, 1),
         (0.8, 1, 0),
         (0.9, 1, 0),
@@ -236,16 +252,17 @@ def test_asked_more_than_once_the_bar_pools_the_repeats_and_gives_each_with_the_
 
     summary = summarize(report(covered, uncovered, repeat=3))
 
-    one = summary.modes[Mode.LIVE]
-    assert (one.repeats, one.answered, one.failed) == (3, 6, 0)
+    live_mode = summary.modes[Mode.LIVE]
+    assert (live_mode.repeats, live_mode.answered, live_mode.failed) == (3, 6, 0)
     assert summary.modes[Mode.RETRIEVAL].repeats == 1
-    assert [(r.repeat, r.pointer_coverage) for r in one.by_repeat] == [
+    assert [(r.repeat, r.pointer_coverage) for r in live_mode.by_repeat] == [
         (1, 1.0),
         (2, pytest.approx(1 / 3)),
         (3, 1.0),
     ]
     coverage = next(b for b in summary.bar if b.name == "Pointer coverage")
     assert (coverage.value, coverage.met) == (pytest.approx(7 / 9), False)
+    assert coverage.per_repeat == [1.0, pytest.approx(1 / 3), 1.0]
     assert coverage.spread == pytest.approx(2 / 3)
     hit = next(b for b in summary.bar if b.name == "hit@8")
     assert (hit.value, hit.per_repeat) == (1.0, [])

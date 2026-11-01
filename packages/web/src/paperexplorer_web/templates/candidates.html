@@ -1,0 +1,25 @@
+{#- The Works a reader might choose for a Reference, likeliest first; each choice swaps the
+    Reference's Resolution for the one the API returns. -#}
+{%- from "works.html" import work_brief -%}
+{%- set target = "#resolution-" ~ key %}
+{%- set url = "/works/" ~ work_id ~ "/references/" ~ key ~ "/choice" %}
+<div class="candidates">
+  {% if message %}<p class="failed">{{ message }}</p>{% endif %}
+  {% if candidates %}
+  <ol>
+    {% for w in candidates %}
+    <li>{{ work_brief(w) }}
+      <button type="button" hx-put="{{ url }}" hx-vals='{{ {"c": citation_id, "pick": "work", "work_id": w.id} | tojson }}' hx-target="{{ target }}" hx-swap="outerHTML">Choose</button></li>
+    {% endfor %}
+  </ol>
+  {% elif not message %}
+  <p class="note">No Work looks like this Reference.</p>
+  {% endif %}
+  <form class="named" hx-put="{{ url }}" hx-target="{{ target }}" hx-swap="outerHTML">
+    <input type="hidden" name="c" value="{{ citation_id }}">
+    <input type="hidden" name="pick" value="named">
+    <input type="text" name="named" required aria-label="A Zotero key or a DOI" placeholder="Another Work: a Zotero key or a DOI">
+    <button type="submit">Choose</button>
+  </form>
+  <button type="button" hx-put="{{ url }}" hx-vals='{{ {"c": citation_id, "pick": "none"} | tojson }}' hx-target="{{ target }}" hx-swap="outerHTML" title="This Reference names no Work">None of these</button>
+</div>

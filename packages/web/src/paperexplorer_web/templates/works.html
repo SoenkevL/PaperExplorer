@@ -1,0 +1,7 @@
+{#- How the panel shows a Work a Resolution names, or one the reader might choose. -#}
+{%- macro work_brief(w) -%}
+<p class="work-brief"><span class="title">{{ w.title or w.zotero_key or w.doi }}</span>
+  <span class="byline">{{ w.creators | join("; ") }}{% if w.year %} ({{ w.year }}){% endif %}</span>
+  {%- if w.doi %} · <a href="https://doi.org/{{ w.doi }}">{{ w.doi }}</a>{% endif %}
+  {%- if not w.zotero_key %} <span class="note">not in your Library</span>{% endif %}</p>
+{%- endmacro -%}

@@ -6,6 +6,7 @@
 {% else %}
 <p class="status down">API unreachable</p>
 {% endif %}
+{% with groups = duplicates, message = none %}{% include "duplicates.html" %}{% endwith %}
 {% if works %}
 <ul class="works">
   {% for w in works %}

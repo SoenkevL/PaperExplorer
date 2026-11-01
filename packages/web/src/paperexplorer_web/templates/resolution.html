@@ -1,0 +1,41 @@
+{#- A Reference's Resolution in the panel; its buttons swap it for the Resolution they return. -#}
+{%- from "works.html" import work_brief -%}
+{%- set target = "#resolution-" ~ key %}
+{%- set url = "/works/" ~ work_id ~ "/references/" ~ key %}
+{%- macro pick(w) -%}
+<button type="button" hx-put="{{ url }}/choice" hx-vals='{{ {"c": citation_id, "pick": "work", "work_id": w.id} | tojson }}' hx-target="{{ target }}" hx-swap="outerHTML">This one</button>
+{%- endmacro -%}
+<div class="resolution" id="resolution-{{ key }}">
+  <h3>Resolution</h3>
+  {% if res is none %}
+  <p class="note">Not resolved yet: run the resolve Stage.</p>
+  {% elif res.state == "resolved" %}
+  <p class="state"><span class="level {{ res.level }}">{{ res.level }}</span> {{ sources[res.layer] }}</p>
+  {{ work_brief(res.work) }}
+  {% if res.doi_conflict %}{{ pick(res.work) }}{% endif %}
+  {% elif res.state == "unchecked" %}
+  <p class="state">Unchecked Reference: neither your Library nor an earlier Check knows its Work.</p>
+  {% elif res.chosen %}
+  <p class="state">Your choice: this Reference names no Work.</p>
+  {% else %}
+  <p class="state">Unresolved Reference: no registry knows its Work.</p>
+  {% endif %}
+  {% if res and res.doi_conflict %}
+  <p class="conflict">DOI Conflict: the printed DOI names another Work, which disagrees with the Reference:</p>
+  {{ work_brief(res.doi_conflict) }}
+  {{ pick(res.doi_conflict) }}
+  {% endif %}
+  {% if message %}<p class="failed">{{ message }}</p>{% endif %}
+  <div class="actions">
+    {% if not res or res.state == "unchecked" %}
+    <button type="button" hx-post="{{ url }}/check" hx-vals='{{ {"c": citation_id} | tojson }}' hx-target="{{ target }}" hx-swap="outerHTML" hx-disabled-elt="this">Check</button>
+    {% elif res and not res.chosen and (res.state == "unresolved" or res.level == "low") %}
+    <button type="button" hx-post="{{ url }}/check" hx-vals='{{ {"c": citation_id, "refresh": "true"} | tojson }}' hx-target="{{ target }}" hx-swap="outerHTML" hx-disabled-elt="this" title="Ask the registries again, past the cache">Check again</button>
+    {% endif %}
+    <button type="button" hx-get="{{ url }}/candidates?c={{ citation_id }}" hx-target="#choices-{{ key }}" title="Pick the Work this Reference names yourself">Choose the Work…</button>
+    {% if res and res.chosen %}
+    <button type="button" hx-delete="{{ url }}/choice?c={{ citation_id }}" hx-target="{{ target }}" hx-swap="outerHTML">Clear my choice</button>
+    {% endif %}
+  </div>
+  <div id="choices-{{ key }}"></div>
+</div>

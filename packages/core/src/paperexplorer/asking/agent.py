@@ -323,7 +323,7 @@ async def _answer(
             ),
         ],
     )
-    result = await _run(agent, tools, conversation.handles, history, REQUEST_LIMIT, emit)
+    result = await _run(agent, tools, conversation.handles, history, REQUEST_LIMIT, tally, emit)
     draft = answer_draft(result.output)
     answer = _resolve(ctx, tools, conversation, draft)
     if not any(c.isalnum() for c in answer.text):
@@ -435,7 +435,7 @@ async def _redraft(
     history = [*_without_thinking(messages), ModelRequest(parts=[UserPromptPart(REDRAFT)])]
     with ctx.tracing.span("redraft", input=first) as span:
         try:
-            result = await _run(agent, tools, conversation.handles, history, 1, emit)
+            result = await _run(agent, tools, conversation.handles, history, 1, tally, emit)
         except Exception as error:
             logger.warning("Asked again for its handles, the model failed", exc_info=True)
             span.update(output=f"failed: {error}")

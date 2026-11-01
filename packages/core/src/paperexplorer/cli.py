@@ -4,6 +4,8 @@ import asyncio
 import json
 import textwrap
 import time
+from collections.abc import Callable, Generator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
@@ -11,15 +13,16 @@ from typing import Annotated
 
 import psycopg
 import typer
+from psycopg.rows import TupleRow
 
 from paperexplorer import __version__, asking, citations, evals, parsing, pipeline, retrieval, store
 from paperexplorer.citations import ConfidenceLevel, confidence_level
 from paperexplorer.config import Settings
-from paperexplorer.domain import Answer, Scope
-from paperexplorer.embedding import OpenAICompatibleEmbedder
+from paperexplorer.domain import Answer, Scope, Work
 from paperexplorer.library import ZoteroLibrary
 from paperexplorer.logs import configure_logging
 from paperexplorer.tracing import configure_tracing, trace_release
+from paperexplorer.wiring import Wiring
 
 app = typer.Typer(no_args_is_help=True, help="Follow a paper's citations into its sources.")
 
@@ -31,6 +34,26 @@ def main(
     """Configure logging from settings before any command runs."""
     settings = Settings()
     configure_logging("DEBUG" if verbose else settings.log_level, settings.log_format)
+
+
+def _wiring(ctx: typer.Context, settings: Settings) -> Wiring:
+    """The command's adapters: from `settings`, unless the caller's `obj` builds them."""
+    build: Callable[[Settings], Wiring] = ctx.obj or Wiring.from_settings
+    return build(settings)
+
+
+@contextmanager
+def _work_or_exit(
+    settings: Settings, key: str
+) -> Generator[tuple[psycopg.Connection[TupleRow], Work]]:
+    """A store connection, its schema up to date, and the Work `key`; exit 1 if it is unknown."""
+    with psycopg.connect(settings.database_url, autocommit=True) as conn:
+        store.migrate(conn)
+        found = store.Works(conn).find(key)
+        if found is None:
+            typer.echo(f"No Work {key}; run fetch, parse, chunk and embed first", err=True)
+            raise typer.Exit(1)
+        yield conn, found
 
 
 @app.command()
@@ -100,6 +123,7 @@ class StageName(StrEnum):
 
 @app.command("run")
 def run_command(
+    ctx: typer.Context,
     stage: Annotated[StageName, typer.Argument(help="The Stage to run.")],
     work: Annotated[str, typer.Argument(help="The Work's Zotero item key, e.g. YAAC9XCX.")],
 ) -> None:
@@ -108,21 +132,23 @@ def run_command(
     with psycopg.connect(settings.database_url, autocommit=True) as conn:
         store.migrate(conn)
         work_id = store.Works(conn).ensure(work)
-        tracing = configure_tracing(settings)
+        wiring = None
         try:
-            ctx = pipeline.StageContext(
+            wiring = _wiring(ctx, settings)
+            stage_ctx = pipeline.StageContext(
                 conn=conn,
                 settings=settings,
                 library=ZoteroLibrary.from_settings(settings),
-                embedder=OpenAICompatibleEmbedder.from_settings(settings, tracing),
-                tracing=tracing,
+                embedder=wiring.embedder,
+                tracing=wiring.tracing,
             )
-            result = pipeline.run_stage(ctx, stage.value, work_id)
+            result = pipeline.run_stage(stage_ctx, stage.value, work_id)
         except Exception as e:
             typer.echo(f"{stage.value} failed for {work}: {e}", err=True)
             raise typer.Exit(1) from e
         finally:
-            tracing.flush()
+            if wiring is not None:
+                wiring.tracing.flush()
     counts = ", ".join(f"{k} {v}" for k, v in result.counts.items())
     typer.echo(f"{stage.value} {work}: {counts}")
 
@@ -133,6 +159,7 @@ def _placing(placing: retrieval.Placing | None) -> str:
 
 @app.command("search")
 def search_command(
+    ctx: typer.Context,
     work: Annotated[str, typer.Argument(help="The Work's Zotero item key, e.g. YAAC9XCX.")],
     query: Annotated[str, typer.Argument(help="What to search for, e.g. a Question.")],
     k: Annotated[int, typer.Option("-k", min=1, help="How many Chunks to list.")] = 8,
@@ -142,23 +169,17 @@ def search_command(
 ) -> None:
     """Search a Work's Chunks and list them best first, with both rankings and their RRF."""
     settings = Settings()
-    with psycopg.connect(settings.database_url, autocommit=True) as conn:
-        store.migrate(conn)
-        found = store.Works(conn).find(work)
-        if found is None:
-            typer.echo(f"No Work {work}; run fetch, parse, chunk and embed first", err=True)
-            raise typer.Exit(1)
-        tracing = configure_tracing(settings)
-        embedder = OpenAICompatibleEmbedder.from_settings(settings, tracing)
+    with _work_or_exit(settings, work) as (conn, found):
+        wiring = _wiring(ctx, settings)
         try:
-            with tracing.trace(
+            with wiring.tracing.trace(
                 "search", tags=["cli", f"work:{work}"], metadata={"work_id": str(found.id)}
             ):
-                results = retrieval.search(conn, embedder, query, Scope.of(found.id), k=k)
+                results = retrieval.search(conn, wiring.embedder, query, Scope.of(found.id), k=k)
         finally:
-            tracing.flush()
+            wiring.tracing.flush()
     chunks = "Chunk" if len(results) == 1 else "Chunks"
-    typer.echo(f"{work}: {len(results)} {chunks} for {query!r} ({embedder.model})")
+    typer.echo(f"{work}: {len(results)} {chunks} for {query!r} ({wiring.embedder.model})")
     for i, r in enumerate(results, start=1):
         heading = " > ".join(r.chunk.heading_path) or "(no heading)"
         typer.echo(
@@ -171,32 +192,21 @@ def search_command(
 
 @app.command("ask")
 def ask_command(
+    ctx: typer.Context,
     work: Annotated[str, typer.Argument(help="The Work's Zotero item key, e.g. YAAC9XCX.")],
     question: Annotated[str, typer.Argument(help="The Question to ask about it.")],
 ) -> None:
     """Ask a Work a Question: stream the model's draft, then list its Pointers and Quotes."""
     settings = Settings()
-    with psycopg.connect(settings.database_url, autocommit=True) as conn:
-        store.migrate(conn)
-        found = store.Works(conn).find(work)
-        if found is None:
-            typer.echo(f"No Work {work}; run fetch, parse, chunk and embed first", err=True)
-            raise typer.Exit(1)
-        tracing = configure_tracing(settings)
-        ctx = asking.AskingContext(
-            conn=conn,
-            embedder=OpenAICompatibleEmbedder.from_settings(settings, tracing),
-            model=asking.chat_model(settings),
-            settings=settings,
-            tracing=tracing,
-        )
+    with _work_or_exit(settings, work) as (conn, found):
+        wiring = _wiring(ctx, settings)
         conversation = asking.Conversation(work=found)
         try:
             started = time.monotonic()
-            answered = asyncio.run(_stream_answer(ctx, conversation, question))
+            answered = asyncio.run(_stream_answer(wiring.asking(conn), conversation, question))
             latency = time.monotonic() - started
         finally:
-            tracing.flush()
+            wiring.tracing.flush()
         blocks = [b.text for b in (store.WorkTexts(conn).get(found.id) or _NO_TEXT).blocks]
     _print_answer(answered.answer, conversation, blocks)
     counts = answered.answer.counts()
@@ -218,6 +228,7 @@ _NO_TEXT = parsing.ParsedWork(text_origin=parsing.TextOrigin.PRINTED, blocks=[],
 
 @app.command("eval")
 def eval_command(
+    ctx: typer.Context,
     work: Annotated[str, typer.Argument(help="The Seed's Zotero item key, e.g. YAAC9XCX.")],
     questions: Annotated[
         Path, typer.Option(exists=True, dir_okay=False, help="The Question set to ask.")
@@ -263,12 +274,7 @@ def eval_command(
             raise typer.Exit(1)
         dataset.cases = [c for c in dataset.cases if c.name in only]
     modes = [evals.Mode.LIVE, *([evals.Mode.RETRIEVAL] if retrieval_mode else [])]
-    with psycopg.connect(settings.database_url, autocommit=True) as conn:
-        store.migrate(conn)
-        found = store.Works(conn).find(work)
-        if found is None:
-            typer.echo(f"No Work {work}; run fetch, parse, chunk and embed first", err=True)
-            raise typer.Exit(1)
+    with _work_or_exit(settings, work) as (conn, found):
         chunks = store.Chunks(conn)
         stored = chunks.for_work(found.id)
         if not stored or chunks.without_embedding(found.id, settings.embedding_model):
@@ -280,25 +286,17 @@ def eval_command(
             for name, place in unknown:
                 typer.echo(f"  {name}: {place}", err=True)
             raise typer.Exit(1)
-        tracing = configure_tracing(settings)
-        embedder = OpenAICompatibleEmbedder.from_settings(settings, tracing)
+        wiring = _wiring(ctx, settings)
         info = evals.run_info(
             settings,
             found,
             questions,
-            embedding_model=embedder.model,
+            embedding_model=wiring.embedder.model,
             git_sha=trace_release(settings),
-            tracing_host=tracing.base_url,
+            tracing_host=wiring.tracing.base_url,
             started=datetime.now(UTC),
             run_id=run_id,
             repeat=repeat,
-        )
-        ctx = asking.AskingContext(
-            conn=conn,
-            embedder=embedder,
-            model=asking.chat_model(settings),
-            settings=settings,
-            tracing=tracing,
         )
         asked = len(dataset.cases)
         named = [
@@ -310,9 +308,9 @@ def eval_command(
             f" {' and '.join(named)}, run {info.run_id}"
         )
         try:
-            report = asyncio.run(evals.run_eval(ctx, found, dataset, info, modes))
+            report = asyncio.run(evals.run_eval(wiring.asking(conn), found, dataset, info, modes))
         finally:
-            tracing.flush()
+            wiring.tracing.flush()
     summary = evals.summarize(report)
     written = evals.write_run(report, summary, settings.data_dir / "eval", summary_dir)
     for check in summary.bar:

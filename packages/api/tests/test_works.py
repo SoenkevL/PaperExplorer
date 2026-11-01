@@ -8,7 +8,7 @@ from psycopg.rows import TupleRow
 
 from paperexplorer.domain import LibraryItem
 from paperexplorer.parsing import ParsedWork
-from paperexplorer.store import Works
+from paperexplorer.store import StageStatuses, Works
 
 from .conftest import Stored
 
@@ -33,15 +33,24 @@ def test_works_are_listed_with_their_metadata_and_stages(api: TestClient, villig
 
 
 def test_a_stage_that_never_ran_is_pending(api: TestClient, store_db: Conn) -> None:
-    Works(store_db).ensure("NEW23456")
+    work_id = Works(store_db).ensure("NEW23456")
+    StageStatuses(store_db).start(work_id, "fetch")
 
     [work] = api.get("/works").json()
 
     assert work["stages"] == {
-        "fetch": "pending", "parse": "pending", "chunk": "pending", "embed": "pending",
+        "fetch": "running", "parse": "pending", "chunk": "pending", "embed": "pending",
         "extract_citations": "pending",
     }  # fmt: skip
     assert work["text_origin"] is None
+
+
+def test_a_library_only_work_is_not_listed(
+    api: TestClient, villiger: Stored, store_db: Conn
+) -> None:
+    Works(store_db).ensure("LIBONLY1")  # synced from the Library, no Stage run
+
+    assert [w["zotero_key"] for w in api.get("/works").json()] == ["VILL2024"]
 
 
 def test_a_work_is_its_blocks_in_reading_order(api: TestClient, villiger: Stored) -> None:

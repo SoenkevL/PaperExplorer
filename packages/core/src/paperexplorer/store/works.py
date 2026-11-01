@@ -1,7 +1,6 @@
 """Works: one row per Work, holding its Library Item's metadata snapshot (ADR 0001)."""
 
 import psycopg
-from psycopg.errors import UniqueViolation
 from psycopg.rows import TupleRow, class_row
 
 from paperexplorer.domain import LibraryItem, Work, WorkId
@@ -15,8 +14,12 @@ _WORK = """
 """
 
 
-class DuplicateWorkError(Exception):
-    """Two Library Items claim the same identifier, so they would be one Work twice."""
+# Which of the Works holding one DOI stands for it: the reader's pick, a Library Item, one with
+# a PDF, the older.
+_STANDING = (
+    "doi_chosen DESC, zotero_key IS NULL, pdf_attachment_key IS NULL, added_at NULLS LAST, id"
+)
+_CANDIDATES = 10
 
 
 class Works:
@@ -38,28 +41,21 @@ class Works:
 
     def record_library_item(self, work: WorkId, item: LibraryItem) -> None:
         """Replace the Work's metadata snapshot with what its Library Item says now."""
-        try:
-            with self._conn.transaction():
-                self._conn.execute(
-                    "UPDATE works SET title = %s, creators = %s, year = %s, doi = lower(%s),"
-                    " pdf_attachment_key = %s, pdf_filename = %s, synced_at = now()"
-                    " WHERE id = %s",
-                    (
-                        item.title,
-                        item.creators,
-                        item.year,
-                        item.doi,
-                        item.pdf.key if item.pdf else None,
-                        item.pdf.filename if item.pdf else None,
-                        work,
-                    ),
-                )
-        except UniqueViolation as e:
-            row = self._conn.execute(
-                "SELECT zotero_key FROM works WHERE doi = lower(%s)", (item.doi,)
-            ).fetchone()
-            other = row[0] if row else "another Work"
-            raise DuplicateWorkError(f"{item.key} has DOI {item.doi}, which {other} has too") from e
+        self._conn.execute(
+            "UPDATE works SET title = %s, creators = %s, year = %s, doi = lower(%s),"
+            " pdf_attachment_key = %s, pdf_filename = %s, added_at = %s, synced_at = now()"
+            " WHERE id = %s",
+            (
+                item.title,
+                item.creators,
+                item.year,
+                item.doi,
+                item.pdf.key if item.pdf else None,
+                item.pdf.filename if item.pdf else None,
+                item.added,
+                work,
+            ),
+        )
 
     def get(self, work: WorkId) -> Work | None:
         """The Work with this id, if there is one."""
@@ -75,3 +71,73 @@ class Works:
         """Every Work, in the order they were first seen."""
         with self._conn.cursor(row_factory=class_row(Work)) as cur:
             return cur.execute(_WORK + " ORDER BY id").fetchall()
+
+    def with_stage_runs(self) -> list[Work]:
+        """The Works a Stage ran for, in the order first seen; Library-only Works are left out."""
+        with self._conn.cursor(row_factory=class_row(Work)) as cur:
+            return cur.execute(
+                _WORK + " WHERE EXISTS (SELECT 1 FROM stage_status s WHERE s.work_id = works.id)"
+                " ORDER BY id"
+            ).fetchall()
+
+    def stand_in(self, doi: str) -> WorkId | None:
+        """The Work that stands for a DOI, when two Library Items hold it."""
+        row = self._conn.execute(
+            f"SELECT id FROM works WHERE doi = lower(%s) ORDER BY {_STANDING} LIMIT 1", (doi,)
+        ).fetchone()
+        return WorkId(row[0]) if row else None
+
+    def choose(self, work: WorkId) -> None:
+        """Make this Work the one that stands for its DOI, as the reader chose."""
+        self._conn.execute(
+            "UPDATE works SET doi_chosen = (id = %s)"
+            " WHERE doi = (SELECT doi FROM works WHERE id = %s)",
+            (work, work),
+        )
+
+    def duplicates(self) -> list[list[Work]]:
+        """Each DOI that two or more Library Items hold: its Works, the one standing first."""
+        with self._conn.cursor(row_factory=class_row(Work)) as cur:
+            rows = cur.execute(
+                _WORK + " WHERE zotero_key IS NOT NULL AND doi IN ("
+                "SELECT doi FROM works WHERE zotero_key IS NOT NULL"
+                " GROUP BY doi HAVING count(*) > 1)"
+                f" ORDER BY doi, {_STANDING}"
+            ).fetchall()
+        groups: dict[str | None, list[Work]] = {}
+        for w in rows:
+            groups.setdefault(w.doi, []).append(w)
+        return list(groups.values())
+
+    def title_candidates(self, title: str) -> list[Work]:
+        """Works whose title is near this one, or holds it (a missing subtitle), nearest first."""
+        with self._conn.cursor(row_factory=class_row(Work)) as cur:
+            return cur.execute(
+                _WORK + " WHERE title %% %(t)s OR %(t)s <%% title OR title <%% %(t)s"
+                " ORDER BY greatest(similarity(title, %(t)s), word_similarity(%(t)s, title),"
+                " word_similarity(title, %(t)s)) DESC, id LIMIT %(n)s",
+                {"t": title, "n": _CANDIDATES},
+            ).fetchall()
+
+    def zotero_keys(self) -> set[str]:
+        """The keys of every Library Item recorded as a Work."""
+        rows = self._conn.execute("SELECT zotero_key FROM works WHERE zotero_key IS NOT NULL")
+        return {r[0] for r in rows.fetchall()}
+
+    def remove_library_item(self, zotero_key: str) -> bool:
+        """Forget a Library Item that left the Library; True if its Work went with it.
+
+        A Work something uses (a Stage run) stays, without a Library Item or its PDF.
+        """
+        gone = self._conn.execute(
+            "DELETE FROM works w WHERE zotero_key = %s"
+            " AND NOT EXISTS (SELECT 1 FROM stage_status s WHERE s.work_id = w.id)",
+            (zotero_key,),
+        ).rowcount
+        if not gone:
+            self._conn.execute(
+                "UPDATE works SET zotero_key = NULL, pdf_attachment_key = NULL,"
+                " pdf_filename = NULL, doi_chosen = false WHERE zotero_key = %s",
+                (zotero_key,),
+            )
+        return bool(gone)

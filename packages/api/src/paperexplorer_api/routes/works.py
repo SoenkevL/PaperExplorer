@@ -34,7 +34,7 @@ def router(connections: Connections) -> APIRouter:
     def list_works() -> list[schemas.WorkSummary]:  # pyright: ignore[reportUnusedFunction]
         with connections() as conn:
             statuses = StageStatuses(conn)
-            return [_summary(w, statuses) for w in Works(conn).list()]
+            return [_summary(w, statuses) for w in Works(conn).with_stage_runs()]
 
     @routes.get("/{work_id}")
     def get_work(work_id: int) -> schemas.WorkText:  # pyright: ignore[reportUnusedFunction]

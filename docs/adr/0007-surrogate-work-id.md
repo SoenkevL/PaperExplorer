@@ -12,5 +12,5 @@ A Work needs an identity before anything else is known about it. The Seed enters
 ## Consequences
 
 - **`WorkId`s are not stable across a rebuild** of the database (ADR 0001 says it must be rebuildable). A bookmark to `/works/17` can break; the Zotero key is the identity to keep outside PaperExplorer.
-- **Two Library Items with the same DOI are refused** (`DuplicateWorkError`) rather than becoming one Work twice.
+- ~~**Two Library Items with the same DOI are refused** (`DuplicateWorkError`) rather than becoming one Work twice.~~ Amended 2026-11-01 ([design-resolution.md](../design-resolution.md), migration `0005`): both are Works, and one stands for the DOI (the reader's choice, else the one with a PDF, else the older); the reader can merge the pair in Zotero.
 - **References, Citations and Citation Links carry `work_id`** in composite foreign keys, so a Citation Link cannot point at another Work's Reference.

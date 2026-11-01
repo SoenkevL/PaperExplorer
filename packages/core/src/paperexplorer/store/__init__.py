@@ -4,6 +4,7 @@ from paperexplorer.store.chunks import ChunkEmbedding, Chunks, Placing, ScoredCh
 from paperexplorer.store.citations import CitationDetail, CitationGraphs, StoredCitation
 from paperexplorer.store.library_sync import LibraryVersions
 from paperexplorer.store.migrate import migrate
+from paperexplorer.store.readers_choices import ReadersChoices
 from paperexplorer.store.registry_responses import RegistryResponse, RegistryResponses
 from paperexplorer.store.resolutions import Resolutions
 from paperexplorer.store.stages import StageState, StageStatus, StageStatuses
@@ -17,6 +18,7 @@ __all__ = [
     "CitationGraphs",
     "LibraryVersions",
     "Placing",
+    "ReadersChoices",
     "RegistryResponse",
     "RegistryResponses",
     "Resolutions",

@@ -3,9 +3,11 @@
 from paperexplorer.domain import Level, normalize_doi
 from paperexplorer.resolution.check import (
     BudgetSpent,
+    CheckCost,
     ReferenceChecked,
     RegistryCheckEvent,
     RegistryCheckFinished,
+    estimate,
     registry_check,
 )
 from paperexplorer.resolution.doi_org import DoiOrgRegistry
@@ -30,6 +32,7 @@ __all__ = [
     "BudgetSpent",
     "BudgetSpentError",
     "Candidate",
+    "CheckCost",
     "DoiConflict",
     "DoiOrgRegistry",
     "DoiRecord",
@@ -45,6 +48,7 @@ __all__ = [
     "RegistryError",
     "agrees",
     "counts",
+    "estimate",
     "match",
     "normalize_doi",
     "registration",

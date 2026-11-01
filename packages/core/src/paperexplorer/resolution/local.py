@@ -22,7 +22,7 @@ from paperexplorer.parsing import Reference
 from paperexplorer.resolution.layers import from_registries
 from paperexplorer.resolution.matching import Candidate, DoiConflict, match
 from paperexplorer.resolution.verification import unregistered
-from paperexplorer.store import RegistryResponses, Works
+from paperexplorer.store import ReadersChoices, RegistryResponses, Works
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +39,12 @@ def resolve(
     Reference whose DOI is an Unregistered DOI is matched as if it printed none (ADR 0012).
     """
     works, cache = Works(conn), RegistryResponses(conn)
+    choices = ReadersChoices(conn).for_work(citing)
     resolutions: list[Resolution] = []
     for ref, note in as_resolved(conn, refs):
+        if ref.text in choices:
+            resolutions.append(_chosen(ref, choices[ref.text]))
+            continue
         library = _from_library(works, citing, ref)
         if library.firm:
             resolution = library
@@ -72,6 +76,19 @@ def as_resolved(
         else:
             matched.append((ref, None))
     return matched
+
+
+def _chosen(ref: Reference, chosen: WorkId | None) -> Resolution:
+    """The Resolution a Reader's Choice sets: the Work picked, or Unresolved for none."""
+    if chosen is None:
+        return Resolution(
+            reference=ref.id, state=ResolutionState.UNRESOLVED, evidence=["readers_choice"],
+            layer=Layer.READER,
+        )  # fmt: skip
+    return Resolution(
+        reference=ref.id, state=ResolutionState.RESOLVED, work=chosen, level=Level.CERTAIN,
+        confidence=1.0, evidence=["readers_choice"], layer=Layer.READER,
+    )  # fmt: skip
 
 
 def _from_library(works: Works, citing: WorkId, ref: Reference) -> Resolution:

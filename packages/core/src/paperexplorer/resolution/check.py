@@ -8,13 +8,14 @@ import asyncio
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable, Collection, Sequence
 from itertools import batched
+from math import ceil
 from typing import Literal
 
 import psycopg
 from psycopg.rows import TupleRow
 from pydantic import BaseModel, JsonValue
 
-from paperexplorer.domain import RegistrySource, Resolution, WorkId
+from paperexplorer.domain import RegistrySource, Resolution, ResolutionState, WorkId
 from paperexplorer.parsing import Reference
 from paperexplorer.resolution.layers import (
     bibliographic_key,
@@ -24,7 +25,13 @@ from paperexplorer.resolution.layers import (
     title_key,
 )
 from paperexplorer.resolution.local import as_resolved, counts, resolve
-from paperexplorer.resolution.registries import BATCH, BudgetSpentError, Registries
+from paperexplorer.resolution.registries import (
+    BATCH,
+    OPENALEX_LIST_COST,
+    OPENALEX_SEARCH_COST,
+    BudgetSpentError,
+    Registries,
+)
 from paperexplorer.store import RegistryResponses, Resolutions
 
 logger = logging.getLogger(__name__)
@@ -57,6 +64,53 @@ class BudgetSpent(BaseModel):
 
 
 RegistryCheckEvent = ReferenceChecked | RegistryCheckFinished | BudgetSpent
+
+
+class CheckCost(BaseModel):
+    """What a Registry Check would ask, at most, before it starts.
+
+    Title and bibliographic searches are an upper bound: a DOI hit settles a Reference before
+    its title is searched. Only OpenAlex's calls cost, out of its daily budget.
+    """
+
+    unchecked: int  # Unchecked References, as the Work page's button counts them
+    crossref_batches: int
+    openalex_batches: int
+    title_searches: int
+    bibliographic_searches: int
+    openalex_usd: float
+
+
+def estimate(
+    conn: psycopg.Connection[TupleRow],
+    citing: WorkId,
+    refs: Sequence[Reference],
+    *,
+    refresh: bool = False,
+) -> CheckCost:
+    """What a Registry Check of these References of `citing` would ask; no registry is called."""
+    cache = RegistryResponses(conn)
+    current = {r.reference: r for r in resolve(conn, citing, refs)}
+    pending = [ref for ref, _ in as_resolved(conn, refs) if not current[ref.id].firm]
+
+    def unanswered(source: RegistrySource, keys: Collection[str | None]) -> int:
+        wanted = sorted({k for k in keys if k is not None})
+        return len(wanted) - (0 if refresh else len(cache.fresh(source, wanted)))
+
+    dois = [doi_key(r) for r in pending]
+    titles = [title_key(r) for r in pending]
+    printed = [bibliographic_key(r) for r in pending if title_key(r) is None]
+    crossref = ceil(unanswered(RegistrySource.CROSSREF_DOI, dois) / BATCH)
+    openalex = ceil(unanswered(RegistrySource.OPENALEX_DOI, dois) / BATCH)
+    searches = unanswered(RegistrySource.OPENALEX_TITLE, titles)
+    return CheckCost(
+        unchecked=sum(r.state is ResolutionState.UNCHECKED for r in current.values()),
+        crossref_batches=crossref,
+        openalex_batches=openalex,
+        title_searches=searches,
+        bibliographic_searches=unanswered(RegistrySource.CROSSREF_BIBLIOGRAPHIC, printed),
+        openalex_usd=openalex * OPENALEX_LIST_COST + searches * OPENALEX_SEARCH_COST,
+    )
 
 
 async def registry_check(

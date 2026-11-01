@@ -61,6 +61,7 @@ class Work(BaseModel):
     pdf: Attachment | None
     synced_at: datetime | None
     text_origin: TextOrigin | None
+    added: datetime | None = None  # its Library Item's dateAdded
 
 
 class Level(StrEnum):

@@ -42,3 +42,15 @@ class Resolutions:
                 " WHERE r.work_id = %s ORDER BY w.position",
                 (work,),
             ).fetchall()
+
+    def repoint(self, old: WorkId, new: WorkId) -> int:
+        """Point every Resolution naming `old` at `new`, as after a merge; how many changed."""
+        return self._conn.execute(
+            "UPDATE resolutions SET"
+            " resolved_work_id = CASE WHEN resolved_work_id = %(old)s THEN %(new)s"
+            " ELSE resolved_work_id END,"
+            " doi_conflict_work_id = CASE WHEN doi_conflict_work_id = %(old)s THEN %(new)s"
+            " ELSE doi_conflict_work_id END"
+            " WHERE %(old)s IN (resolved_work_id, doi_conflict_work_id)",
+            {"old": old, "new": new},
+        ).rowcount

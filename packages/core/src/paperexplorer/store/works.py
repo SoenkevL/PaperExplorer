@@ -6,7 +6,7 @@ from psycopg.rows import TupleRow, class_row
 from paperexplorer.domain import LibraryItem, Work, WorkId
 
 _WORK = """
-    SELECT id, zotero_key, title, creators, year, doi, synced_at, text_origin,
+    SELECT id, zotero_key, title, creators, year, doi, synced_at, text_origin, added_at AS added,
            CASE WHEN pdf_attachment_key IS NOT NULL THEN
                jsonb_build_object('key', pdf_attachment_key, 'filename', pdf_filename)
            END AS pdf

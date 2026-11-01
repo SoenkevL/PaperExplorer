@@ -16,9 +16,9 @@ from pydantic_ai.messages import ModelResponse
 from paperexplorer import __version__, asking, citations, evals, parsing, pipeline, retrieval, store
 from paperexplorer.citations import ConfidenceLevel, confidence_level
 from paperexplorer.config import Settings
-from paperexplorer.domain import Answer, Scope
+from paperexplorer.domain import Answer, Level, Resolution, ResolutionState, Scope, Work
 from paperexplorer.embedding import OpenAICompatibleEmbedder
-from paperexplorer.library import ZoteroLibrary
+from paperexplorer.library import ZoteroLibrary, sync
 from paperexplorer.logs import configure_logging
 from paperexplorer.tracing import configure_tracing, trace_release
 
@@ -127,6 +127,150 @@ def run_command(
             tracing.flush()
     counts = ", ".join(f"{k} {v}" for k, v in result.counts.items())
     typer.echo(f"{stage.value} {work}: {counts}")
+
+
+def _items(n: int) -> str:
+    return f"{n} Library Item{'' if n == 1 else 's'}"
+
+
+@app.command("sync")
+def sync_command(
+    full: Annotated[bool, typer.Option("--full", help="Read the whole Library again.")] = False,
+) -> None:
+    """Bring the Works up to date with the Zotero Library; after the first, only its changes."""
+    settings = Settings()
+    with psycopg.connect(settings.database_url, autocommit=True) as conn:
+        store.migrate(conn)
+        with conn.transaction():
+            result = sync(conn, ZoteroLibrary.from_settings(settings), full=full)
+    if result.stale:
+        typer.echo("Zotero could not be reached; the last copy of the Library stands", err=True)
+        raise typer.Exit(1)
+    read = "whole Library read" if result.full else "changes since the last sync"
+    typer.echo(f"Synced ({read}): {_items(result.items)} recorded, {result.removed} Works removed")
+
+
+def _key(work: Work | None) -> str:
+    if work is None:
+        return "-"
+    return work.zotero_key or f"#{work.id}"
+
+
+@app.command("duplicates")
+def duplicates_command(
+    use: Annotated[
+        str | None, typer.Option("--use", metavar="KEY", help="Let this item stand for its DOI.")
+    ] = None,
+    merge: Annotated[
+        tuple[str, str] | None,
+        typer.Option(
+            "--merge",
+            metavar="KEEP OTHER",
+            help="Merge OTHER into KEEP in Zotero, as Zotero desktop does; OTHER to the trash.",
+        ),
+    ] = None,
+) -> None:
+    """List the DOIs two Library Items hold, the one that stands first; choose one or merge."""
+    settings = Settings()
+    library = ZoteroLibrary.from_settings(settings)
+    with psycopg.connect(settings.database_url, autocommit=True) as conn:
+        store.migrate(conn)
+        works = store.Works(conn)
+        with conn.transaction():
+            sync(conn, library)
+        if use is not None:
+            chosen = _duplicate(works, use)
+            with conn.transaction():
+                works.choose(chosen.id)
+            typer.echo(f"{use} now stands for {chosen.doi}")
+            return
+        if merge is not None:
+            keep, other = (_duplicate(works, key) for key in merge)
+            if keep.doi != other.doi or keep.id == other.id:
+                typer.echo(f"{keep.zotero_key} and {other.zotero_key} do not share a DOI", err=True)
+                raise typer.Exit(1)
+            typer.confirm(
+                f"Merge {other.zotero_key} into {keep.zotero_key} in Zotero? {keep.zotero_key}"
+                f" takes its collections, tags, notes and attachments and keeps its own fields;"
+                f" {other.zotero_key} goes to Zotero's trash.",
+                abort=True,
+            )
+            assert keep.zotero_key is not None and other.zotero_key is not None
+            library.merge(keep.zotero_key, other.zotero_key)
+            with conn.transaction():
+                moved = store.Resolutions(conn).repoint(other.id, keep.id)
+                sync(conn, library)
+            typer.echo(
+                f"Merged {other.zotero_key} into {keep.zotero_key}; {moved} Resolutions moved"
+            )
+            return
+        groups = works.duplicates()
+    if not groups:
+        typer.echo("No DOI is held by two Library Items")
+    for group in groups:
+        typer.echo(group[0].doi)
+        for i, w in enumerate(group):
+            added = w.added.date().isoformat() if w.added else "-"
+            pdf = "pdf" if w.pdf else "-"
+            typer.echo(f"  {'*' if i == 0 else ' '} {_key(w):<10} {pdf:<3} {added:<10} {w.title}")
+
+
+def _duplicate(works: store.Works, key: str) -> Work:
+    """The Work of a Library Item that shares its DOI with another; else exit with why."""
+    work = works.find(key)
+    if (
+        work is None
+        or work.doi is None
+        or all(work.id not in {w.id for w in g} for g in works.duplicates())
+    ):
+        typer.echo(f"{key} is not a Library Item whose DOI another holds", err=True)
+        raise typer.Exit(1)
+    return work
+
+
+def _state(r: Resolution) -> str:
+    return r.level.value if r.level is not None else r.state.value
+
+
+@app.command("resolutions")
+def resolutions_command(
+    work: Annotated[str, typer.Argument(help="The Work's Zotero item key, e.g. YAAC9XCX.")],
+    low: Annotated[
+        bool, typer.Option("--low", help="Only low-confidence ones and DOI Conflicts.")
+    ] = False,
+) -> None:
+    """List each Reference of a Work with what it resolved to, as the last `resolve` left it."""
+    settings = Settings()
+    with psycopg.connect(settings.database_url, autocommit=True) as conn:
+        store.migrate(conn)
+        works = store.Works(conn)
+        found = works.find(work)
+        if found is None:
+            typer.echo(f"No Work {work}; sync the Library or run a Stage for it first", err=True)
+            raise typer.Exit(1)
+        resolutions = store.Resolutions(conn).for_work(found.id)
+        parsed = store.WorkTexts(conn).get(found.id)
+        printed = {r.id: r.text for r in parsed.references} if parsed else {}
+        ids = {i for r in resolutions for i in (r.work, r.doi_conflict) if i is not None}
+        named = {i: works.get(i) for i in ids}
+    if not resolutions:
+        typer.echo(f"No Resolutions for {work} yet; run `paperexplorer run resolve {work}`")
+        return
+    counts = {lv.value: sum(r.level is lv for r in resolutions) for lv in Level} | {
+        "unchecked": sum(r.state is ResolutionState.UNCHECKED for r in resolutions),
+        "DOI Conflicts": sum(r.doi_conflict is not None for r in resolutions),
+    }
+    summary = ", ".join(f"{n} {name}" for name, n in counts.items())
+    typer.echo(f"{len(resolutions)} References of {work}: {summary}")
+    for r in resolutions:
+        if low and r.level is not Level.LOW and r.doi_conflict is None:
+            continue
+        conflict = (
+            f"  [DOI Conflict: {_key(named[r.doi_conflict])}]" if r.doi_conflict is not None else ""
+        )
+        work_key = _key(named[r.work]) if r.work is not None else "-"
+        text = textwrap.shorten(printed.get(r.reference, ""), 70)
+        typer.echo(f"{r.reference:<6} {_state(r):<10} {work_key:<10} {text}{conflict}")
 
 
 def _placing(placing: retrieval.Placing | None) -> str:

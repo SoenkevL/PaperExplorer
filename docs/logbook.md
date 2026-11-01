@@ -162,3 +162,4 @@ Key decisions, newest last. Hard-to-reverse ones link to an ADR.
 - 2026-11-01 — A DOI hit must agree with the printed title (near or equal main title; else surname or year). A DOI Conflict lets the title decide, capped at `low`, the DOI's Work kept as the option; a Reader's Choice settles it and is never overwritten (chosen in the reader, PR 4)
 - 2026-11-01 — A Reader's Choice gets its own table (PR 4), keyed by the Work and the Reference's printed text: `resolutions` go with a re-parse, a choice must not
 - 2026-11-01 — A printed title that opens the DOI's record title in at least four whole words agrees with it: GROBID can cut a title short without a colon
+- 2026-11-01 — The eval's summary and Markdown are pure modules apart from the run (`summaries`, `rendering`); a turn's metrics stay where the run puts them (`QuestionRun.metrics`, read through `QuestionRun.measured`) rather than moving onto the turn, so `report.json` keeps its shape

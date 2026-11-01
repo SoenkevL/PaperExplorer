@@ -23,31 +23,25 @@ from pydantic_ai.models.function import AgentInfo, DeltaToolCall, FunctionModel
 from paperexplorer.asking import AskingContext, Reading
 from paperexplorer.asking.agent import REDRAFT
 from paperexplorer.config import Settings
-from paperexplorer.domain import Answer, AnswerSentence, ChunkId, Pointer, Support, Work
+from paperexplorer.domain import ChunkId, Support, Work
 from paperexplorer.embedding import FakeEmbedder
 from paperexplorer.evals import (
     EvalReport,
-    EvalSummary,
     Hit,
     Kind,
     Mode,
     Place,
-    PointerCheck,
     QuestionMeta,
     QuoteCheck,
     RunInfo,
-    Turn,
     eval_settings,
     load_questions,
-    load_verdicts,
     metrics,
     new_run_id,
-    render_summary,
     run_eval,
     run_info,
     says_not_covered,
     summarize,
-    unjudged,
     unknown_places,
     write_run,
 )
@@ -55,11 +49,10 @@ from paperexplorer.store import Chunks
 from paperexplorer.tracing import Tracing
 
 from .conftest import ABSTRACT, DISCUSSION, INTRODUCTION, RECORDING, SESSIONS, in_memory_tracing
+from .eval_turns import DISCUSSION_PLACE, RECORDING_PLACE, make_pointer, make_turn
 
 Conn = psycopg.Connection[TupleRow]
 QUESTION_SET = Path(__file__).resolve().parents[3] / "evals" / "seed-questions.yaml"
-RECORDING_PLACE = Place(heading_path=("2 Methods", "2.1 Recording"), page=2)
-DISCUSSION_PLACE = Place(heading_path=("3 Discussion",), page=3)
 COVERED = "How was the entropy computed?"
 UNCOVERED = "How does caffeine affect sleep?"
 QUESTIONS_YAML = f"""
@@ -214,82 +207,17 @@ def test_an_answer_says_the_seed_does_not_cover_a_question(text: str, said: bool
     assert says_not_covered(text) is said
 
 
-def _pointer(sentence: int, place: Place, support: Support, similarity: float) -> PointerCheck:
-    return PointerCheck(
-        sentence=sentence,
-        support=support,
-        similarity=similarity,
-        chunk_id=ChunkId(1),
-        place=place,
-        matched="(the Chunk sentence)",
-    )
-
-
-def _turn(
-    *,
-    mode: Mode = Mode.RETRIEVAL,
-    reading: Reading = Reading.RETRIEVAL,
-    search: list[Hit] | None = None,
-    pointers: list[PointerCheck] | None = None,
-    quotes: list[QuoteCheck] | None = None,
-    text: str = "One sentence of four words. Another one with four. A third, unpointed here.",
-    error: str | None = None,
-) -> Turn:
-    pointers = pointers or []
-    sentences = [
-        AnswerSentence(
-            start=0,
-            end=28,
-            substantive=True,
-            pointers=[
-                Pointer(
-                    block_id=0,
-                    start=0,
-                    end=1,
-                    support=p.support,
-                    chunk_id=p.chunk_id,
-                    chunk_start=0,
-                    chunk_end=1,
-                    similarity=p.similarity,
-                )
-                for p in pointers
-                if p.sentence == i
-            ],
-        )
-        for i in range(3)
-    ]
-    answer = Answer(text=text, sentences=sentences, quotes=[]) if error is None else None
-    return Turn(
-        mode=mode,
-        reading=reading,
-        question="Q?",
-        conversation_id="c1",
-        trace_id="t1",
-        answer=answer,
-        error=error,
-        search=search,
-        pointers=pointers,
-        quotes=quotes or [],
-        says_not_covered=answer is not None and says_not_covered(answer.text),
-        model_requests=2 if answer else None,
-        tool_calls=1,
-        tools=["read_section"],
-        latency_s=12.5,
-        first_delta_s=3.0,
-    )
-
-
 def test_a_covered_turn_measures_hit_at_8_pointers_on_expected_places_and_quotes() -> None:
     elsewhere = Place(heading_path=("1 Introduction",), page=1)
     meta = QuestionMeta(kind=Kind.METHOD, places=[RECORDING_PLACE, DISCUSSION_PLACE])
-    turn = _turn(
+    turn = make_turn(
         search=[
             Hit(rank=1, chunk_id=ChunkId(7), place=elsewhere, rrf=0.03),
             Hit(rank=2, chunk_id=ChunkId(8), place=RECORDING_PLACE, rrf=0.02),
         ],
         pointers=[
-            _pointer(0, RECORDING_PLACE, Support.CLOSE, 0.82),
-            _pointer(1, elsewhere, Support.WEAK, 0.55),
+            make_pointer(0, RECORDING_PLACE, Support.CLOSE, 0.82),
+            make_pointer(1, elsewhere, Support.WEAK, 0.55),
         ],
         quotes=[
             QuoteCheck(words="w", exact=True, place=RECORDING_PLACE, verified=True),
@@ -320,7 +248,7 @@ def test_a_covered_turn_measures_hit_at_8_pointers_on_expected_places_and_quotes
 
 def test_a_search_that_misses_every_expected_place_is_no_hit() -> None:
     meta = QuestionMeta(kind=Kind.METHOD, places=[RECORDING_PLACE])
-    turn = _turn(search=[Hit(rank=1, chunk_id=ChunkId(9), place=DISCUSSION_PLACE, rrf=0.03)])
+    turn = make_turn(search=[Hit(rank=1, chunk_id=ChunkId(9), place=DISCUSSION_PLACE, rrf=0.03)])
 
     measured = metrics(turn, meta)
 
@@ -330,7 +258,7 @@ def test_a_search_that_misses_every_expected_place_is_no_hit() -> None:
 
 def test_an_uncovered_turn_measures_whether_it_says_so_and_no_places() -> None:
     meta = QuestionMeta(kind=Kind.UNCOVERED)
-    turn = _turn(text="The Seed does not say how caffeine affects sleep.", search=[])
+    turn = make_turn(text="The Seed does not say how caffeine affects sleep.", search=[])
 
     measured = metrics(turn, meta)
 
@@ -341,7 +269,7 @@ def test_an_uncovered_turn_measures_whether_it_says_so_and_no_places() -> None:
 def test_a_turn_that_read_the_whole_seed_has_no_search_so_no_hit_at_8() -> None:
     meta = QuestionMeta(kind=Kind.METHOD, places=[RECORDING_PLACE])
 
-    measured = metrics(_turn(mode=Mode.LIVE, reading=Reading.WHOLE_SEED, search=None), meta)
+    measured = metrics(make_turn(mode=Mode.LIVE, reading=Reading.WHOLE_SEED, search=None), meta)
 
     assert "hit_at_8" not in measured
 
@@ -349,7 +277,7 @@ def test_a_turn_that_read_the_whole_seed_has_no_search_so_no_hit_at_8() -> None:
 def test_a_failed_turn_measures_only_that_it_failed_and_its_latency() -> None:
     meta = QuestionMeta(kind=Kind.METHOD, places=[RECORDING_PLACE])
 
-    measured = metrics(_turn(error="The model did not answer within 6 requests."), meta)
+    measured = metrics(make_turn(error="The model did not answer within 6 requests."), meta)
 
     assert measured == {"answered": False, "tool_calls": 1, "latency_s": 12.5}
 
@@ -467,47 +395,6 @@ def test_the_summary_carries_metrics_and_trace_ids_but_no_seed_or_answer_text(
     ]
 
 
-def test_the_summary_checks_the_bar_on_the_live_mode_with_hit_at_8_from_the_forced_search(
-    store_db: Conn, small_seed: Work, questions_file: Path
-) -> None:
-    summary = summarize(run(store_db, small_seed, questions_file))
-
-    bar = {b.name: b for b in summary.bar}
-    # The live mode read the Seed whole: hit@8 is the retrieval mode's, a check on the fallback.
-    assert summary.modes[Mode.LIVE].hit_at_8 is None
-    assert (bar["hit@8"].value, bar["hit@8"].met) == (1.0, True)
-    # The uncovered Question's Answer says so and is unpointed; coverage counts covered ones.
-    assert (bar["Pointer coverage"].value, bar["Pointer coverage"].met) == (1.0, True)
-    assert (
-        bar["Quotes marked exact that are not"].value,
-        bar["Quotes marked exact that are not"].met,
-    ) == (0, True)
-    assert bar["Answers judged grounded and correct"].met is None
-    live = summary.modes[Mode.LIVE]
-    assert (live.answered, live.uncovered, live.uncovered_said) == (2, 1, 1)
-    assert live.readings == {Reading.WHOLE_SEED: 2}
-    assert summary.modes[Mode.RETRIEVAL].readings == {Reading.RETRIEVAL: 2}
-    assert live.similarity.count == 2
-    assert sum(b.close + b.weak for b in live.similarity.buckets) == 2
-    markdown = render_summary(summary)
-    assert "| hit@8 | 1.00 | ≥ 0.80 | met |" in markdown
-    assert "| Reading (turns) | whole_seed 2 | retrieval 2 |" in markdown
-
-
-def test_without_the_retrieval_mode_a_seed_read_whole_runs_no_hit_at_8(
-    store_db: Conn, small_seed: Work, questions_file: Path
-) -> None:
-    questions = load_questions(questions_file)
-    report = asyncio.run(
-        run_eval(context(store_db), small_seed, questions, info(small_seed), [Mode.LIVE])
-    )
-
-    bar = {b.name: b for b in summarize(report).bar}
-
-    assert (bar["hit@8"].value, bar["hit@8"].met) == (None, None)
-    assert bar["Pointer coverage"].met is True
-
-
 def test_regression_eval_fcb19996a0a8c2aca5129fb9fe75b646_a_turn_with_no_answer_has_failed(
     store_db: Conn, small_seed: Work, questions_file: Path
 ) -> None:
@@ -526,17 +413,6 @@ def test_regression_eval_fcb19996a0a8c2aca5129fb9fe75b646_a_turn_with_no_answer_
     assert (turn.answer, turn.error) == (None, "The model gave no Answer.")
     assert covered.metrics[Mode.LIVE][1]["answered"] is False
     assert summarize(report).modes[Mode.LIVE].failed == 1
-
-
-@pytest.mark.parametrize("run_id", ["20261029T191529Z-94e980b", "20261029T202214Z-2b41752"])
-def test_the_committed_summaries_of_runs_before_adr_0010_still_read(run_id: str) -> None:
-    path = QUESTION_SET.parent / "runs" / f"{run_id}.json"
-
-    summary = EvalSummary.model_validate_json(path.read_text())
-
-    assert set(summary.modes) == {Mode.RETRIEVAL, Mode.BASELINE}
-    assert all(t.reading is None for q in summary.questions for ts in q.turns.values() for t in ts)
-    assert all(m.readings == {} for m in summary.modes.values())
 
 
 def test_a_run_id_is_its_start_in_utc_and_the_commit() -> None:
@@ -609,26 +485,6 @@ def test_a_run_asks_each_question_live_as_often_as_it_repeats_and_by_retrieval_o
         t.conversation_id for q in report.questions for ts in q.turns.values() for t in ts
     ]
     assert len(set(conversations)) == 2 * (3 + 1)
-    summary = summarize(report)
-    live = summary.modes[Mode.LIVE]
-    assert (live.repeats, live.answered, live.failed) == (3, 6, 0)
-    assert summary.modes[Mode.RETRIEVAL].repeats == 1
-    assert [r.repeat for r in live.by_repeat] == [1, 2, 3]
-    assert [r.pointer_coverage for r in live.by_repeat] == [1.0, 1.0, 1.0]
-    bar = {b.name: b for b in summary.bar}
-    # The bar pools every live turn; each repeat's value and their spread stand beside it.
-    coverage = bar["Pointer coverage"]
-    assert (coverage.value, coverage.per_repeat, coverage.spread) == (1.0, [1.0, 1.0, 1.0], 0.0)
-    # The live mode read the Seed whole: hit@8 is the retrieval mode's single pass.
-    assert (bar["hit@8"].value, bar["hit@8"].per_repeat) == (1.0, [])
-    [turns] = [q.turns[Mode.LIVE] for q in summary.questions[:1]]
-    assert [t.repeat for t in turns] == [1, 2, 3]
-    markdown = render_summary(summary)
-    assert (
-        "| Pointer coverage | 1.00 | ≥ 0.80 | met | 1.00 / 1.00 / 1.00 (spread 0.00) |" in markdown
-    )
-    assert "| Answered | 6 of 6 | 2 of 2 |" in markdown
-    assert "Live asked 3 times per Question" in markdown
 
 
 def test_a_turn_records_that_it_was_redrafted_and_the_request_it_took(
@@ -654,10 +510,6 @@ def test_a_turn_records_that_it_was_redrafted_and_the_request_it_took(
     [turn] = report.questions[0].turns[Mode.LIVE]
     assert (turn.redrafted, turn.model_requests) == (True, 2)
     assert turn.answer is not None and turn.pointers
-    summary = summarize(report)
-    assert summary.modes[Mode.LIVE].redrafted == 1
-    assert summary.questions[0].turns[Mode.LIVE][0].redrafted is True
-    assert "| Redrafted (turns) | 1 |" in render_summary(summary)
 
 
 def test_a_run_records_the_chat_settings_and_how_often_live_repeats(
@@ -677,21 +529,3 @@ def test_a_run_records_the_chat_settings_and_how_often_live_repeats(
     )
 
     assert (recorded.temperature, recorded.answer_thinking, recorded.repeat) == (0.3, False, 3)
-
-
-def test_the_committed_summary_and_verdicts_of_one_pass_read_as_repeat_1() -> None:
-    runs = QUESTION_SET.parent / "runs"
-    summary = EvalSummary.model_validate_json((runs / "20261031T140751Z-a758bbc.json").read_text())
-    verdicts = load_verdicts(runs / "20261031T140751Z-a758bbc.verdicts.yaml")
-
-    turns = [t for q in summary.questions for ts in q.turns.values() for t in ts]
-    assert len(turns) == 44
-    assert {(t.repeat, t.redrafted) for t in turns} == {(1, False)}
-    assert {m.repeats for m in summary.modes.values()} == {1}
-    assert (summary.run.repeat, summary.run.temperature, summary.run.answer_thinking) == (
-        1,
-        None,
-        None,
-    )
-    assert {v.repeat for v in verdicts.verdicts} == {1}
-    assert unjudged(verdicts, summary) == []

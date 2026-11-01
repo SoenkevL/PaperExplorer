@@ -1,12 +1,17 @@
-"""What the eval reads and records: its Questions with their places, and one turn of asking."""
+"""What the eval reads and records: its Questions with their places, one turn of asking, a run.
 
+A run's full report quotes the Seed and holds the Answers, so it stays under `data/` (the Seed's
+licence is unknown); `summaries` keeps what may be committed.
+"""
+
+from datetime import datetime
 from enum import StrEnum
 from typing import Self
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from paperexplorer.asking import Reading
-from paperexplorer.domain import Answer, Chunk, ChunkId, Support
+from paperexplorer.domain import Answer, Chunk, ChunkId, Support, WorkId
 
 
 class Kind(StrEnum):
@@ -154,3 +159,60 @@ class Turn(BaseModel):
     tools: list[str]
     latency_s: float
     first_delta_s: float | None
+
+
+type Metrics = dict[str, bool | int | float]
+
+
+class RunInfo(BaseModel):
+    """What a run ran against: Seed, commit, model, prompt, embeddings, threshold, Questions.
+
+    `temperature` and `answer_thinking` are the chat settings each request went with (None in
+    runs before they were set); `repeat`, how many times the live mode asked each Question.
+    """
+
+    run_id: str
+    started_at: datetime
+    git_sha: str | None
+    seed: str
+    work_id: WorkId
+    model: str
+    prompt_version: str
+    num_ctx: int
+    temperature: float | None = None
+    answer_thinking: bool | None = None
+    repeat: int = 1
+    embedding_model: str
+    support_threshold: float
+    questions_file: str
+    questions_sha: str
+    langfuse_environment: str
+    tracing_host: str | None
+
+
+class QuestionRun(BaseModel):
+    """One Question of a run: its turns in each mode and what each measured (the full report).
+
+    A mode's turns come in the order asked, each with its repeat; `metrics` and `failures`
+    (cases pydantic-evals could not run or measure) are keyed by mode, then repeat.
+    """
+
+    name: str
+    kind: Kind
+    question: str
+    places: list[Place]
+    turns: dict[Mode, list[Turn]]
+    metrics: dict[Mode, dict[int, Metrics]]
+    failures: dict[Mode, dict[int, str]] = {}
+
+    def measured(self, mode: Mode, turn: Turn) -> Metrics:
+        """What one of the mode's turns measured."""
+        return self.metrics.get(mode, {}).get(turn.repeat, {})
+
+
+class EvalReport(BaseModel):
+    """A whole run, Answers and the Seed's words included: it stays under `data/`."""
+
+    run: RunInfo
+    modes: list[Mode]
+    questions: list[QuestionRun]

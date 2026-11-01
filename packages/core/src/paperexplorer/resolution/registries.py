@@ -27,6 +27,8 @@ TRIES = 3
 # An OpenAlex call's cost in US dollars of the day's budget (research/2026-10-doi-resolution.md).
 OPENALEX_LIST_COST = 0.0001
 OPENALEX_SEARCH_COST = 0.001
+# Any record will do: a singleton costs nothing and still reports the day's budget.
+OPENALEX_SINGLETON = f"{OPENALEX}/W2741809807"
 
 
 class RegistryError(Exception):
@@ -112,6 +114,12 @@ class Registries:
         if self._client is not None:
             await self._client.aclose()
             self._client = None
+
+    async def budget(self) -> float | None:
+        """What is left of OpenAlex's day in US dollars, asked of a free singleton record."""
+        params = {"api_key": self._api_key} if self._api_key else {}
+        await self._get(self._openalex, OPENALEX_SINGLETON, params, budgeted=True)
+        return self.budget_usd
 
     async def crossref_dois(self, dois: Collection[str]) -> dict[str, JsonValue]:
         """Crossref's item for each of up to 100 normalized DOIs, `None` where it has none."""

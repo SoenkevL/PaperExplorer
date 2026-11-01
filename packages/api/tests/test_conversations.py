@@ -397,3 +397,4 @@ def test_the_app_from_the_environment_answers_questions(
     paths = app.openapi()["paths"]
     assert "/works/{work_id}/conversations" in paths
     assert "/conversations/{conversation_id}/questions" in paths
+    assert "/works/{work_id}/checks" not in paths  # no Zotero keys here

@@ -23,6 +23,7 @@ from paperexplorer.parsing import ParsedWork, Reference, TextOrigin
 from paperexplorer.pipeline import StageContext, StageError, run_stage
 from paperexplorer.resolution import InMemoryDoiRegistry
 from paperexplorer.store import (
+    ReadersChoices,
     RegistryResponses,
     Resolutions,
     StageStatuses,
@@ -223,3 +224,43 @@ def test_a_reference_a_registry_check_resolved_stays_resolved_from_the_cache(
 
     [resolution] = Resolutions(ctx.conn).for_work(seed)
     assert (resolution.level, resolution.layer) == (Level.CERTAIN, Layer.CROSSREF)
+
+
+def test_a_readers_choice_wins_over_the_library_and_outlives_a_re_parse(
+    ctx: StageContext,
+) -> None:
+    # The Library matches b0 to RESNET by DOI; the reader says it names ATTENTION.
+    printed = "He, K. (2016). Deep residual learning for image recognition."
+    seed = _seed(ctx.conn, [Reference(id="b0", text=printed, page=1, doi="10.5555/resnet")])
+    run_stage(ctx, "resolve", seed)
+    attention = _work(ctx.conn, ATTENTION.key)
+    ReadersChoices(ctx.conn).choose(seed, printed, attention)
+    _seed(ctx.conn, [Reference(id="b7", text=printed, page=2, doi="10.5555/resnet")])
+
+    result = run_stage(ctx, "resolve", seed)
+
+    assert Resolutions(ctx.conn).for_work(seed) == [
+        Resolution(
+            reference="b7", state=ResolutionState.RESOLVED, work=attention, level=Level.CERTAIN,
+            confidence=1.0, evidence=["readers_choice"], layer=Layer.READER,
+        )
+    ]  # fmt: skip
+    assert result.counts["certain"] == 1
+
+
+def test_a_readers_choice_of_none_leaves_it_unresolved_until_cleared(ctx: StageContext) -> None:
+    seed = _seed(ctx.conn, [_ref("b0", doi="10.5555/resnet", title=RESNET.title)])
+    ReadersChoices(ctx.conn).choose(seed, "Printed b0", None)
+
+    run_stage(ctx, "resolve", seed)
+    chosen = Resolutions(ctx.conn).for_work(seed)
+    ReadersChoices(ctx.conn).clear(seed, "Printed b0")
+    run_stage(ctx, "resolve", seed)
+
+    assert chosen == [
+        Resolution(
+            reference="b0", state=ResolutionState.UNRESOLVED, evidence=["readers_choice"],
+            layer=Layer.READER,
+        )
+    ]  # fmt: skip
+    assert Resolutions(ctx.conn).for_work(seed)[0].layer is Layer.LIBRARY

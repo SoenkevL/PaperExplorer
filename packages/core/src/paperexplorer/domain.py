@@ -95,6 +95,7 @@ class Layer(StrEnum):
     LIBRARY = "library"
     CROSSREF = "crossref"
     OPENALEX = "openalex"
+    READER = "reader"  # a Reader's Choice
 
 
 class RegistrySource(StrEnum):
@@ -135,7 +136,9 @@ class Resolution(BaseModel):
 
     @property
     def firm(self) -> bool:
-        """Resolved at certain or high: nothing later is asked for it."""
+        """Resolved at certain or high, or the reader's choice: nothing later is asked for it."""
+        if self.layer is Layer.READER:
+            return True
         return self.state is ResolutionState.RESOLVED and self.level is not Level.LOW
 
     @model_validator(mode="after")

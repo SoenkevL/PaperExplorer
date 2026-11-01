@@ -22,7 +22,7 @@ from paperexplorer.parsing import Reference
 from paperexplorer.resolution.layers import from_registries
 from paperexplorer.resolution.matching import Candidate, DoiConflict, match
 from paperexplorer.resolution.verification import unregistered
-from paperexplorer.store import RegistryResponses, Works
+from paperexplorer.store import ReadersChoices, RegistryResponses, Resolutions, Works
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +39,12 @@ def resolve(
     Reference whose DOI is an Unregistered DOI is matched as if it printed none (ADR 0012).
     """
     works, cache = Works(conn), RegistryResponses(conn)
+    choices = ReadersChoices(conn).for_work(citing)
     resolutions: list[Resolution] = []
     for ref, note in as_resolved(conn, refs):
+        if ref.text in choices:
+            resolutions.append(_chosen(ref, choices[ref.text]))
+            continue
         library = _from_library(works, citing, ref)
         if library.firm:
             resolution = library
@@ -59,6 +63,26 @@ def resolve(
     return resolutions
 
 
+def candidates(conn: psycopg.Connection[TupleRow], citing: WorkId, ref: Reference) -> list[Work]:
+    """The Works a reader might choose for a Reference, likeliest first; no registry is asked.
+
+    Its Resolution's Work and DOI Conflict, the Work standing for its printed DOI, then the
+    Works with a near title, a Check's among them.
+    """
+    works = Works(conn)
+    saved = Resolutions(conn).get(citing, ref.id)
+    ids = [saved.work, saved.doi_conflict] if saved else []
+    ids.append(works.standing_item(normalize_doi(ref.doi)) if ref.doi else None)
+    pool: dict[WorkId, Work] = {}
+    for work in [works.get(i) for i in ids if i is not None]:
+        if work is not None:
+            pool.setdefault(work.id, work)
+    for work in works.title_candidates(ref.title) if ref.title else []:
+        pool.setdefault(work.id, work)
+    pool.pop(citing, None)
+    return list(pool.values())
+
+
 def as_resolved(
     conn: psycopg.Connection[TupleRow], refs: Sequence[Reference]
 ) -> list[tuple[Reference, str | None]]:
@@ -72,6 +96,19 @@ def as_resolved(
         else:
             matched.append((ref, None))
     return matched
+
+
+def _chosen(ref: Reference, chosen: WorkId | None) -> Resolution:
+    """The Resolution a Reader's Choice sets: the Work picked, or Unresolved for none."""
+    if chosen is None:
+        return Resolution(
+            reference=ref.id, state=ResolutionState.UNRESOLVED, evidence=["readers_choice"],
+            layer=Layer.READER,
+        )  # fmt: skip
+    return Resolution(
+        reference=ref.id, state=ResolutionState.RESOLVED, work=chosen, level=Level.CERTAIN,
+        confidence=1.0, evidence=["readers_choice"], layer=Layer.READER,
+    )  # fmt: skip
 
 
 def _from_library(works: Works, citing: WorkId, ref: Reference) -> Resolution:

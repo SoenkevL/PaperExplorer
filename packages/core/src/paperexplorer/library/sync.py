@@ -6,8 +6,9 @@ import psycopg
 from psycopg.rows import TupleRow
 from pydantic import BaseModel
 
+from paperexplorer.domain import Work
 from paperexplorer.library.port import ItemNotFoundError, Library, LibraryUnavailableError
-from paperexplorer.store import LibraryVersions, Resolutions, Works
+from paperexplorer.store import LibraryVersions, ReadersChoices, Resolutions, Works
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,30 @@ class SyncResult(BaseModel):
     removed: int
     moved: int = 0  # Resolutions moved to the item a merged one went into
     stale: bool = False  # the Library was unreachable; the last copy stands
+
+
+class NotDuplicateItemsError(ValueError):
+    """The two items are not one Work's Duplicate Items: they hold different DOIs, or are one."""
+
+
+def check_duplicates(keep: Work, other: Work) -> None:
+    """Raise `NotDuplicateItemsError` unless these are two Library Items holding one DOI."""
+    if keep.doi is None or keep.doi != other.doi or keep.id == other.id:
+        raise NotDuplicateItemsError(f"{keep.zotero_key} and {other.zotero_key} do not share a DOI")
+
+
+def merge(conn: psycopg.Connection[TupleRow], library: Library, keep: Work, other: Work) -> int:
+    """Merge Duplicate Item `other` into `keep` in the Library, then sync; Resolutions moved.
+
+    The caller asks the reader first: this writes to the Library, `other` to its trash.
+    """
+    check_duplicates(keep, other)
+    assert keep.zotero_key is not None and other.zotero_key is not None
+    library.merge(keep.zotero_key, other.zotero_key)
+    with conn.transaction():
+        moved = sync(conn, library).moved  # follows dc:replaces
+    logger.info("Merged %s into %s; %d Resolutions moved", other.zotero_key, keep.zotero_key, moved)
+    return moved
 
 
 def sync(conn: psycopg.Connection[TupleRow], library: Library, *, full: bool = False) -> SyncResult:
@@ -47,10 +72,12 @@ def sync(conn: psycopg.Connection[TupleRow], library: Library, *, full: bool = F
     for item in items.values():
         work = works.ensure(item.key)
         works.record_library_item(work, item)
-        # A merge (ours or Zotero desktop's): the References the other item had are this one's.
+        # A merge (ours or Zotero desktop's): the References and choices the other item had are
+        # this one's.
         for replaced in item.replaces:
             if (old := works.find(replaced)) is not None and old.id != work:
                 moved += Resolutions(conn).repoint(old.id, work)
+                ReadersChoices(conn).repoint(old.id, work)
     if changes.full:
         gone |= works.zotero_keys() - items.keys()
     removed = sum(works.remove_library_item(key) for key in sorted(gone))

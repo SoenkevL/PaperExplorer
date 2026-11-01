@@ -142,6 +142,13 @@ class Works:
             groups.setdefault(w.doi, []).append(w)
         return list(groups.values())
 
+    def duplicate_item(self, zotero_key: str) -> Work | None:
+        """The Work of this Library Item if another Library Item holds its DOI, else None."""
+        found = self.find(zotero_key)
+        if found is None or not any(found.id in {w.id for w in g} for g in self.duplicate_items()):
+            return None
+        return found
+
     def title_candidates(self, title: str) -> list[Work]:
         """Works whose title is near this one, or holds it (a missing subtitle), nearest first."""
         with self._conn.cursor(row_factory=class_row(Work)) as cur:
@@ -160,13 +167,15 @@ class Works:
     def remove_library_item(self, zotero_key: str) -> bool:
         """Forget a Library Item that left the Library; True if its Work went with it.
 
-        A Work something uses (a Stage run, a Resolution) stays, without a Library Item or PDF.
+        A Work something uses (a Stage run, a Resolution, a Reader's Choice) stays, without a
+        Library Item or PDF.
         """
         gone = self._conn.execute(
             "DELETE FROM works w WHERE zotero_key = %s"
             " AND NOT EXISTS (SELECT 1 FROM stage_status s WHERE s.work_id = w.id)"
             " AND NOT EXISTS (SELECT 1 FROM resolutions r"
-            " WHERE w.id IN (r.resolved_work_id, r.doi_conflict_work_id))",
+            " WHERE w.id IN (r.resolved_work_id, r.doi_conflict_work_id))"
+            " AND NOT EXISTS (SELECT 1 FROM readers_choices c WHERE c.chosen_work_id = w.id)",
             (zotero_key,),
         ).rowcount
         if not gone:

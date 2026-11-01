@@ -29,7 +29,8 @@ from paperexplorer import (
 from paperexplorer.citations import ConfidenceLevel, confidence_level
 from paperexplorer.config import Settings
 from paperexplorer.domain import Answer, Level, Resolution, Scope, Work
-from paperexplorer.library import ZoteroLibrary, sync
+from paperexplorer.library import NotDuplicateItemsError, ZoteroLibrary, check_duplicates, sync
+from paperexplorer.library import merge as library_merge
 from paperexplorer.logs import configure_logging
 from paperexplorer.tracing import configure_tracing, trace_release
 from paperexplorer.wiring import Wiring
@@ -221,22 +222,20 @@ def duplicates_command(
             return
         if merge is not None:
             keep, other = (_duplicate_item(works, key) for key in merge)
-            if keep.doi != other.doi or keep.id == other.id:
-                typer.echo(f"{keep.zotero_key} and {other.zotero_key} do not share a DOI", err=True)
-                raise typer.Exit(1)
+            try:
+                check_duplicates(keep, other)
+            except NotDuplicateItemsError as e:
+                typer.echo(str(e), err=True)
+                raise typer.Exit(1) from e
             typer.confirm(
                 f"Merge {other.zotero_key} into {keep.zotero_key} in Zotero? {keep.zotero_key}"
                 f" takes its collections, tags, notes and attachments and keeps its own fields;"
                 f" {other.zotero_key} goes to Zotero's trash.",
                 abort=True,
             )
-            assert keep.zotero_key is not None and other.zotero_key is not None
-            library.merge(keep.zotero_key, other.zotero_key)
-            with conn.transaction():
-                result = sync(conn, library)  # follows dc:replaces, moving the Resolutions
+            moved = library_merge(conn, library, keep, other)
             typer.echo(
-                f"Merged {other.zotero_key} into {keep.zotero_key};"
-                f" {result.moved} Resolutions moved"
+                f"Merged {other.zotero_key} into {keep.zotero_key}; {moved} Resolutions moved"
             )
             return
         groups = works.duplicate_items()
@@ -252,12 +251,8 @@ def duplicates_command(
 
 def _duplicate_item(works: store.Works, key: str) -> Work:
     """The Work of a Duplicate Item; else exit with why."""
-    work = works.find(key)
-    if (
-        work is None
-        or work.doi is None
-        or all(work.id not in {w.id for w in g} for g in works.duplicate_items())
-    ):
+    work = works.duplicate_item(key)
+    if work is None:
         typer.echo(f"{key} is not a Duplicate Item: no other Library Item holds its DOI", err=True)
         raise typer.Exit(1)
     return work

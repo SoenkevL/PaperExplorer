@@ -41,8 +41,10 @@ from paperexplorer.asking import (
     Conversation,
     DeltaEvent,
     ErrorEvent,
+    HandlePiece,
     Reading,
     StepEvent,
+    TextPiece,
     ask,
     chat_model,
 )
@@ -189,7 +191,7 @@ def test_a_turn_streams_its_steps_and_draft_then_the_resolved_answer(
     ]
     assert events[0] == StepEvent(tool="search", args={"query": QUESTION})
     assert events[1] == StepEvent(tool="read_section", args={"heading": "§2"})
-    assert "".join(e.text for e in events if isinstance(e, DeltaEvent)) == draft()
+    assert shown(events) == draft()
     answered = events[-1]
     assert isinstance(answered, AnsweredEvent)
     assert answered.answer.text == "Entropy was computed from each EEG recording."
@@ -789,7 +791,17 @@ def test_a_reading_set_on_the_context_is_used_whatever_the_seeds_size(
 
 
 def deltas(events: Sequence[AnswerEvent]) -> list[str]:
-    return [e.text for e in events if isinstance(e, DeltaEvent)]
+    return [shown([e]) for e in events if isinstance(e, DeltaEvent)]
+
+
+def shown(events: Sequence[AnswerEvent]) -> str:
+    """The draft the DeltaEvents show, each handle written back as `[#n]`."""
+    return "".join(
+        p.text if isinstance(p, TextPiece) else f"[#{p.handle}]"
+        for e in events
+        if isinstance(e, DeltaEvent)
+        for p in e.pieces
+    )
 
 
 def last_response_text(conversation: Conversation) -> list[str]:
@@ -994,6 +1006,26 @@ def test_regression_dc485d10c4cd2e5d03a5901b88429045_bare_numbers_are_handles_by
     assert [e.type for e in events] == ["delta", "answer"]
 
 
+def test_the_draft_streams_as_pieces_its_bare_handles_shown_and_unknown_ones_dropped(
+    store_db: Conn, unnumbered_seed: Work
+) -> None:
+    conversation = Conversation(work=unnumbered_seed)
+    script = Script(
+        ["Entropy was computed from each EEG recording [", "3]. The sample was small [#99]."]
+    )
+
+    events = turn(context(store_db, script, reading=Reading.WHOLE_SEED), conversation, QUESTION)
+
+    # The Seed cites by author and year, so a bare `[3]` is a handle; no Chunk has handle 99.
+    assert [e.pieces for e in events if isinstance(e, DeltaEvent)] == [
+        [TextPiece(text="Entropy was computed from each EEG recording ")],
+        [HandlePiece(handle=3), TextPiece(text=". The sample was small.")],
+    ]
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent)
+    assert answered.answer.unknown_handles == [99]
+
+
 def test_regression_eval_7f32813a3ef4cd52aca983d0e0ad660e_an_answer_is_asked_for_its_handles(
     store_db: Conn, conversation: Conversation
 ) -> None:
@@ -1048,6 +1080,8 @@ def test_regression_eval_70cf08933dac78bcf79873edbada5a1e_without_a_redraft_the_
     answered = events[-1]
     assert isinstance(answered, AnsweredEvent)
     assert answered.redrafted is False
+    # The redraft's request was made, though its Answer does not stand.
+    assert answered.model_requests == 2
     assert answered.answer.text == first
     assert all(s.pointers == [] for s in answered.answer.sentences)
     assert last_response_text(conversation) == [first]
@@ -1293,3 +1327,55 @@ def test_reading_the_whole_seed_only_the_question_asked_closes_with_the_note(
     messages, _ = script.requests[1]
     assert user_prompts(messages) == [QUESTION, f"{NO_TOOLS}\n\n{QUESTION_LABEL}\n{later}"]
     assert user_prompts(conversation.messages) == [QUESTION, later]
+
+
+def test_a_retrieval_turn_counts_the_models_requests_and_tools_not_the_forced_search(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    script = Script(
+        [Call("read_section", {"heading": "§2"})],
+        ["Entropy was computed from each EEG recording."],
+    )
+
+    events = turn(context(store_db, script), conversation, QUESTION)
+
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent)
+    assert (answered.model_requests, answered.tool_calls) == (2, 1)
+    # The forced search's Chunks, ranked as the model was shown them.
+    [(messages, _), _] = script.requests
+    [shown] = tool_returns(messages, "search")
+    assert answered.forced_search is not None
+    assert [c.chunk.text for c in answered.forced_search] == list(handles_shown(shown))
+
+
+def test_a_whole_seed_turn_counts_its_redraft_and_has_no_forced_search(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    first = "Entropy was computed from each EEG recording. The sample was small."
+    second = "Entropy was computed from each EEG recording. [#3] The sample was small. [#5]"
+    script = Script([first], [second])
+
+    events = turn(context(store_db, script, reading=Reading.WHOLE_SEED), conversation, QUESTION)
+
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent) and answered.redrafted
+    assert (answered.model_requests, answered.tool_calls) == (2, 0)
+    assert answered.forced_search is None
+
+
+def test_a_failed_retrieval_turn_keeps_its_counts_and_forced_search(
+    store_db: Conn, conversation: Conversation
+) -> None:
+    script = Script(then=[Call("search", {"query": "again"})])
+
+    events = turn(context(store_db, script), conversation, QUESTION)
+
+    failed = events[-1]
+    assert isinstance(failed, ErrorEvent)
+    # Asked for the last time without tools, the model calls one anyway: it counts.
+    assert (failed.model_requests, failed.tool_calls) == (REQUEST_LIMIT, REQUEST_LIMIT)
+    [(messages, _), *_] = script.requests
+    [shown] = tool_returns(messages, "search")
+    assert failed.forced_search is not None
+    assert [c.chunk.text for c in failed.forced_search] == list(handles_shown(shown))

@@ -34,6 +34,19 @@ class LibraryItem(BaseModel):
     year: int | None = None
     doi: str | None = None
     pdf: Attachment | None = None
+    added: datetime | None = None  # when it entered the Library; the older of two stands
+
+
+class LibraryChanges(BaseModel):
+    """What changed in the Library since a version: items as they are now, keys that went.
+
+    A full read (`full`) lists every Library Item, so any key it leaves out has gone too.
+    """
+
+    version: int
+    items: list[LibraryItem]
+    deleted: list[str] = []
+    full: bool = False
 
 
 class Work(BaseModel):

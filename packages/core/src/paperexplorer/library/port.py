@@ -1,9 +1,9 @@
-"""What the pipeline needs from a library: an item's metadata and a local copy of its PDF."""
+"""What the pipeline needs from a library: its items, their changes, PDFs, and merging two."""
 
 from pathlib import Path
 from typing import Protocol
 
-from paperexplorer.domain import Attachment, LibraryItem
+from paperexplorer.domain import Attachment, LibraryChanges, LibraryItem
 
 
 class ItemNotFoundError(LookupError):
@@ -19,4 +19,12 @@ class Library(Protocol):
 
     def pdf(self, attachment: Attachment) -> Path:
         """A local path to the attached PDF, fetching it first if needed."""
+        ...
+
+    def changes(self, since: int | None) -> LibraryChanges:
+        """The Library Items changed and the keys deleted since a version; `None` reads it all."""
+        ...
+
+    def merge(self, keep: str, other: str) -> None:
+        """Merge `other` into `keep`, as Zotero desktop does, and move `other` to the trash."""
         ...

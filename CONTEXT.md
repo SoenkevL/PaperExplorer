@@ -72,6 +72,14 @@ _Avoid_: Pending reference, unknown reference
 A Reference that a Registry Check could not match to any Work. It has no Library Item. Distinct from an Unchecked Reference, which no Registry Check has looked up yet, and from a resolved Work whose Text Availability is none.
 _Avoid_: Missing source, noSource
 
+**DOI Conflict**:
+A Reference whose printed DOI names a Work that its printed title, or without one its first surname and year, does not. The title then decides, at low confidence, and the DOI's Work stays the other option for the reader.
+_Avoid_: Mismatch, bad DOI
+
+**Reader's Choice**:
+A Resolution the reader set: the Work they picked for a Reference, or none. Resolving and Registry Checks never overwrite it; only the reader clears it.
+_Avoid_: Override, pin
+
 **Citation**:
 One place in a Work's body text where the authors point at exactly one Reference. A grouped marker such as "[3–5, 9]" is four Citations sharing one Citing Sentence.
 _Avoid_: Reference, in-text reference, marker

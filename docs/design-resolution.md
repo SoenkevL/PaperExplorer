@@ -18,9 +18,10 @@ The `resolve` Stage runs for every Reference of a Work. Its only network call is
 - **Duplicate DOIs** (two Library Items, one DOI). The item with a PDF stands for the DOI; when both or neither have one, the older stands. The reader (index page, side panel) and the CLI (`paperexplorer duplicates`, `--use <key>`, `--merge <keep> <other>`) let you choose the other item or merge the pair. A merge writes to Zotero like Zotero desktop's merge: the kept item takes the other's collections, tags, notes and attachments and a `dc:replaces` relation; the other goes to Zotero's trash; the kept item's fields win; you confirm before anything is written. This amends ADR 0007, which refused the pair.
 - **A Library Item deleted in Zotero** (not by a merge): its Work row goes when nothing uses it; when a Resolution or a Stage run does, the row stays without a Library Item. After a merge, References that pointed at the trashed item point at the kept one.
 - **Matching against the Library.**
-  - A printed DOI that a Library Item holds: `certain`.
+  - A printed DOI that a Library Item holds, and that agrees with the Reference: `certain`. It agrees when the titles are near (≥ 0.9) or their main titles are equal; without a printed title, when the first surname or the year agrees; a Reference that prints only its DOI has nothing to disagree with.
+  - A DOI that disagrees is a **DOI Conflict**: the title rules below run as if no DOI were printed. A title match wins, capped at `low` and flagged, with the DOI's Work kept as the other option. With no title match the Reference stays Unchecked, the DOI's Work kept likewise. The same agreement rule (`resolution.agrees`) checks a Registry Check's DOI hits.
   - No printed DOI: an exact title after normalization (lowercase, accents and punctuation stripped, spaces collapsed) with the first surname or the year agreeing, or an equal main title (before the colon) with both agreeing: `high`. A near title (similarity ≥ 0.9): `low`.
-  - A title never overrules a printed DOI: a preprint and its published Version often share a title.
+  - Otherwise a title never overrules a printed DOI: a Library Item with another DOI is never a title match for it, since a preprint and its published Version often share a title. Only a DOI Conflict sets the printed DOI aside.
   - Title candidates come from a trigram index (`pg_trgm`) on the normalized title, then the scoring above.
 - **Then the cached registry responses** from earlier Registry Checks, matched by the same rules.
 - What is still unmatched is an Unchecked Reference.
@@ -31,7 +32,7 @@ A Registry Check (ADR 0011) looks References up in Crossref and OpenAlex. It run
 - **Layer 1: DOI batches**, 100 DOIs per call to Crossref (`filter=doi:a,doi:b,…`) and OpenAlex (`filter=doi:a|b|…`) at the same time.
   - Crossref decides which Work a DOI is: the printed DOI wins. `posted-content` makes a preprint its own Version; its `is-preprint-of` stays in the cached response until the reader shows Versions. An alias DOI (JSTOR, APA's `//` form) is the same Work.
   - OpenAlex adds open-access links, the abstract and the OpenAlex ID, and supplies the record for DOIs Crossref does not know (DataCite, such as arXiv's).
-  - Every DOI hit is checked against the Reference's title, first surname and year. Agreement: `certain`. Disagreement: the Reference goes on to layer 2 as if it printed no DOI, and the conflict is reported.
+  - Every DOI hit is checked by the same agreement rule as against the Library. Agreement: `certain`. A DOI Conflict goes on to layer 2 as if it printed no DOI; a title match there is capped at `low`, and with none left after layer 3 it is Unresolved, the DOI's record kept as the other option.
 - **Layer 2: OpenAlex title search** (`filter=title.search:`), 5 candidates per Reference, no year filter, scored as against the Library.
 - **Layer 3: Crossref `query.bibliographic`** on the printed string, for References with no usable title or only a `low` title match. A hit is `low`.
 - Nothing matched: an Unresolved Reference.
@@ -55,14 +56,14 @@ A Registry Check (ADR 0011) looks References up in Crossref and OpenAlex. It run
 
 ## Store
 - `registry_responses`: one row per source and key (`crossref:doi`, `openalex:doi`, `openalex:title`, `crossref:bibliographic`) with the raw JSON (a batch split per DOI), hit or miss, and `fetched_at`. Keys are normalized DOIs (lowercase; `https://doi.org/`, `doi:` and trailing `.` or `,` stripped; `//` kept) or normalized query strings. Rows commit as they land, on their own connection. Misses are retried after 30 days; hits stay until `--refresh`.
-- `resolutions`: one row per Reference: resolved, Unchecked or Unresolved, with confidence, level (`certain`, `high`, `low`), evidence and the layer that matched.
+- `resolutions`: one row per Reference: resolved, Unchecked or Unresolved, with confidence, level (`certain`, `high`, `low`), evidence, the layer that matched, the DOI's Work on a DOI Conflict, and whether it is a Reader's Choice, which no resolve or Check (`--refresh` included) overwrites.
 - A Work found by a Registry Check gets a `works` row with its DOI, OpenAlex ID and the registry's title, creators and year until `catalog` gives it a Library Item; a null `synced_at` marks metadata not yet from Zotero.
 - The index page and `GET /works` list only Works with a Stage run; Library-only Works appear through Resolutions.
 - `resolution`'s interface is `resolve(refs) -> list[Resolution]`, one per Reference, async inside; callers run it through `asyncio.run`.
 - The table is not named `lookups`: CONTEXT.md lists "Lookup" among the words to avoid for Resolution.
 
 ## Testing
-- Matching rules are pure functions with hand-written cases: an exact DOI, a neighbour's DOI, a `posted-content` preprint, an alias DOI, no title, a missing subtitle, a wrong-year near-miss, a garbage string, an empty result.
+- Matching rules are pure functions with hand-written cases: an exact DOI, a DOI with a misspelt title that still agrees, a DOI alone, a neighbour's DOI (a DOI Conflict, with and without a title match), a `posted-content` preprint, an alias DOI, no title, a missing subtitle, a wrong-year near-miss, a garbage string, an empty result.
 - Resolution tests seed `registry_responses` rows from recorded JSON in the real Postgres; the HTTP side runs over `httpx.MockTransport` (batch splitting, 429 with `Retry-After`, 5xx, a spent budget). No vcrpy: a real failure becomes a named regression test from its recorded rows.
 - `InMemoryLibrary` gains the sync and merge calls; the Zotero adapter is tested over hand-written Web API JSON.
 - Thresholds are calibrated once, live, on fixture References that print a DOI: their title search should find that DOI (~100 searches, one keyless day); the responses are kept for the tests.
@@ -72,4 +73,4 @@ Four PRs into `dev`, each test-first and through the gate, with a check-in after
 1. `feat/resolution-design`: this design, ADR 0011, the research note, CONTEXT.md's terms, `architecture.md` and `design-v1.md` updated.
 2. `feat/library-sync`: settings, migration `0005`, Library sync, every Library Item a Work, `pg_trgm`, duplicates (stand-in, choose, merge on the CLI), the local `resolve` Stage, `paperexplorer resolutions <zotero_key> [--low]`. On the tower it reports how much of the Seed the Library already resolves.
 3. `feat/registry-check`: HTTP clients, limiters, budget, cache, `paperexplorer check`, threshold calibration, a live Check of the Seed timed against the estimate.
-4. `feat/check-ui`: API routes for Checks (whole Work as an event stream, one Reference) and duplicates, the Work page button with its cost, the side panel's states and buttons, duplicates on the index page.
+4. `feat/check-ui`: API routes for Checks (whole Work as an event stream, one Reference) and duplicates, the Work page button with its cost, the side panel's states and buttons, duplicates on the index page, and the Reader's Choice: a DOI Conflict shows both Works, and the reader picks one, another Work or none, or clears an earlier choice.

@@ -37,6 +37,13 @@ class Match(BaseModel):
     candidate: int
     level: Level
     evidence: list[str]
+    doi_conflict: int | None = None  # the candidate the printed DOI names, when it disagreed
+
+
+class DoiConflict(BaseModel):
+    """The printed DOI names a candidate the Reference does not agree with, and no title matched."""
+
+    candidate: int
 
 
 def normalize_doi(doi: str) -> str:
@@ -54,19 +61,59 @@ def normalize_title(title: str) -> str:
     return " ".join(re.sub(r"[\W_]+", " ", bare).split())
 
 
-def match(ref: Reference, candidates: Sequence[Candidate]) -> Match | None:
-    """The candidate the Reference names, if any rule ties it to one."""
+def agrees(ref: Reference, c: Candidate) -> bool:
+    """Whether a DOI hit is the Work the Reference prints, allowing slips and a dropped subtitle.
+
+    Titles agree when near or when their main titles are equal; without both titles, the first
+    surname or the year must agree. A Reference that prints only its DOI has nothing to disagree.
+    """
+    if ref.title and c.title and normalize_title(ref.title):
+        ours, theirs = normalize_title(ref.title), normalize_title(c.title)
+        near = difflib.SequenceMatcher(None, ours, theirs).ratio() >= NEAR_TITLE
+        return near or _main(ref.title) == _main(c.title)
+    if ref.surnames or ref.year:
+        return _surname_agrees(ref, c) or _year_agrees(ref, c)
+    return True
+
+
+def match(ref: Reference, candidates: Sequence[Candidate]) -> Match | DoiConflict | None:
+    """The candidate the Reference names, if any rule ties it to one.
+
+    A DOI hit that does not agree is a DOI Conflict: the title rules run as if no DOI were
+    printed, a title match capped at low; with none, `DoiConflict` keeps the DOI's candidate.
+    """
     doi = normalize_doi(ref.doi) if ref.doi else None
+    conflict: int | None = None
     if doi is not None:
         for i, c in enumerate(candidates):
             if c.doi and normalize_doi(c.doi) == doi:
-                return Match(candidate=i, level=Level.CERTAIN, evidence=["doi"])
+                if agrees(ref, c):
+                    return Match(candidate=i, level=Level.CERTAIN, evidence=["doi"])
+                conflict = i
+                break
+    found = _best_title_match(ref, candidates, printed_doi=doi if conflict is None else None)
+    if conflict is None:
+        return found
+    if found is None:
+        return DoiConflict(candidate=conflict)
+    return Match(
+        candidate=found.candidate,
+        level=Level.LOW,
+        evidence=[*found.evidence, "doi_conflict"],
+        doi_conflict=conflict,
+    )
+
+
+def _best_title_match(
+    ref: Reference, candidates: Sequence[Candidate], *, printed_doi: str | None
+) -> Match | None:
+    """The best candidate by the title rules: highest level, then closest title."""
     if not ref.title:
         return None
     best: tuple[int, float, Match] | None = None
     for i, c in enumerate(candidates):
         # A title never overrules a printed DOI: a preprint and its published Version share one.
-        if doi is not None and c.doi:
+        if printed_doi is not None and c.doi:
             continue
         found = _title_match(ref, ref.title, c, i)
         if found is None:

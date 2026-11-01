@@ -2,10 +2,12 @@
 
 from paperexplorer.resolution.matching import (
     Candidate,
+    DoiConflict,
     Level,
     Match,
+    agrees,
     match,
     normalize_doi,
 )
 
-__all__ = ["Candidate", "Level", "Match", "match", "normalize_doi"]
+__all__ = ["Candidate", "DoiConflict", "Level", "Match", "agrees", "match", "normalize_doi"]

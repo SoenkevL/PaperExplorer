@@ -2,7 +2,6 @@
 
 import hashlib
 import logging
-from functools import cache
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlencode
@@ -50,10 +49,10 @@ def _panel_url(work_id: int, citations: list[int]) -> str:
     return f"/works/{work_id}/panel?{urlencode([('c', c) for c in citations])}"
 
 
-@cache
 def _static_url(path: str) -> str:
     # The contents' hash in the URL: a deploy that changes a file changes its URL, so a browser
-    # never runs a cached old script beside a new page.
+    # never runs a cached old script beside a new page. Hashed on every render (a few files, a few
+    # hundred kB), so a dev server sees an edited file without a restart.
     version = hashlib.sha256((_HERE / "static" / path).read_bytes()).hexdigest()[:12]
     return f"/static/{path}?v={version}"
 

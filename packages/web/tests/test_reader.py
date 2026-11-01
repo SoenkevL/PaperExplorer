@@ -247,8 +247,7 @@ def test_the_citation_pane_hints_until_a_citation_is_opened_and_is_a_sheet_below
 
 
 def test_every_script_and_stylesheet_url_carries_its_contents_version() -> None:
-    # A deploy that changes a file changes its URL, so no browser runs a cached old script
-    # beside the new page (seen after the three-pane reader: the drawer opened and shut at once).
+    # Seen after the three-pane reader: a cached old conversation.js shut the drawer it opened.
     client = _reader()
     page = client.get("/works/7").text
 

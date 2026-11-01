@@ -4,6 +4,9 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Changed
+- Asking: the Draft is cut at its handles in core. The `delta` event's contract changes: `DeltaEvent` carries `pieces` instead of `text`, each `{"text": …}` or `{"handle": n}` (`TextPiece`, `HandlePiece` in `asking` and in the API's schemas). `DraftCut` reads the handle grammar `resolve_answer` reads, now defined once in `asking.handles`, so a bare `[13]` on a Seed that numbers no Reference shows as a chip while streaming; a handle the Conversation does not know is left out. The web app renders the pieces and its own copy of the grammar (`answers.Draft`) is gone; the CLI prints handles as `[#n]`. CONTEXT.md gains Draft.
+
 ### Added
 - Asking: `AnsweredEvent` and `ErrorEvent` carry the turn's accounting: `model_requests` and `tool_calls`, the model's own (a redraft's request counts, the forced search does not), counted as each is made so a failed turn keeps them, and `forced_search`, the forced search's ranked Chunks (None reading the whole Seed). The CLI's `ask` and the eval read them from the event instead of counting `ModelResponse`s in the Conversation, and the eval's hit@8 no longer runs the search again. The trace's `model_requests` and `tool_calls` scores are the same counts, so a failed redraft's request now counts. The API's events are unchanged.
 - Docs: the design for resolving References (`docs/design-resolution.md`): the Library synced as Works and matched first, Registry Checks against Crossref and OpenAlex only when the reader asks (ADR 0011), a cache so no DOI or query is sent twice, duplicate DOIs chosen or merged; the measurements behind it in `docs/research/2026-10-doi-resolution.md`; CONTEXT.md gains Library, Registry Check and Unchecked Reference, and Unresolved Reference now needs a Check.

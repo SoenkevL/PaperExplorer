@@ -14,7 +14,7 @@ import hashlib
 import logging
 import re
 import time
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Container
 from dataclasses import dataclass, replace
 from importlib import resources
 
@@ -323,7 +323,7 @@ async def _answer(
             ),
         ],
     )
-    result = await _run(agent, tools, history, REQUEST_LIMIT, tally, emit)
+    result = await _run(agent, tools, conversation.handles, history, REQUEST_LIMIT, emit)
     draft = answer_draft(result.output)
     answer = _resolve(ctx, tools, conversation, draft)
     if not any(c.isalnum() for c in answer.text):
@@ -342,6 +342,7 @@ async def _answer(
 async def _run(
     agent: Agent[SeedTools, str],
     tools: SeedTools,
+    handles: Container[int],
     history: list[ModelMessage],
     request_limit: int,
     tally: _Tally,
@@ -349,8 +350,10 @@ async def _run(
 ) -> AgentRunResult[str]:
     """Run the agent on `history`, streaming its steps and its draft as cut; its result.
 
-    Each request and tool call is counted in `tally` as it is made, so a failed run counts too.
+    The draft is cut at the `handles` the Conversation knows when each delta comes, and every
+    request's draft starts a cut of its own.
     """
+    bare = not tools.numbered_references()
     async with agent.iter(
         None,
         message_history=history,
@@ -359,12 +362,12 @@ async def _run(
     ) as run:
         async for node in run:
             if Agent.is_model_request_node(node):
-                cut = DraftCut()
+                cut = DraftCut(handles, bare_handles=bare)
                 async with node.stream(run.ctx) as stream:
                     tally.model_requests += 1  # sent: the request limit stops one before this
                     async for event in stream:
-                        if (text := _draft(event)) and (shown := cut.add(text)):
-                            emit(DeltaEvent(text=shown))
+                        if (text := _draft(event)) and (pieces := cut.add(text)):
+                            emit(DeltaEvent(pieces=pieces))
             elif Agent.is_call_tools_node(node):
                 async with node.stream(run.ctx) as stream:
                     async for event in stream:
@@ -432,7 +435,7 @@ async def _redraft(
     history = [*_without_thinking(messages), ModelRequest(parts=[UserPromptPart(REDRAFT)])]
     with ctx.tracing.span("redraft", input=first) as span:
         try:
-            result = await _run(agent, tools, history, 1, tally, emit)
+            result = await _run(agent, tools, conversation.handles, history, 1, emit)
         except Exception as error:
             logger.warning("Asked again for its handles, the model failed", exc_info=True)
             span.update(output=f"failed: {error}")

@@ -14,8 +14,10 @@ from paperexplorer_api.schemas import (
     AnsweredEvent,
     DeltaEvent,
     ErrorEvent,
+    HandlePiece,
     RedraftEvent,
     StepEvent,
+    TextPiece,
 )
 
 from .conftest import AppFactory, Call, Script, Stored
@@ -58,7 +60,9 @@ def test_the_client_starts_a_conversation_and_streams_its_typed_events(
     assert [type(e) for e in events] == [StepEvent, StepEvent, DeltaEvent, AnsweredEvent]
     assert events[0] == StepEvent(tool="search", args={"query": QUESTION})
     assert events[1] == StepEvent(tool="read_around", args={"handle": 1})
-    assert events[2] == DeltaEvent(text="It was a training. [#1]")
+    assert events[2] == DeltaEvent(
+        pieces=[TextPiece(text="It was a training. "), HandlePiece(handle=1)]
+    )
     answered = events[-1]
     assert isinstance(answered, AnsweredEvent)
     assert answered.answer.text == "It was a training."
@@ -136,7 +140,7 @@ def test_the_client_reads_server_sent_events_past_keep_alive_comments() -> None:
         "\n"
         "event: delta\n"
         'data: {"type": "delta",\n'
-        'data:  "text": "It was"}\n'
+        'data:  "pieces": [{"text": "It was "}, {"handle": 3}]}\n'
         "\n"
         ": ping\n"
         "\n"
@@ -151,17 +155,17 @@ def test_the_client_reads_server_sent_events_past_keep_alive_comments() -> None:
     events = list(ApiClient(http).ask("c1", QUESTION))
 
     assert events == [
-        DeltaEvent(text="It was"),
+        DeltaEvent(pieces=[TextPiece(text="It was "), HandlePiece(handle=3)]),
         RedraftEvent(),
         ErrorEvent(message="The model could not answer"),
     ]
 
 
 def test_closing_the_events_early_closes_the_stream() -> None:
-    http = CannedHttp('event: delta\ndata: {"type":"delta","text":"It"}\n\n' * 3)
+    http = CannedHttp('event: delta\ndata: {"type":"delta","pieces":[{"text":"It"}]}\n\n' * 3)
 
     events = ApiClient(http).ask("c1", QUESTION)
-    assert next(events) == DeltaEvent(text="It")
+    assert next(events) == DeltaEvent(pieces=[TextPiece(text="It")])
     events.close()
 
     assert http.closed

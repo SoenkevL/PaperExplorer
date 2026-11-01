@@ -179,11 +179,31 @@ class StepEvent(BaseModel):
     args: dict[str, JsonValue]
 
 
+class TextPiece(BaseModel):
+    """A run of the Draft's text."""
+
+    text: str
+
+
+class HandlePiece(BaseModel):
+    """One handle of the Draft, by its number; its Pointer comes with the Answer."""
+
+    handle: int
+
+
+type DraftPiece = TextPiece | HandlePiece
+"""A piece of the Draft: `{"text": ...}` or `{"handle": n}`, one per number a handle carries."""
+
+
 class DeltaEvent(BaseModel):
-    """More of the model's draft, handles and all; the Answer replaces the draft."""
+    """More of the Draft, cut into text and handles; the Answer replaces the Draft.
+
+    Text that may still turn into a handle or a control token comes with a later delta; a
+    handle the Conversation does not know is left out.
+    """
 
     type: Literal["delta"] = "delta"
-    text: str
+    pieces: list[DraftPiece]
 
 
 class RedraftEvent(BaseModel):

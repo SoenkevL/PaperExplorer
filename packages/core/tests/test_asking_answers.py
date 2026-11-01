@@ -466,7 +466,7 @@ def test_no_quote_is_exact_unless_the_authors_printed_its_words_at_its_place() -
     assert exact >= 100  # the guard saw real matches, not only misses
 
 
-# The handle forms core and web both read, each rebuilt around a form an eval run recorded.
+# The handle forms Answers and drafts are read with, each rebuilt around a form a run recorded.
 HANDLE_FORMS = json.loads(
     (Path(__file__).parents[3] / "tests" / "fixtures" / "handle-forms.json").read_text("utf-8")
 )["forms"]
@@ -493,6 +493,9 @@ def test_regression_eval_handle_forms_are_read_with_every_number_they_carry(
     assert unknown.text == text
     # Every sentence of a draft with handles carries one here, and gets its Pointer.
     assert [bool(s.pointers) for s in tied.sentences] == [bool(numbers)] * len(tied.sentences)
+    if "bare_handles" in form:
+        bare = resolve_answer(draft, {}, [], FakeEmbedder(), THRESHOLD, bare_handles=True)
+        assert (bare.unknown_handles, bare.text) == (form["bare_handles"], form["bare_text"])
 
 
 @pytest.mark.parametrize(

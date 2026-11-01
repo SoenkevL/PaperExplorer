@@ -19,10 +19,12 @@ from paperexplorer_api.schemas import (
     CitationSpan,
     DeltaEvent,
     ErrorEvent,
+    HandlePiece,
     Pointer,
     Quote,
     RedraftEvent,
     StepEvent,
+    TextPiece,
     WorkText,
 )
 from paperexplorer_web.app import create_app, templates
@@ -208,9 +210,9 @@ def test_each_event_is_relayed_as_html_for_its_place_in_the_question() -> None:
     api = FakeApi(
         [
             StepEvent(tool="search", args={"query": "entropy measured"}),
-            DeltaEvent(text="Entropy rose. [#"),
+            DeltaEvent(pieces=[TextPiece(text="Entropy rose. ")]),
             StepEvent(tool="read_around", args={"handle": 3, "n": 1}),
-            DeltaEvent(text="3] It fell."),
+            DeltaEvent(pieces=[HandlePiece(handle=3), TextPiece(text=" It fell.")]),
             ANSWERED,
         ]
     )
@@ -223,7 +225,7 @@ def test_each_event_is_relayed_as_html_for_its_place_in_the_question() -> None:
     search, first, read, second, answer = (data for _, data in events)
     assert _text(search) == "search entropy measured"
     assert _text(read) == "read_around 3, 1"
-    # The draft grows at the end of the draft; a handle waits until it is whole, then is a chip.
+    # The draft grows at the end of the draft, each handle piece a chip.
     assert re.search(r'sse-swap="delta" hx-swap="beforeend"', turn)
     assert first == "Entropy rose. "
     assert re.fullmatch(r'<span class="chip"[^>]*>#3</span> It fell\.', second)
@@ -236,9 +238,15 @@ def test_each_event_is_relayed_as_html_for_its_place_in_the_question() -> None:
 def test_a_redraft_clears_the_draft_and_says_pointers_are_being_added() -> None:
     api = FakeApi(
         [
-            DeltaEvent(text="Entropy rose. It fell [#"),
+            DeltaEvent(pieces=[TextPiece(text="Entropy rose. It fell ")]),
             RedraftEvent(),
-            DeltaEvent(text="Entropy rose. [#3] It fell."),
+            DeltaEvent(
+                pieces=[
+                    TextPiece(text="Entropy rose. "),
+                    HandlePiece(handle=3),
+                    TextPiece(text=" It fell."),
+                ]
+            ),
             ANSWERED,
         ]
     )
@@ -343,7 +351,9 @@ def test_model_text_is_escaped_wherever_it_shows() -> None:
     api = FakeApi(
         [
             StepEvent(tool="<search>", args={"query": HOSTILE}),
-            DeltaEvent(text="<img src=x onerror=alert(1)> [#1]"),
+            DeltaEvent(
+                pieces=[TextPiece(text="<img src=x onerror=alert(1)> "), HandlePiece(handle=1)]
+            ),
             AnsweredEvent(answer=answer),
         ],
         [ErrorEvent(message=HOSTILE)],
@@ -368,7 +378,7 @@ def test_an_error_ends_the_question_with_its_message() -> None:
     api = FakeApi(
         [
             StepEvent(tool="search", args={"query": "entropy"}),
-            DeltaEvent(text="Entropy"),
+            DeltaEvent(pieces=[TextPiece(text="Entropy")]),
             ErrorEvent(message="The model did not answer within 6 requests."),
         ]
     )
@@ -442,7 +452,7 @@ def test_a_questions_stream_is_given_once() -> None:
 
 
 def test_a_stream_that_ends_without_an_answer_says_so() -> None:
-    events = _ask(FakeApi([DeltaEvent(text="Entropy")]).client())
+    events = _ask(FakeApi([DeltaEvent(pieces=[TextPiece(text="Entropy")])]).client())
 
     assert [name for name, _ in events] == ["delta", "error"]
     assert "without an Answer" in _text(events[-1][1])
@@ -462,7 +472,10 @@ def test_closing_the_relay_closes_the_apis_stream_and_so_cancels_the_turn() -> N
 
     class Body(httpx.SyncByteStream):
         def __iter__(self) -> Iterator[bytes]:
-            for event in (StepEvent(tool="search", args={}), DeltaEvent(text="Entropy")):
+            for event in (
+                StepEvent(tool="search", args={}),
+                DeltaEvent(pieces=[TextPiece(text="Entropy")]),
+            ):
                 yield f"event: {event.type}\ndata: {event.model_dump_json()}\n\n".encode()
 
         def close(self) -> None:

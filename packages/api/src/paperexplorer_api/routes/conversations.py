@@ -75,14 +75,22 @@ def _event(event: asking.AnswerEvent) -> schemas.AnswerEvent:
     match event:
         case asking.StepEvent(tool=tool, args=args):
             return schemas.StepEvent(tool=tool, args=args)
-        case asking.DeltaEvent(text=text):
-            return schemas.DeltaEvent(text=text)
+        case asking.DeltaEvent(pieces=pieces):
+            return schemas.DeltaEvent(pieces=[_piece(p) for p in pieces])
         case asking.RedraftEvent():
             return schemas.RedraftEvent()
         case asking.AnsweredEvent(answer=answer):
             return schemas.AnsweredEvent(answer=_answer(answer))
         case asking.ErrorEvent(message=message):
             return schemas.ErrorEvent(message=message)
+
+
+def _piece(piece: asking.DraftPiece) -> schemas.DraftPiece:
+    match piece:
+        case asking.TextPiece(text=text):
+            return schemas.TextPiece(text=text)
+        case asking.HandlePiece(handle=handle):
+            return schemas.HandlePiece(handle=handle)
 
 
 def _answer(answer: Answer) -> schemas.Answer:

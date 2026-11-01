@@ -41,8 +41,10 @@ from paperexplorer.asking import (
     Conversation,
     DeltaEvent,
     ErrorEvent,
+    HandlePiece,
     Reading,
     StepEvent,
+    TextPiece,
     ask,
     chat_model,
 )
@@ -189,7 +191,7 @@ def test_a_turn_streams_its_steps_and_draft_then_the_resolved_answer(
     ]
     assert events[0] == StepEvent(tool="search", args={"query": QUESTION})
     assert events[1] == StepEvent(tool="read_section", args={"heading": "§2"})
-    assert "".join(e.text for e in events if isinstance(e, DeltaEvent)) == draft()
+    assert shown(events) == draft()
     answered = events[-1]
     assert isinstance(answered, AnsweredEvent)
     assert answered.answer.text == "Entropy was computed from each EEG recording."
@@ -789,7 +791,17 @@ def test_a_reading_set_on_the_context_is_used_whatever_the_seeds_size(
 
 
 def deltas(events: Sequence[AnswerEvent]) -> list[str]:
-    return [e.text for e in events if isinstance(e, DeltaEvent)]
+    return [shown([e]) for e in events if isinstance(e, DeltaEvent)]
+
+
+def shown(events: Sequence[AnswerEvent]) -> str:
+    """The draft the DeltaEvents show, each handle written back as `[#n]`."""
+    return "".join(
+        p.text if isinstance(p, TextPiece) else f"[#{p.handle}]"
+        for e in events
+        if isinstance(e, DeltaEvent)
+        for p in e.pieces
+    )
 
 
 def last_response_text(conversation: Conversation) -> list[str]:
@@ -992,6 +1004,26 @@ def test_regression_dc485d10c4cd2e5d03a5901b88429045_bare_numbers_are_handles_by
     ]
     # The draft had its handles, so the model is not asked for them again.
     assert [e.type for e in events] == ["delta", "answer"]
+
+
+def test_the_draft_streams_as_pieces_its_bare_handles_shown_and_unknown_ones_dropped(
+    store_db: Conn, unnumbered_seed: Work
+) -> None:
+    conversation = Conversation(work=unnumbered_seed)
+    script = Script(
+        ["Entropy was computed from each EEG recording [", "3]. The sample was small [#99]."]
+    )
+
+    events = turn(context(store_db, script, reading=Reading.WHOLE_SEED), conversation, QUESTION)
+
+    # The Seed cites by author and year, so a bare `[3]` is a handle; no Chunk has handle 99.
+    assert [e.pieces for e in events if isinstance(e, DeltaEvent)] == [
+        [TextPiece(text="Entropy was computed from each EEG recording ")],
+        [HandlePiece(handle=3), TextPiece(text=". The sample was small.")],
+    ]
+    answered = events[-1]
+    assert isinstance(answered, AnsweredEvent)
+    assert answered.answer.unknown_handles == [99]
 
 
 def test_regression_eval_7f32813a3ef4cd52aca983d0e0ad660e_an_answer_is_asked_for_its_handles(

@@ -1,5 +1,6 @@
 import json
 from collections.abc import AsyncIterator, Callable
+from datetime import UTC, datetime
 from pathlib import Path
 
 import psycopg
@@ -11,8 +12,10 @@ from typer.testing import CliRunner
 from paperexplorer import chunking, store
 from paperexplorer.cli import StageName, app
 from paperexplorer.config import Settings
+from paperexplorer.domain import Attachment, LibraryItem
 from paperexplorer.embedding import FakeEmbedder
-from paperexplorer.parsing import Block, BlockKind, ParsedWork, Span, TextOrigin
+from paperexplorer.library import InMemoryLibrary, ZoteroLibrary
+from paperexplorer.parsing import Block, BlockKind, ParsedWork, Reference, Span, TextOrigin
 from paperexplorer.pipeline import STAGES
 from paperexplorer.wiring import Wiring
 
@@ -399,3 +402,123 @@ def test_eval_says_when_the_work_is_unknown_and_fails(eval_files: Path) -> None:
 
     assert result.exit_code == 1
     assert "No Work NOSUCHKY" in result.output
+
+
+ATTENTION = LibraryItem(
+    key="ATTN2017", title="Attention Is All You Need", creators=["Vaswani, Ashish"], year=2017,
+    doi="10.5555/attention", added=datetime(2020, 1, 1, tzinfo=UTC),
+)  # fmt: skip
+ATTENTION_COPY = ATTENTION.model_copy(
+    update={
+        "key": "ATTNCOPY",
+        "pdf": Attachment(key="ATTPDF11", filename="a.pdf"),
+        "added": datetime(2025, 1, 1, tzinfo=UTC),
+    }
+)
+
+
+@pytest.fixture
+def library(cli_env: None, monkeypatch: pytest.MonkeyPatch) -> InMemoryLibrary:
+    """The Library every command reads, in memory instead of Zotero."""
+    monkeypatch.setenv("PE_LOG_LEVEL", "WARNING")
+    held = InMemoryLibrary(
+        [LibraryItem(key="SEED1111", title="The Seed"), ATTENTION, ATTENTION_COPY], {}
+    )
+    monkeypatch.setattr(ZoteroLibrary, "from_settings", lambda settings: held)
+    return held
+
+
+def _works(url: str) -> dict[str, str | None]:
+    with psycopg.connect(url) as conn:
+        return {w.zotero_key or f"#{w.id}": w.title for w in store.Works(conn).list()}
+
+
+def test_sync_makes_every_library_item_a_work(
+    library: InMemoryLibrary, scratch_database_url: str
+) -> None:
+    first = CliRunner().invoke(app, ["sync"])
+    library.put(LibraryItem(key="NEWW2026", title="Added later"))
+    second = CliRunner().invoke(app, ["sync"])
+
+    assert first.exit_code == 0, first.output
+    assert "3 Library Items" in first.stdout
+    assert "4 Library Items" in second.stdout  # `sync` always reads the whole Library
+    assert set(_works(scratch_database_url)) == {"SEED1111", "ATTN2017", "ATTNCOPY", "NEWW2026"}
+
+
+def test_duplicates_lists_each_works_duplicate_items_standing_item_first(
+    library: InMemoryLibrary,
+) -> None:
+    CliRunner().invoke(app, ["sync"])
+
+    listed = CliRunner().invoke(app, ["duplicates"])
+    CliRunner().invoke(app, ["duplicates", "--stand", "ATTN2017"])
+    let = CliRunner().invoke(app, ["duplicates"])
+
+    assert listed.exit_code == 0, listed.output
+    doi, first, second = listed.stdout.splitlines()[:3]
+    assert "10.5555/attention" in doi
+    assert first.split()[:2] == ["*", "ATTNCOPY"]  # the one with a PDF stands
+    assert second.split()[0] == "ATTN2017"
+    assert let.stdout.splitlines()[1].split()[:2] == ["*", "ATTN2017"]
+
+
+def _resolved_seed(url: str) -> None:
+    refs = [
+        Reference(id="b0", text="Vaswani 2017. Attention is all you need.", page=9,
+                  title="Attention is all you need", surnames=["Vaswani"], year="2017"),
+        Reference(id="b1", text="Nobody 1999. Unknown.", page=9, title="Unknown things"),
+    ]  # fmt: skip
+    with psycopg.connect(url, autocommit=True) as conn:
+        store.migrate(conn)
+        seed = store.Works(conn).ensure("SEED1111")
+        store.WorkTexts(conn).replace(
+            seed, ParsedWork(text_origin=TextOrigin.PRINTED, blocks=[], references=refs)
+        )
+    result = CliRunner().invoke(app, ["run", "resolve", "SEED1111"])
+    assert result.exit_code == 0, result.output
+
+
+def test_a_merge_asks_first_then_merges_in_the_library_and_moves_the_resolutions(
+    library: InMemoryLibrary, scratch_database_url: str
+) -> None:
+    _resolved_seed(scratch_database_url)
+
+    declined = CliRunner().invoke(
+        app, ["duplicates", "--merge", "ATTN2017", "ATTNCOPY"], input="n\n"
+    )
+    assert declined.exit_code == 1
+    assert library.item("ATTNCOPY").key == "ATTNCOPY"
+
+    merged = CliRunner().invoke(app, ["duplicates", "--merge", "ATTN2017", "ATTNCOPY"], input="y\n")
+
+    assert merged.exit_code == 0, merged.output
+    assert library.item("ATTN2017").pdf == ATTENTION_COPY.pdf
+    assert "ATTNCOPY" not in _works(scratch_database_url)
+    listed = CliRunner().invoke(app, ["resolutions", "SEED1111"])
+    assert "ATTN2017" in listed.stdout.splitlines()[1]
+
+
+def test_resolutions_lists_each_reference_with_its_state_and_work(
+    library: InMemoryLibrary, scratch_database_url: str
+) -> None:
+    _resolved_seed(scratch_database_url)
+
+    result = CliRunner().invoke(app, ["resolutions", "SEED1111"])
+    low = CliRunner().invoke(app, ["resolutions", "SEED1111", "--low"])
+
+    assert result.exit_code == 0, result.output
+    header, first, second, *_ = result.stdout.splitlines()
+    assert "2 References" in header
+    assert first.split()[:3] == ["b0", "high", "ATTNCOPY"]
+    assert "Vaswani 2017" in first
+    assert second.split()[:2] == ["b1", "unchecked"]
+    assert "1 high" in result.stdout and "1 unchecked" in result.stdout
+    assert low.stdout.splitlines()[1:] == []
+
+
+def test_resolutions_of_an_unknown_work_fail(library: InMemoryLibrary) -> None:
+    result = CliRunner().invoke(app, ["resolutions", "NOPE2345"])
+
+    assert result.exit_code == 1
+    assert "NOPE2345" in result.output

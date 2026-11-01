@@ -10,7 +10,7 @@ _Avoid_: Paper, article, document, publication
 
 **Version**:
 A Work that is another edition of the same study as some other Work, e.g. a preprint and its published article. Versions are distinct Works; when a Reference could mean either, the published Version is preferred.
-_Avoid_: Duplicate, copy, variant
+_Avoid_: Duplicate (see Duplicate Items), copy, variant
 
 **Library Item**:
 The record of a Work in the Zotero library; the authoritative source of its metadata and attached PDF.
@@ -19,6 +19,14 @@ _Avoid_: Zotero entry, record
 **Library**:
 The reader's Zotero library: every Library Item in it, whether or not an Exploration uses it.
 _Avoid_: Zotero, collection
+
+**Duplicate Items**:
+Two or more Library Items that hold one DOI: one Work recorded twice in the Library. One of them is its Standing Item; merging them in Zotero leaves one. Not Versions, which are distinct Works.
+_Avoid_: Duplicate Work, copy, twin
+
+**Standing Item**:
+The one of a Work's Duplicate Items that stands for its DOI, the one its Resolutions name: the one the reader let stand, else the one with a PDF, else the oldest.
+_Avoid_: Stand-in, primary, master, chosen item
 
 **Exploration**:
 The reading of one Seed together with the Works it cites, mirrored as one Zotero collection.
@@ -71,6 +79,14 @@ _Avoid_: Pending reference, unknown reference
 **Unresolved Reference**:
 A Reference that a Registry Check could not match to any Work. It has no Library Item. Distinct from an Unchecked Reference, which no Registry Check has looked up yet, and from a resolved Work whose Text Availability is none.
 _Avoid_: Missing source, noSource
+
+**DOI Conflict**:
+A Reference whose printed DOI names a Work that its printed title, or without one its first surname and year, does not. The title then decides, at low confidence, and the DOI's Work stays the other option for the reader.
+_Avoid_: Mismatch, bad DOI
+
+**Reader's Choice**:
+A Resolution the reader set: the Work they picked for a Reference, or none. Resolving and Registry Checks never overwrite it; only the reader clears it.
+_Avoid_: Override, pin
 
 **Citation**:
 One place in a Work's body text where the authors point at exactly one Reference. A grouped marker such as "[3–5, 9]" is four Citations sharing one Citing Sentence.

@@ -1,9 +1,10 @@
+from datetime import UTC, datetime
+
 import psycopg
-import pytest
 from psycopg.rows import TupleRow
 
 from paperexplorer.domain import Attachment, LibraryItem, WorkId
-from paperexplorer.store import DuplicateWorkError, Works
+from paperexplorer.store import Works
 
 Conn = psycopg.Connection[TupleRow]
 
@@ -76,13 +77,83 @@ def test_a_work_is_found_by_its_zotero_key_without_creating_one(store_db: Conn) 
     assert [w.id for w in works.list()] == [work]
 
 
-def test_a_doi_belongs_to_one_work(store_db: Conn) -> None:
-    works = Works(store_db)
-    works.record_library_item(works.ensure("VILL2024"), VILLIGER)
-    duplicate = works.ensure("VILLCOPY")
+def _record(works: Works, item: LibraryItem) -> WorkId:
+    work = works.ensure(item.key)
+    works.record_library_item(work, item)
+    return work
 
-    with pytest.raises(DuplicateWorkError, match="VILL2024"):
-        works.record_library_item(duplicate, VILLIGER.model_copy(update={"key": "VILLCOPY"}))
+
+def _copy(key: str, *, pdf: bool, added: int) -> LibraryItem:
+    return VILLIGER.model_copy(
+        update={
+            "key": key,
+            "pdf": Attachment(key=f"ATT{key}", filename="v.pdf") if pdf else None,
+            "added": datetime(added, 1, 1, tzinfo=UTC),
+        }
+    )
+
+
+def test_duplicate_items_each_get_a_work_and_the_one_with_a_pdf_stands(
+    store_db: Conn,
+) -> None:
+    works = Works(store_db)
+    _record(works, _copy("OLDNOPDF", pdf=False, added=2020))
+    with_pdf = _record(works, _copy("NEWWPDF1", pdf=True, added=2025))
+
+    assert works.standing_item("10.1080/09540261.2024.2357669") == with_pdf
+
+
+def test_when_both_or_neither_have_a_pdf_the_older_stands(store_db: Conn) -> None:
+    works = Works(store_db)
+    _record(works, _copy("NEWER111", pdf=True, added=2025))
+    older = _record(works, _copy("OLDER222", pdf=True, added=2020))
+
+    assert works.standing_item("10.1080/09540261.2024.2357669") == older
+
+
+def test_the_duplicate_item_the_reader_lets_stand_stands(store_db: Conn) -> None:
+    works = Works(store_db)
+    first = _record(works, _copy("WITHPDF1", pdf=True, added=2020))
+    let = _record(works, _copy("LETSTAND", pdf=False, added=2025))
+
+    works.let_stand(let)
+
+    assert works.standing_item("10.1080/09540261.2024.2357669") == let
+    works.let_stand(first)
+    assert works.standing_item("10.1080/09540261.2024.2357669") == first
+
+
+def test_duplicate_items_are_listed_per_doi_with_the_standing_item_first(store_db: Conn) -> None:
+    works = Works(store_db)
+    other = _record(works, _copy("OLDNOPDF", pdf=False, added=2020))
+    stands = _record(works, _copy("NEWWPDF1", pdf=True, added=2025))
+    _record(works, LibraryItem(key="SINGLE11", title="Alone", doi="10.1/alone"))
+
+    assert [[w.id for w in d] for d in works.duplicate_items()] == [[stands, other]]
+
+
+def test_a_doi_nobody_holds_has_no_standing_item(store_db: Conn) -> None:
+    assert Works(store_db).standing_item("10.1/nobody") is None
+
+
+def test_title_candidates_find_near_titles_and_titles_missing_their_subtitle(
+    store_db: Conn,
+) -> None:
+    works = Works(store_db)
+    full = _record(
+        works,
+        LibraryItem(
+            key="ATTN2017",
+            title="Attention Is All You Need: Transformers for Sequence Transduction",
+        ),
+    )
+    _record(works, LibraryItem(key="RESN2016", title="Deep residual learning for images"))
+
+    assert [w.id for w in works.title_candidates("Attention is all you need")] == [full]
+    assert [w.id for w in works.title_candidates("Atention is all you need: transformers")] == [
+        full
+    ]
+    assert works.title_candidates("Something nobody wrote about") == []
 
 
 def test_works_are_listed_in_the_order_they_were_first_seen(store_db: Conn) -> None:
@@ -90,3 +161,16 @@ def test_works_are_listed_in_the_order_they_were_first_seen(store_db: Conn) -> N
     first, second = works.ensure("FIRST"), works.ensure("SECOND")
 
     assert [w.id for w in works.list()] == [first, second]
+
+
+def test_a_library_doi_is_recorded_as_a_key_so_any_printed_form_finds_it(store_db: Conn) -> None:
+    works = Works(store_db)
+    url_form = _record(
+        works, LibraryItem(key="URLFORM1", title="T", doi="https://doi.org/10.5555/ABC.")
+    )
+    _record(works, LibraryItem(key="BAREFORM", title="T", doi="10.5555/abc"))
+
+    assert works.standing_item("10.5555/abc") == url_form
+    assert [[w.zotero_key for w in d] for d in works.duplicate_items()] == [
+        ["URLFORM1", "BAREFORM"]
+    ]

@@ -1,14 +1,14 @@
-"""The Seed's first Stages: fetch, parse, chunk and embed its text, link its Citations."""
+"""The Seed's Stages: fetch, parse, chunk and embed its text, link its Citations, resolve."""
 
 import logging
 from collections import Counter
 
-from paperexplorer import chunking, citations, parsing
+from paperexplorer import chunking, citations, parsing, resolution
 from paperexplorer.citations import ConfidenceLevel, confidence_level
 from paperexplorer.domain import ChunkFlag, WorkId
-from paperexplorer.library import ItemNotFoundError
+from paperexplorer.library import ItemNotFoundError, sync
 from paperexplorer.pipeline.stage import StageContext, StageError, StageResult
-from paperexplorer.store import Chunks, CitationGraphs, Works, WorkTexts
+from paperexplorer.store import Chunks, CitationGraphs, Resolutions, Works, WorkTexts
 
 logger = logging.getLogger(__name__)
 
@@ -92,3 +92,17 @@ def extract_citations(ctx: StageContext, work: WorkId) -> StageResult:
         counts={"citations": len(graph.citations)}
         | {lv.value: levels[lv] for lv in ConfidenceLevel}
     )
+
+
+def resolve(ctx: StageContext, work: WorkId) -> StageResult:
+    """Match every Reference of the parsed Work to a Work, from the Library synced just before.
+
+    No registry is asked (ADR 0011): what nothing local matches is an Unchecked Reference.
+    """
+    parsed = WorkTexts(ctx.conn).get(work)
+    if parsed is None:
+        raise StageError(f"Work {work} has no text yet; run parse first")
+    sync(ctx.conn, ctx.library)
+    found = resolution.resolve(ctx.conn, work, parsed.references)
+    Resolutions(ctx.conn).replace(work, found)
+    return StageResult(counts=resolution.counts(found))

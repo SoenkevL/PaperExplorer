@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{{ work.title or work.zotero_key }} · PaperExplorer{% endblock %}
-{% block scripts %}<script src="{{ url_for('static', path='conversation.js') }}" defer></script>{% endblock %}
+{% block scripts %}<script src="{{ static_url('conversation.js') }}" defer></script>{% endblock %}
 {% block trail %}<span class="sep">/</span><span class="here">{{ work.title or work.zotero_key }}</span>{% endblock %}
 {% block toggles %}
 <div class="segmented" role="group" aria-label="Panes">

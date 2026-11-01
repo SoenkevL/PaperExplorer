@@ -57,6 +57,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - Asking: `PROMPT_VERSION` hashes the agent's notes (`LAST_REQUEST`, `WHOLE_SEED`, `NO_TOOLS`) with the system prompt, so editing a note changes the version too. `PE_SUPPORT_THRESHOLD` stays 0.7, now set from the eval rather than provisional.
 
 ### Fixed
+- Web: every script and stylesheet URL carries a hash of the file's contents (`?v=…`), so a deploy that changes a file changes its URL and a browser never runs a cached old script beside a new page. A cached `conversation.js` from before the three-pane reader opened and shut the drawer at once and scrolled the window instead of the Work.
 - Asking: in a Seed that numbers no Reference, a bare `[13]`, `[13, 14]` or `[13–15]` in square brackets is read as a handle; the model wrote such numbers for `[#n]` in the live app and the Answer got no Pointer. In a numbered Seed `[12]` stays its marker, and parentheses stay text.
 - Asking: the model lost the Question behind the no-tools note in two live Answers of the eval of 2026-10-31 and answered another; the Question now comes last.
 - Eval: a tool name not shaped like a tool's is withheld from the committed summary; in the eval of 2026-10-31 a tool call whose name held a drafted Answer put Answer words in it.

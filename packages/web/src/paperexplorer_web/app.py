@@ -1,5 +1,6 @@
 """FastAPI + Jinja application factory for the web app."""
 
+import hashlib
 import logging
 from pathlib import Path
 from typing import Annotated
@@ -48,11 +49,20 @@ def _panel_url(work_id: int, citations: list[int]) -> str:
     return f"/works/{work_id}/panel?{urlencode([('c', c) for c in citations])}"
 
 
+def _static_url(path: str) -> str:
+    # The contents' hash in the URL: a deploy that changes a file changes its URL, so a browser
+    # never runs a cached old script beside a new page. Hashed on every render (a few files, a few
+    # hundred kB), so a dev server sees an edited file without a restart.
+    version = hashlib.sha256((_HERE / "static" / path).read_bytes()).hexdigest()[:12]
+    return f"/static/{path}?v={version}"
+
+
 def templates() -> Jinja2Templates:
     """The web app's Jinja templates (autoescaped), with the reader's helpers."""
     loaded = Jinja2Templates(directory=_HERE / "templates")
     loaded.env.globals["panel_url"] = _panel_url  # pyright: ignore[reportUnknownMemberType]
     loaded.env.globals["evidence"] = EVIDENCE  # pyright: ignore[reportUnknownMemberType]
+    loaded.env.globals["static_url"] = _static_url  # pyright: ignore[reportUnknownMemberType]
     return loaded
 
 

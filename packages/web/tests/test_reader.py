@@ -1,5 +1,6 @@
 """The reader over a mocked API whose JSON comes from the API's own schemas."""
 
+import hashlib
 import html
 import re
 
@@ -243,3 +244,19 @@ def test_the_citation_pane_hints_until_a_citation_is_opened_and_is_a_sheet_below
     assert re.search(r"@media \(max-width: 80rem\)", css)
     # The panel's content no longer closes the pane by emptying it; the pane's own button does.
     assert "replaceChildren" not in reader.get("/works/7/panel", params={"c": 11}).text
+
+
+def test_every_script_and_stylesheet_url_carries_its_contents_version() -> None:
+    # Seen after the three-pane reader: a cached old conversation.js shut the drawer it opened.
+    client = _reader()
+    page = client.get("/works/7").text
+
+    urls = re.findall(r'(?:src|href)="(?:https?://[^/"]+)?(/static/[^"]+)"', page)
+    names = {re.sub(r"\?.*", "", u).removeprefix("/static/") for u in urls}
+    assert names == {"style.css", "htmx.min.js", "sse.min.js", "panes.js", "conversation.js"}
+    for url in urls:
+        assert re.search(r"\?v=[0-9a-f]{12}$", url), url
+        assert client.get(url).status_code == 200
+    script = next(u for u in urls if "/panes.js" in u)
+    served = client.get(script).content
+    assert script.endswith(hashlib.sha256(served).hexdigest()[:12])

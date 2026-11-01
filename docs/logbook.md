@@ -156,3 +156,4 @@ Key decisions, newest last. Hard-to-reverse ones link to an ADR.
 - 2026-11-01 — Title levels: an exact normalized title (or main title before the colon, with surname and year) is `high`, a near title (≥ 0.9) `low`
 - 2026-11-01 — Registry responses are cached raw per DOI and per query in `registry_responses` (not `lookups`: CONTEXT.md avoids the word), committed as they land; misses retried after 30 days. Tests seed these rows instead of vcrpy cassettes
 - 2026-11-01 — `PE_OPENALEX_API_KEY` and `PE_CROSSREF_MAILTO` are optional; without them the limiters run at the keyless and public rates
+- 2026-11-01 — The eval's summary and Markdown are pure modules apart from the run (`summaries`, `rendering`); a measured turn keeps its path through the report (`QuestionRun.measured`) so `report.json` keeps its shape

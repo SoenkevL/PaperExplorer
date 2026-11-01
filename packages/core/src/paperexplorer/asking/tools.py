@@ -20,7 +20,14 @@ from paperexplorer.citations import confidence_level
 from paperexplorer.domain import Scope
 from paperexplorer.embedding import Embedder
 from paperexplorer.parsing import Reference
-from paperexplorer.store import Chunks, CitationGraphs, StoredChunk, StoredCitation, WorkTexts
+from paperexplorer.store import (
+    Chunks,
+    CitationGraphs,
+    ScoredChunk,
+    StoredChunk,
+    StoredCitation,
+    WorkTexts,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -110,11 +117,15 @@ class SeedTools:
 
     def search(self, query: str, k: int = 8) -> str:
         """The `k` Chunks of the Seed that best match `query`, best first."""
+        return self.ranked_search(query, k)[1]
+
+    def ranked_search(self, query: str, k: int = 8) -> tuple[list[ScoredChunk], str]:
+        """What `search` finds, best first, and what it shows of it."""
         k = max(1, min(k, SEARCH_K_MAX))
         found = retrieval.search(self._conn, self._embedder, query, Scope.of(self._work.id), k=k)
         if not found:
-            return f"Nothing in the Seed matches {query!r}."
-        return self._show(found)
+            return [], f"Nothing in the Seed matches {query!r}."
+        return found, self._show(found)
 
     def read_section(self, heading: str, part: int = 1) -> str:
         """The Chunks under one heading in reading order, about `SECTION_TOKENS` per part."""

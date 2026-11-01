@@ -14,7 +14,7 @@ from pydantic_ai.messages import ModelMessage
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from paperexplorer_api.client import ApiClient
-from paperexplorer_api.schemas import AnsweredEvent, DeltaEvent, StepEvent
+from paperexplorer_api.schemas import AnsweredEvent, DeltaEvent, StepEvent, TextPiece
 
 from .conftest import AppFactory, Stored
 
@@ -67,11 +67,11 @@ def test_events_arrive_while_the_turn_still_runs(make_app: AppFactory, villiger:
         events = client.ask(client.start_conversation(villiger.work).id, QUESTION)
 
         assert isinstance(next(events), StepEvent)
-        assert next(events) == DeltaEvent(text="The training ")
+        assert next(events) == DeltaEvent(pieces=[TextPiece(text="The training ")])
         model.go.set()
         rest = list(events)
 
-    assert rest[0] == DeltaEvent(text="was long.")
+    assert rest[0] == DeltaEvent(pieces=[TextPiece(text="was long.")])
     assert isinstance(rest[-1], AnsweredEvent)
     assert rest[-1].answer.text == "The training was long."
 

@@ -8,13 +8,13 @@ from pydantic_ai.messages import ModelMessage
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from typer.testing import CliRunner
 
-from paperexplorer import asking, chunking, store
+from paperexplorer import chunking, store
 from paperexplorer.cli import StageName, app
 from paperexplorer.config import Settings
-from paperexplorer.embedding import FakeEmbedder, OpenAICompatibleEmbedder
+from paperexplorer.embedding import FakeEmbedder
 from paperexplorer.parsing import Block, BlockKind, ParsedWork, Span, TextOrigin
 from paperexplorer.pipeline import STAGES
-from paperexplorer.tracing import Tracing
+from paperexplorer.wiring import Wiring
 
 
 @pytest.fixture
@@ -113,15 +113,27 @@ def embedded_seed(
             work, fake.model, {s.id: v for s, v in zip(stored, vectors, strict=True)}
         )
 
-    def from_settings(settings: Settings, tracing: Tracing) -> FakeEmbedder:
-        return FakeEmbedder(settings.embedding_model)
 
-    monkeypatch.setattr(OpenAICompatibleEmbedder, "from_settings", from_settings)
+def _wired(*responses: str) -> Callable[[Settings], Wiring]:
+    """The CLI's wiring: the fake Embedder, and a chat model answering each request with the
+    next of `responses`."""
+    queue = list(responses)
+
+    async def stream(messages: list[ModelMessage], info: AgentInfo) -> AsyncIterator[str]:
+        yield queue.pop(0)
+
+    return lambda settings: Wiring.from_settings(
+        settings,
+        embedder=FakeEmbedder(settings.embedding_model),
+        model=FunctionModel(stream_function=stream, model_name=settings.chat_model),
+    )
 
 
 @pytest.mark.usefixtures("embedded_seed")
 def test_search_lists_the_ranked_chunks_with_their_places_and_scores() -> None:
-    result = CliRunner().invoke(app, ["search", "YAAC9XCX", "How was entropy measured?"])
+    result = CliRunner().invoke(
+        app, ["search", "YAAC9XCX", "How was entropy measured?"], obj=_wired()
+    )
 
     assert result.exit_code == 0, result.output
     header, first, text, second, *rest = result.stdout.splitlines()
@@ -142,7 +154,9 @@ def test_search_lists_the_ranked_chunks_with_their_places_and_scores() -> None:
 
 @pytest.mark.usefixtures("embedded_seed")
 def test_search_without_text_prints_no_words_of_the_chunks() -> None:
-    result = CliRunner().invoke(app, ["search", "YAAC9XCX", "entropy", "-k", "1", "--no-text"])
+    result = CliRunner().invoke(
+        app, ["search", "YAAC9XCX", "entropy", "-k", "1", "--no-text"], obj=_wired()
+    )
 
     assert result.exit_code == 0, result.output
     assert len(result.stdout.splitlines()) == 2
@@ -158,24 +172,13 @@ def test_search_says_when_the_work_is_unknown_and_fails() -> None:
     assert "No Work NOSUCHKY" in result.output
 
 
-def _scripted(*responses: str) -> Callable[[Settings], FunctionModel]:
-    """A chat model that answers each request with the next of `responses`."""
-    queue = list(responses)
-
-    async def stream(messages: list[ModelMessage], info: AgentInfo) -> AsyncIterator[str]:
-        yield queue.pop(0)
-
-    return lambda settings: FunctionModel(stream_function=stream, model_name=settings.chat_model)
-
-
 @pytest.mark.usefixtures("embedded_seed")
-def test_ask_streams_the_draft_then_lists_the_answers_pointers_and_quotes(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_ask_streams_the_draft_then_lists_the_answers_pointers_and_quotes() -> None:
     draft = 'Sample entropy was measured "in every participant". [#1]'
-    monkeypatch.setattr(asking, "chat_model", _scripted(draft))
 
-    result = CliRunner().invoke(app, ["ask", "YAAC9XCX", "How was entropy measured?"])
+    result = CliRunner().invoke(
+        app, ["ask", "YAAC9XCX", "How was entropy measured?"], obj=_wired(draft)
+    )
 
     assert result.exit_code == 0, result.output
     lines = result.stdout.splitlines()
@@ -197,13 +200,12 @@ def test_ask_streams_the_draft_then_lists_the_answers_pointers_and_quotes(
 
 
 @pytest.mark.usefixtures("embedded_seed")
-def test_ask_says_when_the_model_writes_its_answer_again_with_handles(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_ask_says_when_the_model_writes_its_answer_again_with_handles() -> None:
     first = "Sample entropy was measured in every participant."
-    monkeypatch.setattr(asking, "chat_model", _scripted(first, f"{first} [#1]"))
 
-    result = CliRunner().invoke(app, ["ask", "YAAC9XCX", "How was entropy measured?"])
+    result = CliRunner().invoke(
+        app, ["ask", "YAAC9XCX", "How was entropy measured?"], obj=_wired(first, f"{first} [#1]")
+    )
 
     assert result.exit_code == 0, result.output
     lines = result.stdout.splitlines()
@@ -222,9 +224,12 @@ def test_ask_searches_a_seed_over_the_whole_seed_budget(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("PE_WHOLE_SEED_MAX_TOKENS", "1")
-    monkeypatch.setattr(asking, "chat_model", _scripted("Sample entropy was measured. [#1]"))
 
-    result = CliRunner().invoke(app, ["ask", "YAAC9XCX", "How was entropy measured?"])
+    result = CliRunner().invoke(
+        app,
+        ["ask", "YAAC9XCX", "How was entropy measured?"],
+        obj=_wired("Sample entropy was measured. [#1]"),
+    )
 
     assert result.exit_code == 0, result.output
     lines = result.stdout.splitlines()
@@ -234,10 +239,12 @@ def test_ask_searches_a_seed_over_the_whole_seed_budget(
 
 
 @pytest.mark.usefixtures("embedded_seed")
-def test_ask_marks_a_quote_that_is_not_the_authors_words(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(asking, "chat_model", _scripted('They "measured it twice". [#1]'))
-
-    result = CliRunner().invoke(app, ["ask", "YAAC9XCX", "How was entropy measured?"])
+def test_ask_marks_a_quote_that_is_not_the_authors_words() -> None:
+    result = CliRunner().invoke(
+        app,
+        ["ask", "YAAC9XCX", "How was entropy measured?"],
+        obj=_wired('They "measured it twice". [#1]'),
+    )
 
     assert result.exit_code == 0, result.output
     assert '  "measured it twice"  not exact' in result.stdout.splitlines()
@@ -279,11 +286,10 @@ def eval_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 @pytest.mark.usefixtures("embedded_seed")
 def test_eval_asks_every_question_live_and_by_retrieval_and_writes_the_run(
-    monkeypatch: pytest.MonkeyPatch, eval_files: Path
+    eval_files: Path,
 ) -> None:
     measured = "Sample entropy was measured in every participant. [#1]"
     uncovered = "The Seed does not say how caffeine affects sleep."
-    monkeypatch.setattr(asking, "chat_model", _scripted(measured, uncovered, measured, uncovered))
 
     result = CliRunner().invoke(
         app,
@@ -297,6 +303,7 @@ def test_eval_asks_every_question_live_and_by_retrieval_and_writes_the_run(
             "--run-id",
             "test-run",
         ],
+        obj=_wired(measured, uncovered, measured, uncovered),
     )
 
     assert result.exit_code == 0, result.output
@@ -317,10 +324,8 @@ def test_eval_asks_every_question_live_and_by_retrieval_and_writes_the_run(
 
 @pytest.mark.usefixtures("embedded_seed")
 def test_eval_without_retrieval_asks_only_as_the_reader_does(
-    monkeypatch: pytest.MonkeyPatch, eval_files: Path
+    eval_files: Path,
 ) -> None:
-    monkeypatch.setattr(asking, "chat_model", _scripted("Measured. [#1]"))
-
     result = CliRunner().invoke(
         app,
         [
@@ -334,6 +339,7 @@ def test_eval_without_retrieval_asks_only_as_the_reader_does(
             "--only",
             "method-entropy",
         ],
+        obj=_wired("Measured. [#1]"),
     )
 
     assert result.exit_code == 0, result.output
@@ -342,10 +348,9 @@ def test_eval_without_retrieval_asks_only_as_the_reader_does(
 
 @pytest.mark.usefixtures("embedded_seed")
 def test_eval_repeats_each_question_live_as_often_as_asked_and_retrieval_once(
-    monkeypatch: pytest.MonkeyPatch, eval_files: Path
+    eval_files: Path,
 ) -> None:
     measured = "Sample entropy was measured in every participant. [#1]"
-    monkeypatch.setattr(asking, "chat_model", _scripted(measured, measured, measured))
 
     result = CliRunner().invoke(
         app,
@@ -363,6 +368,7 @@ def test_eval_repeats_each_question_live_as_often_as_asked_and_retrieval_once(
             "--run-id",
             "test-run",
         ],
+        obj=_wired(measured, measured, measured),
     )
 
     assert result.exit_code == 0, result.output

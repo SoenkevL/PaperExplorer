@@ -23,11 +23,12 @@ from paperexplorer_api.schemas import (
     Answer,
     AnsweredEvent,
     DeltaEvent,
+    DraftPiece,
     ErrorEvent,
     RedraftEvent,
     StepEvent,
 )
-from paperexplorer_web.answers import Draft, DraftPiece, answer_runs
+from paperexplorer_web.answers import answer_runs
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +90,7 @@ class Views:
         return self._render("step", tool=event.tool, args=_arguments(event.args))
 
     def draft(self, pieces: Sequence[DraftPiece]) -> str:
-        """More draft text, its handles as placeholder chips."""
+        """More of the Draft: its text, and each handle as a placeholder chip."""
         return self._render("draft", pieces=pieces)
 
     def redraft(self, question_id: str) -> str:
@@ -117,10 +118,11 @@ def relay(
 ) -> Generator[str]:
     """The Question's events as server-sent events carrying HTML, ending in `answer` or `error`.
 
-    Events: `step`, `delta` (draft text to append), `redraft` (the draft is written again with
-    its handles: emptied, and a line says so), `conversation` (the Conversation was gone and a
-    new one took over), then `answer` or `error`, which replace the reply and so close the
-    page's EventSource. Closing this iterator closes the API's stream, cancelling the turn.
+    Events: `step`, `delta` (Draft pieces to append, handles as chips), `redraft` (the draft
+    is written again with its handles: emptied, and a line says so), `conversation` (the
+    Conversation was gone and a new one took over), then `answer` or `error`, which replace the
+    reply and so close the page's EventSource. Closing this iterator closes the API's stream,
+    cancelling the turn.
     """
     if question is None:
         yield sse("error", views.error(LOST))
@@ -158,18 +160,15 @@ def _relay(
         yield sse("error", views.error(STILL_ANSWERING))
         return
     steps: list[StepEvent] = []
-    draft = Draft()
     with closing(events):
         for event in chain(() if first is None else (first,), events):
             match event:
                 case StepEvent():
                     steps.append(event)
                     yield sse("step", views.step(event))
-                case DeltaEvent(text=text):
-                    if pieces := draft.add(text):
-                        yield sse("delta", views.draft(pieces))
+                case DeltaEvent(pieces=pieces):
+                    yield sse("delta", views.draft(pieces))
                 case RedraftEvent():
-                    draft = Draft()
                     yield sse("redraft", views.redraft(question_id))
                 case AnsweredEvent(answer=answer):
                     yield sse("answer", views.answer(answer, steps))

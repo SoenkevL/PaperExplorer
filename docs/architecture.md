@@ -24,7 +24,7 @@ Each row is one module with a small interface. Internals (caches, tokenizer, reg
 | `parsing` | `parse(pdf, settings) -> ParsedWork`: GROBID finds the structure, pdfium reads the printed text and PDF link targets, LiteParse OCR reads scans (ADR 0006) | GROBID (external service, output cached by PDF hash) + local libs | fixture PDFs + recorded GROBID output; one live GROBID check |
 | `citations` | `extract(doc: ParsedWork) -> CitationGraph`: Citation Links weighed from PDF link, GROBID and rules; Citing Sentences | in-process | parsed fixtures and hand-built `ParsedWork`s |
 | `chunking` | `chunk(doc: ParsedWork) -> list[Chunk]`: paragraphs and footnotes into Chunks of at most 400 bge-m3 tokens, split at sentence borders (`parsing.sentence_spans`); a Chunk's span and sentences are code-point offsets into its block's text | in-process (bge-m3 tokenizer internal, shipped xz-compressed in the package) | fixture `ParsedWork`s and hand-built blocks |
-| `resolution` | `resolve(ref: Reference) -> Resolution` | true external (Crossref, OpenAlex, arXiv, GROBID) | hand-written cases + regression cassettes (see Testing) |
+| `resolution` | `resolve(refs) -> list[Resolution]`, one per Reference, async inside: the Library and cached registry responses in the `resolve` Stage; Crossref and OpenAlex only in a Registry Check (ADR 0011, `design-resolution.md`) | true external (Crossref, OpenAlex) + store | pure matching cases + `registry_responses` rows + `httpx.MockTransport` (see Testing) |
 | `library` | port `Library`: `item(key)`, `pdf(attachment)` so far (later: find, ensure collection, create, tag, attach); `ZoteroLibrary` reads the Web API with httpx | true external (Zotero) | `InMemoryLibrary` adapter; Zotero adapter over hand-written Web API JSON |
 | `embedding` | port `Embedder`: `model` (its name, stored with each Vector) and `embed(texts) -> list[Vector]`, one per text in order; `OpenAICompatibleEmbedder` POSTs batches of `PE_EMBEDDING_BATCH_SIZE` to `<PE_EMBEDDING_BASE_URL>/embeddings`, each batch one embedding observation in the current trace; `FakeEmbedder` hashes a text's content words into 1024 dimensions, so texts that share words come out closer | true external (OpenAI-compatible) | `FakeEmbedder` adapter; the OpenAI-compatible one over `httpx.MockTransport`; one live bge-m3 check |
 | `store` | repositories per aggregate (`Works`, `WorkTexts`, `Chunks`, `CitationGraphs`, `StageStatuses`) + `migrate()`; `Works.find` a Work by Zotero key; `Chunks` reads a Work's Chunks in reading order, by id, `around` one (its neighbours) and `under` a Heading Path, records and reads their embeddings (`record_embeddings`, `embeddings`, `without_embedding` a model), and runs the hybrid query (`search`, see Retrieval) | Postgres + pgvector (local-substitutable) | real pgvector via testcontainers |
@@ -71,8 +71,9 @@ PaperExplorer/
 - `embed` embeds only the Work's Chunks without a Vector from the Embedder's model, so running it again embeds none, and a new model re-embeds them all. Re-chunking deletes the Vectors with their Chunks.
 
 ```
-Seed:    fetch → parse → chunk → embed → extract_citations → resolve → catalog
+Seed:    fetch → parse → chunk → embed → extract_citations → resolve (local) → catalog
 Sources: fetch_sources → for each Source: fetch → parse → chunk → embed
+On ask:  Registry Check (a Work or one Reference) → resolutions
 Then:    embed_citing_sentences → report
 ```
 
@@ -208,6 +209,6 @@ Fake what we don't own, run what we do.
 - **Chat model**: pydantic-ai's `FunctionModel` scripts tool calls and text; Pointer and Quote resolution is tested as a pure function over hand-built Chunks and Answers. A bad real Answer becomes a named regression test built from its recorded message history.
 - **Tracing**: an in-memory span exporter checks trace names, `session_id`, tags and nesting. Tracing is off in every other test.
 - **Web app**: its tests fake the API over `httpx.MockTransport` with JSON and event streams built from `paperexplorer_api.schemas`, and check the HTML (the Answer's marks parsed as XML). That closing the relay closes the API's stream is tested on `relay.relay` directly, since Starlette's `TestClient` reads a stream whole. The browser side (`conversation.js`: highlights by code point; `panes.js`: theme, panes, sheet and drawer, at each width) is checked by hand in a browser; `tests/e2e` runs a Question from the sidebar through the real API with a scripted model.
-- **External HTTP** (Crossref, OpenAlex, arXiv): `resolution` keeps the matching logic in a pure internal function tested with hand-written cases for the likely and the harmful scenarios (exact DOI, no DOI, wrong-year near-miss, preprint vs published, garbage string, empty result, 429/5xx). HTTP is never live in tests.
-- **Regression rule**: every real failure seen in use is recorded as a cassette (vcrpy) and kept as a named test before it is fixed.
+- **External HTTP** (Crossref, OpenAlex): `resolution` keeps the matching rules in pure functions tested with hand-written cases for the likely and the harmful scenarios (exact DOI, a neighbour's DOI, preprint vs published, alias DOI, missing subtitle, wrong-year near-miss, garbage string, empty result). Resolution tests seed `registry_responses` rows from recorded JSON; the HTTP clients run over `httpx.MockTransport` (batches, 429/5xx, spent budget). HTTP is never live in tests.
+- **Regression rule**: every real failure seen in use is kept as a named test with its recorded responses (`registry_responses` rows for resolution) before it is fixed.
 - `@pytest.mark.tower`: only tests needing Ollama, a real Zotero account or the GPU.

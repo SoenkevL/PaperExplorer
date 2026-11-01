@@ -16,6 +16,10 @@ _Avoid_: Duplicate, copy, variant
 The record of a Work in the Zotero library; the authoritative source of its metadata and attached PDF.
 _Avoid_: Zotero entry, record
 
+**Library**:
+The reader's Zotero library: every Library Item in it, whether or not an Exploration uses it.
+_Avoid_: Zotero, collection
+
 **Exploration**:
 The reading of one Seed together with the Works it cites, mirrored as one Zotero collection.
 _Avoid_: Project, session, collection (when meaning the domain concept)
@@ -56,8 +60,16 @@ _Avoid_: Bibliography entry, source (see above), citation
 The match of a Reference to a Work, with a confidence.
 _Avoid_: Lookup, linking
 
+**Registry Check**:
+The reader's request to look one or more References up in Crossref and OpenAlex. It spends their rate limits, so it runs only when the reader asks; matching against the Library never needs one.
+_Avoid_: Lookup, check (alone), query
+
+**Unchecked Reference**:
+A Reference that neither the Library nor an earlier Registry Check has matched to a Work, and that no Registry Check has looked up yet.
+_Avoid_: Pending reference, unknown reference
+
 **Unresolved Reference**:
-A Reference that could not be matched to any Work. It has no Library Item. Distinct from a resolved Work whose Text Availability is none.
+A Reference that a Registry Check could not match to any Work. It has no Library Item. Distinct from an Unchecked Reference, which no Registry Check has looked up yet, and from a resolved Work whose Text Availability is none.
 _Avoid_: Missing source, noSource
 
 **Citation**:

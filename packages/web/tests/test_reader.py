@@ -180,3 +180,66 @@ def test_the_index_lists_the_works() -> None:
 
     assert 'href="/works/7"' in page
     assert "Personal psychedelic experience" in page
+
+
+def test_the_fonts_are_served_by_the_web_app_itself() -> None:
+    reader = _reader()
+    css = reader.get("/static/style.css").text
+
+    faces = re.findall(r"@font-face\s*{[^}]*}", css)
+    files = re.findall(r'url\("?/static/fonts/([\w.-]+\.woff2)"?\)', " ".join(faces))
+    assert set(files) == {
+        "inter-latin-wght-normal.woff2",
+        "source-serif-4-latin-opsz-normal.woff2",
+        "source-serif-4-latin-opsz-italic.woff2",
+        "jetbrains-mono-latin-wght-normal.woff2",
+    }
+    for name in files:
+        font = reader.get(f"/static/fonts/{name}")
+        assert font.status_code == 200
+        assert font.content[:4] == b"wOF2"
+    assert "googleapis" not in css + reader.get("/works/7").text
+
+
+def test_every_page_sets_its_stored_theme_before_the_stylesheet_and_offers_a_toggle() -> None:
+    reader = _reader()
+
+    for url in ("/", "/works/7", "/works/999"):
+        page = reader.get(url).text
+        head = page.split("</head>")[0]
+        # The stored choice is applied before the stylesheet paints, so the page never flashes.
+        assert head.index("pe.theme") < head.index("style.css"), url
+        toggle = re.search(r'<button[^>]*class="theme-toggle"[^>]*>', page)
+        assert toggle, url
+        assert "aria-label=" in toggle[0]
+        assert "panes.js" in head
+
+
+def test_the_work_page_has_three_panes_and_a_toggle_for_each_side_pane() -> None:
+    page = _reader().get("/works/7").text
+
+    order = [m[1] for m in re.finditer(r'<(?:aside|main) id="([a-z-]+)"', page)]
+    assert order == ["conversation", "work", "citation"]
+    for pane in ("conversation", "citation"):
+        toggle = re.search(rf'<button[^>]*class="pane-toggle"[^>]*data-pane="{pane}"[^>]*>', page)
+        assert toggle, pane
+        assert f'aria-controls="{pane}"' in toggle[0]
+        assert 'aria-pressed="true"' in toggle[0]
+    assert "Graph" not in page
+
+
+def test_the_citation_pane_hints_until_a_citation_is_opened_and_is_a_sheet_below_80rem() -> None:
+    reader = _reader()
+    page = reader.get("/works/7").text
+    css = reader.get("/static/style.css").text
+
+    pane = re.search(r'<aside id="citation"[^>]*>(.*?)</aside>', page, re.S)
+    assert pane, "no Citation pane"
+    assert "Click a Citation" in pane[1]
+    assert '<div id="panel" class="panel" aria-live="polite"></div>' in pane[1]
+    handle = re.search(r'<button class="sheet-handle"[^>]*>', pane[1])
+    assert handle and "aria-label=" in handle[0]
+    assert re.search(r'<button class="sheet-toggle"[^>]*aria-controls="citation"', page)
+    assert re.search(r"@media \(max-width: 80rem\)", css)
+    # The panel's content no longer closes the pane by emptying it; the pane's own button does.
+    assert "replaceChildren" not in reader.get("/works/7/panel", params={"c": 11}).text

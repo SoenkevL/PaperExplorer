@@ -1,11 +1,11 @@
-{# The Conversation about this Work: a column left of the reader, a drawer below 92rem. #}
-<button class="drawer-toggle" type="button" aria-controls="conversation" aria-expanded="false">Questions</button>
-<aside id="conversation" class="conversation" aria-label="Questions about this Work">
-  <header>
-    <h2>Questions</h2>
-    <button class="drawer-close" type="button" aria-controls="conversation" aria-label="Close">×</button>
+{# The Conversation about this Work: the left pane from 64rem, a drawer below. #}
+<aside id="conversation" class="pane conversation" aria-label="Questions about this Work">
+  <header class="pane-head">
+    <h2>Conversation</h2>
+    <button class="pane-close" type="button" data-pane="conversation" aria-label="Close the Conversation pane">×</button>
   </header>
-  <div class="legend answer-legend">
+  <details class="key answer-legend">
+    <summary>Key</summary>
     <p>A model writes the Answers. A chip after a sentence leads to the place in the Work that bears it out:</p>
     <ul>
       <li><span class="pointer close">1</span> close: the place says what the sentence says</li>
@@ -16,11 +16,13 @@
       <li><span class="quote exact">exact</span>: the authors' words as printed; click to see them</li>
       <li><span class="quote not-exact">not exact</span>: not found as quoted; the model's words</li>
     </ul>
-  </div>
+  </details>
   <div id="turns" class="turns"></div>
   <form class="ask" hx-post="/works/{{ work.id }}/questions" hx-target="#turns" hx-swap="beforeend">
     <input type="hidden" id="conversation-id" name="conversation_id" value="">
-    <textarea name="text" rows="3" required aria-label="Your Question" placeholder="Ask a Question about this Work"></textarea>
-    <button type="submit">Ask</button>
+    <textarea name="text" rows="2" required aria-label="Your Question" placeholder="Ask a Question about this Work"></textarea>
+    <button type="submit" aria-label="Ask">
+      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+    </button>
   </form>
 </aside>

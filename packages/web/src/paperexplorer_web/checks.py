@@ -43,7 +43,6 @@ class PendingCheck(BaseModel):
     """A Check the Work page posted, waiting for its EventSource to start it."""
 
     work_id: int
-    refresh: bool = False
 
 
 def summary(counts: Mapping[str, int]) -> str:
@@ -76,7 +75,7 @@ def relay_check(
         return
     work_id = check.work_id
     try:
-        with closing(api.check(work_id, refresh=check.refresh)) as events:
+        with closing(api.check(work_id)) as events:
             for event in events:
                 match event:
                     case ReferenceCheckedEvent(resolution=resolution):

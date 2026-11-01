@@ -27,14 +27,12 @@
   {% endif %}
   {% if message %}<p class="failed">{{ message }}</p>{% endif %}
   <div class="actions">
-    {% if res and res.state == "unchecked" %}
+    {% if not res or res.state == "unchecked" %}
     <button type="button" hx-post="{{ url }}/check" hx-vals='{{ {"c": citation_id} | tojson }}' hx-target="{{ target }}" hx-swap="outerHTML" hx-disabled-elt="this">Check</button>
     {% elif res and not res.chosen and (res.state == "unresolved" or res.level == "low") %}
     <button type="button" hx-post="{{ url }}/check" hx-vals='{{ {"c": citation_id, "refresh": "true"} | tojson }}' hx-target="{{ target }}" hx-swap="outerHTML" hx-disabled-elt="this" title="Ask the registries again, past the cache">Check again</button>
     {% endif %}
-    {% if res %}
     <button type="button" hx-get="{{ url }}/candidates?c={{ citation_id }}" hx-target="#choices-{{ key }}" title="Pick the Work this Reference names yourself">Choose the Work…</button>
-    {% endif %}
     {% if res and res.chosen %}
     <button type="button" hx-delete="{{ url }}/choice?c={{ citation_id }}" hx-target="{{ target }}" hx-swap="outerHTML">Clear my choice</button>
     {% endif %}

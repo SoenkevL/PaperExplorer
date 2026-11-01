@@ -9,7 +9,8 @@
   {% if cost.budget_usd is none -%}
   at most ${{ usd(cost.openalex_usd) }} of OpenAlex's day; OpenAlex did not say what is left of its day.
   {%- else -%}
-  at most ${{ usd(cost.openalex_usd) }} of the ${{ usd(cost.budget_usd) }} left of OpenAlex's day.
+  at most ${{ usd(cost.openalex_usd) }} of the ${{ usd(cost.budget_usd) }} left of OpenAlex's day
+  {%- if cost.budget_usd > 0 %} ({{ "%.0f" | format(100 * cost.openalex_usd / cost.budget_usd) }}% of what is left){% endif %}.
   {%- if cost.budget_usd < cost.openalex_usd %} That is more than is left, so the Check may stop before it is done; what it lands is kept.{% endif %}
   {%- endif %}</p>
 <button type="button" hx-post="/works/{{ work_id }}/checks" hx-target="#check" hx-disabled-elt="this">Check {{ plural(cost.unchecked, "Unchecked Reference", "Unchecked References") }}</button>

@@ -146,8 +146,7 @@ def create_app(api: ApiClient) -> FastAPI:
             return duplicates_view(
                 request, duplicate_items(), f"Not let stand: {_why(e)}", failed=True
             )
-        context = {"groups": groups, "message": None}
-        return pages.TemplateResponse(request, "duplicates.html", context)
+        return duplicates_view(request, groups, f"{key} now stands for its DOI.", failed=False)
 
     @app.post("/duplicates/merge", response_class=HTMLResponse)
     def merge(  # pyright: ignore[reportUnusedFunction]
@@ -228,7 +227,8 @@ def create_app(api: ApiClient) -> FastAPI:
         try:
             checked = api.check_reference(work_id, key, refresh=refresh)
         except NotFoundError as e:
-            return resolution(request, work_id, key, c, as_it_stands(c), _unserved(e))
+            message = _unserved("Not checked", e)
+            return resolution(request, work_id, key, c, as_it_stands(c), message)
         except httpx.HTTPError as e:
             logger.warning("Check of Reference %s failed", key, exc_info=True)
             return resolution(request, work_id, key, c, as_it_stands(c), f"Not checked: {e}.")
@@ -246,7 +246,7 @@ def create_app(api: ApiClient) -> FastAPI:
         try:
             found = api.candidates(work_id, key)
         except NotFoundError as e:
-            message = _unserved(e)
+            message = _unserved("No candidates", e)
         except httpx.HTTPError as e:
             logger.warning("Candidates of Reference %s failed", key, exc_info=True)
             message = f"No candidates: {e}."
@@ -274,7 +274,7 @@ def create_app(api: ApiClient) -> FastAPI:
             case "work":
                 choice = ReadersChoice(work_id=work_id_)
             case "named" if named.strip():
-                choice = ReadersChoice(key=named)
+                choice = ReadersChoice(key=named.strip())
             case "named":
                 return resolution(
                     request, work_id, key, c, as_it_stands(c), "Name a Zotero key or a DOI."
@@ -386,10 +386,10 @@ def create_app(api: ApiClient) -> FastAPI:
     return app
 
 
-def _unserved(error: NotFoundError) -> str:
+def _unserved(outcome: str, error: NotFoundError) -> str:
     """What the reader hears when the API has no such route or thing (404)."""
     return (
-        f"Not checked: the API does not serve this ({error}); Checks, choices and Duplicate"
+        f"{outcome}: the API does not serve this ({error}); Checks, choices and Duplicate"
         " Items need Zotero's keys."
     )
 

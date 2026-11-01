@@ -418,3 +418,30 @@ def test_a_merge_the_api_refuses_says_why() -> None:
 
     assert "Not merged: SMIT2020 and TWIN2020 hold other DOIs" in after
     assert "TWIN2020" in after  # the items as they still stand
+
+
+def test_a_reference_not_yet_resolved_can_still_be_checked_or_chosen_for() -> None:
+    buttons = _buttons(_panel(None))
+
+    assert "Check" in buttons and "Choose the Work…" in buttons
+
+
+def test_the_candidates_say_when_the_api_serves_none() -> None:
+    web, _ = _web()
+
+    fragment = _text(web.get("/works/7/references/b42/candidates", params={"c": 11}).text)
+
+    assert "No candidates" in fragment and "Not checked" not in fragment
+
+
+def test_the_cost_gives_the_checks_share_of_what_is_left() -> None:
+    web, _ = _web({COST: _cost(budget=0.121)})
+
+    assert "10% of what is left" in _text(web.get("/works/7/check").text)
+
+
+def test_letting_an_item_stand_says_so() -> None:
+    turned = PAIR.model_copy(update={"items": [TWIN, STANDING]})
+    web, _ = _web({("PUT", "/duplicates/TWIN2020/stand"): _json([turned])})
+
+    assert "TWIN2020 now stands for its DOI" in _text(web.put("/duplicates/TWIN2020/stand").text)

@@ -4,7 +4,14 @@ import logging
 
 from paperexplorer.domain import WorkId
 from paperexplorer.pipeline.stage import Stage, StageContext, StageError, StageResult
-from paperexplorer.pipeline.stages import chunk, embed, extract_citations, fetch, parse
+from paperexplorer.pipeline.stages import (
+    chunk,
+    embed,
+    extract_citations,
+    fetch,
+    parse,
+    resolve,
+)
 from paperexplorer.store import StageStatuses
 
 __all__ = ["STAGES", "Stage", "StageContext", "StageError", "StageResult", "run_stage"]
@@ -18,6 +25,7 @@ STAGES: dict[str, Stage] = {
     "chunk": chunk,
     "embed": embed,
     "extract_citations": extract_citations,
+    "resolve": resolve,
 }
 
 

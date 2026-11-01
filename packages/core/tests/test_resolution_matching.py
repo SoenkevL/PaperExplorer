@@ -188,3 +188,12 @@ def test_without_a_title_the_doi_must_agree_with_surname_or_year() -> None:
 
     assert match(disagrees, [UNRELATED]) == DoiConflict(candidate=0)
     assert match(agrees, [UNRELATED]) == Match(candidate=0, level=Level.CERTAIN, evidence=["doi"])
+
+
+def test_a_title_matchs_confidence_is_the_titles_similarity() -> None:
+    ref = _ref(title="Attention is all you need: transformer for sequence transduction")
+
+    found = match(ref, [ATTENTION])
+
+    assert isinstance(found, Match)
+    assert 0.9 <= found.confidence < 1

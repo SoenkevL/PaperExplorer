@@ -157,3 +157,4 @@ Key decisions, newest last. Hard-to-reverse ones link to an ADR.
 - 2026-11-01 — Registry responses are cached raw per DOI and per query in `registry_responses` (not `lookups`: CONTEXT.md avoids the word), committed as they land; misses retried after 30 days. Tests seed these rows instead of vcrpy cassettes
 - 2026-11-01 — `PE_OPENALEX_API_KEY` and `PE_CROSSREF_MAILTO` are optional; without them the limiters run at the keyless and public rates
 - 2026-11-01 — A DOI hit must agree with the printed title (near or equal main title; else surname or year). A DOI Conflict lets the title decide, capped at `low`, the DOI's Work kept as the option; a Reader's Choice settles it and is never overwritten (chosen in the reader, PR 4)
+- 2026-11-01 — A Reader's Choice gets its own table (PR 4), keyed by the Work and the Reference's printed text: `resolutions` go with a re-parse, a choice must not

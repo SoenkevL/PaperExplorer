@@ -4,22 +4,14 @@ import difflib
 import re
 import unicodedata
 from collections.abc import Sequence
-from enum import StrEnum
 
 from pydantic import BaseModel
 
+from paperexplorer.domain import Level
 from paperexplorer.parsing import Reference
 
 # Until calibrated live on fixture References that print a DOI (design-resolution.md).
 NEAR_TITLE = 0.9
-
-
-class Level(StrEnum):
-    """How firmly a Resolution ties a Reference to its Work."""
-
-    CERTAIN = "certain"  # the printed DOI
-    HIGH = "high"
-    LOW = "low"
 
 
 class Candidate(BaseModel):
@@ -37,6 +29,7 @@ class Match(BaseModel):
     candidate: int
     level: Level
     evidence: list[str]
+    confidence: float = 1.0  # the titles' similarity for a title match
     doi_conflict: int | None = None  # the candidate the printed DOI names, when it disagreed
 
 
@@ -100,6 +93,7 @@ def match(ref: Reference, candidates: Sequence[Candidate]) -> Match | DoiConflic
         candidate=found.candidate,
         level=Level.LOW,
         evidence=[*found.evidence, "doi_conflict"],
+        confidence=found.confidence,
         doi_conflict=conflict,
     )
 
@@ -141,11 +135,17 @@ def _title_match(ref: Reference, title: str, c: Candidate, i: int) -> tuple[floa
         if agrees
     ]
     if ours == theirs and agreed:
-        return similarity, Match(candidate=i, level=Level.HIGH, evidence=["title", *agreed])
+        return similarity, Match(
+            candidate=i, level=Level.HIGH, evidence=["title", *agreed], confidence=similarity
+        )
     if len(agreed) == 2 and _main(title) and _main(title) == _main(c.title):
-        return similarity, Match(candidate=i, level=Level.HIGH, evidence=["main_title", *agreed])
+        return similarity, Match(
+            candidate=i, level=Level.HIGH, evidence=["main_title", *agreed], confidence=similarity
+        )
     if similarity >= NEAR_TITLE:
-        return similarity, Match(candidate=i, level=Level.LOW, evidence=["near_title"])
+        return similarity, Match(
+            candidate=i, level=Level.LOW, evidence=["near_title"], confidence=similarity
+        )
     return None
 
 

@@ -97,6 +97,7 @@ class StageName(StrEnum):
     CHUNK = "chunk"
     EMBED = "embed"
     EXTRACT_CITATIONS = "extract_citations"
+    RESOLVE = "resolve"
 
 
 @app.command("run")

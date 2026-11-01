@@ -56,7 +56,8 @@ A Registry Check (ADR 0011) looks References up in Crossref and OpenAlex. It run
 
 ## Store
 - `registry_responses`: one row per source and key (`crossref:doi`, `openalex:doi`, `openalex:title`, `crossref:bibliographic`) with the raw JSON (a batch split per DOI), hit or miss, and `fetched_at`. Keys are normalized DOIs (lowercase; `https://doi.org/`, `doi:` and trailing `.` or `,` stripped; `//` kept) or normalized query strings. Rows commit as they land, on their own connection. Misses are retried after 30 days; hits stay until `--refresh`.
-- `resolutions`: one row per Reference: resolved, Unchecked or Unresolved, with confidence, level (`certain`, `high`, `low`), evidence, the layer that matched, the DOI's Work on a DOI Conflict, and whether it is a Reader's Choice, which no resolve or Check (`--refresh` included) overwrites.
+- `resolutions`: one row per Reference: resolved, Unchecked or Unresolved, with confidence, level (`certain`, `high`, `low`), evidence, the layer that matched, and the DOI's Work on a DOI Conflict. A re-parse replaces a Work's References, and their Resolutions go with them.
+- `readers_choices` (PR 4): one row per Reader's Choice, keyed by the Work and the Reference's printed text rather than its row, so a re-parse that prints the Reference the same keeps it. No resolve or Check (`--refresh` included) overwrites one; it wins over the Resolution until the reader clears it.
 - A Work found by a Registry Check gets a `works` row with its DOI, OpenAlex ID and the registry's title, creators and year until `catalog` gives it a Library Item; a null `synced_at` marks metadata not yet from Zotero.
 - The index page and `GET /works` list only Works with a Stage run; Library-only Works appear through Resolutions.
 - `resolution`'s interface is `resolve(refs) -> list[Resolution]`, one per Reference, async inside; callers run it through `asyncio.run`.

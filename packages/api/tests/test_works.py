@@ -28,7 +28,7 @@ def test_works_are_listed_with_their_metadata_and_stages(api: TestClient, villig
     assert work["text_origin"] == "printed"
     assert work["stages"] == {
         "fetch": "done", "parse": "done", "chunk": "done", "embed": "done",
-        "extract_citations": "done",
+        "extract_citations": "done", "resolve": "pending",
     }  # fmt: skip
 
 
@@ -40,7 +40,7 @@ def test_a_stage_that_never_ran_is_pending(api: TestClient, store_db: Conn) -> N
 
     assert work["stages"] == {
         "fetch": "running", "parse": "pending", "chunk": "pending", "embed": "pending",
-        "extract_citations": "pending",
+        "extract_citations": "pending", "resolve": "pending",
     }  # fmt: skip
     assert work["text_origin"] is None
 

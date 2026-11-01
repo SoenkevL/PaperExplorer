@@ -127,11 +127,13 @@ class Works:
     def remove_library_item(self, zotero_key: str) -> bool:
         """Forget a Library Item that left the Library; True if its Work went with it.
 
-        A Work something uses (a Stage run) stays, without a Library Item or its PDF.
+        A Work something uses (a Stage run, a Resolution) stays, without a Library Item or PDF.
         """
         gone = self._conn.execute(
             "DELETE FROM works w WHERE zotero_key = %s"
-            " AND NOT EXISTS (SELECT 1 FROM stage_status s WHERE s.work_id = w.id)",
+            " AND NOT EXISTS (SELECT 1 FROM stage_status s WHERE s.work_id = w.id)"
+            " AND NOT EXISTS (SELECT 1 FROM resolutions r"
+            " WHERE w.id IN (r.resolved_work_id, r.doi_conflict_work_id))",
             (zotero_key,),
         ).rowcount
         if not gone:

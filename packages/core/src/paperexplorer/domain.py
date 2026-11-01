@@ -1,4 +1,4 @@
-"""Domain records shared across modules: Works, Library Items, Chunks, Scopes, Answers, ids."""
+"""Domain records shared across modules: Works, Library Items, Resolutions, Chunks, Answers."""
 
 from datetime import datetime
 from enum import StrEnum
@@ -61,6 +61,52 @@ class Work(BaseModel):
     pdf: Attachment | None
     synced_at: datetime | None
     text_origin: TextOrigin | None
+
+
+class Level(StrEnum):
+    """How firmly a Resolution ties a Reference to its Work."""
+
+    CERTAIN = "certain"  # the printed DOI, agreeing with the Reference
+    HIGH = "high"
+    LOW = "low"  # a near title, or a title that won a DOI Conflict
+
+
+class ResolutionState(StrEnum):
+    """Where a Reference stands: matched to a Work, not yet looked up, or looked up in vain."""
+
+    RESOLVED = "resolved"
+    UNCHECKED = "unchecked"  # an Unchecked Reference
+    UNRESOLVED = "unresolved"  # an Unresolved Reference: only a Registry Check makes one
+
+
+class Layer(StrEnum):
+    """What matched a Reference to its Work."""
+
+    LIBRARY = "library"
+
+
+class Resolution(BaseModel):
+    """A Reference of a Work, by its key, matched to a Work or not, and how firmly.
+
+    `confidence` is 1 for a DOI that agrees, else the titles' similarity. `doi_conflict` is the
+    Work the printed DOI names when it disagreed with the Reference (a DOI Conflict).
+    """
+
+    reference: str
+    state: ResolutionState
+    work: WorkId | None = None
+    level: Level | None = None
+    confidence: float | None = None
+    evidence: list[str] = []
+    layer: Layer | None = None
+    doi_conflict: WorkId | None = None
+
+    @model_validator(mode="after")
+    def _resolved_has_its_work(self) -> Self:
+        resolved = self.state is ResolutionState.RESOLVED
+        if resolved != (self.work is not None and self.level is not None):
+            raise ValueError("a resolved Reference needs its Work and level; no other has one")
+        return self
 
 
 class ChunkFlag(StrEnum):

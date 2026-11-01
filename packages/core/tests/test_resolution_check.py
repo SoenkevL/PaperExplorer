@@ -552,3 +552,18 @@ def test_the_budget_left_today_comes_from_a_free_openalex_record(
     assert asyncio.run(ask()) == pytest.approx(0.042)  # pyright: ignore[reportUnknownMemberType]
     [request] = registry.requests
     assert request.url.path.startswith("/works/W")
+
+
+def test_refresh_asks_again_for_a_reference_the_cache_resolved_certain(
+    store_db: Conn, registry: Registry, registries: Registries
+) -> None:
+    registry.crossref["10.1109/cvpr.2016.90"] = RESNET
+    refs = [_ref("b0", doi="10.1109/CVPR.2016.90", title=RESNET["title"][0], surnames=["He"])]
+    seed = _seed(store_db, refs)
+    _check(store_db, seed, refs, registries)
+    asked = len(registry.sent("api.crossref.org"))
+
+    events = _check(store_db, seed, refs, registries, refresh=True)
+
+    assert len(registry.sent("api.crossref.org")) == asked + 1
+    assert _checked(events)["b0"].layer is Layer.CROSSREF

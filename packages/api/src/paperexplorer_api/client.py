@@ -9,15 +9,27 @@ from pydantic import TypeAdapter
 
 from paperexplorer_api.schemas import (
     AnswerEvent,
+    CheckCost,
+    CheckedReference,
+    CheckEvent,
     CitationDetail,
     Conversation,
+    DuplicateItems,
     Health,
+    Merge,
+    Merged,
+    ReadersChoice,
+    Resolution,
+    WorkBrief,
     WorkSummary,
     WorkText,
 )
 
 _WORK_SUMMARIES = TypeAdapter(list[WorkSummary])
 _ANSWER_EVENT: TypeAdapter[AnswerEvent] = TypeAdapter(AnswerEvent)
+_CHECK_EVENT: TypeAdapter[CheckEvent] = TypeAdapter(CheckEvent)
+_WORK_BRIEFS = TypeAdapter(list[WorkBrief])
+_DUPLICATES = TypeAdapter(list[DuplicateItems])
 # A turn's stream may sit idle while the model thinks; the API sends a keep-alive comment every
 # 15 s, so only a minute without a byte means it is gone.
 STREAM_TIMEOUT_S = 60.0
@@ -50,6 +62,10 @@ class HttpClient(Protocol):
 
     def post(self, url: str, *, json: Any = None) -> _Response:
         """POST `json` to `url`."""
+        ...
+
+    def request(self, method: str, url: str, *, json: Any = None) -> _Response:
+        """Send a request with any method, PUT and DELETE among them."""
         ...
 
     def stream(
@@ -115,10 +131,66 @@ class ApiClient:
             if response.status_code >= 400:
                 response.read()
             _check(response, path)
-            yield from _events(response.iter_lines())
+            yield from _events(response.iter_lines(), _ANSWER_EVENT)
+
+    def check_cost(self, work_id: int) -> CheckCost:
+        """What a Registry Check of the Work would ask, and what is left of OpenAlex's day."""
+        return CheckCost.model_validate(self._get(f"/works/{work_id}/checks/cost"))
+
+    def check(self, work_id: int, *, refresh: bool = False) -> Generator[CheckEvent]:
+        """Check the Work's References: each one's Resolution as it lands, then how it ended.
+
+        The request goes out when iteration starts; closing the iterator early closes the stream.
+        """
+        path = f"/works/{work_id}/checks"
+        with self._http.stream(
+            "POST", path, json={"refresh": refresh}, timeout=STREAM_TIMEOUT_S
+        ) as response:
+            if response.status_code >= 400:
+                response.read()
+            _check(response, path)
+            yield from _events(response.iter_lines(), _CHECK_EVENT)
+
+    def check_reference(self, work_id: int, key: str, *, refresh: bool = False) -> CheckedReference:
+        """Check one Reference; `refresh` asks the registries again, past the cache."""
+        path = f"/works/{work_id}/references/{key}/checks"
+        return CheckedReference.model_validate(self._send("POST", path, {"refresh": refresh}))
+
+    def candidates(self, work_id: int, key: str) -> list[WorkBrief]:
+        """The Works a reader might choose for a Reference, likeliest first."""
+        return _WORK_BRIEFS.validate_python(
+            self._get(f"/works/{work_id}/references/{key}/candidates")
+        )
+
+    def choose(self, work_id: int, key: str, choice: ReadersChoice) -> Resolution:
+        """Set the Reader's Choice for a Reference: its Resolution as it now stands."""
+        path = f"/works/{work_id}/references/{key}/choice"
+        return Resolution.model_validate(self._send("PUT", path, choice.model_dump()))
+
+    def clear_choice(self, work_id: int, key: str) -> Resolution:
+        """Clear the Reader's Choice for a Reference: its Resolution resolved again."""
+        path = f"/works/{work_id}/references/{key}/choice"
+        return Resolution.model_validate(self._send("DELETE", path))
+
+    def duplicates(self) -> list[DuplicateItems]:
+        """Each Work's Duplicate Items, its Standing Item first."""
+        return _DUPLICATES.validate_python(self._get("/duplicates"))
+
+    def let_stand(self, zotero_key: str) -> list[DuplicateItems]:
+        """Let this Duplicate Item stand for its DOI; the Duplicate Items as they now stand."""
+        return _DUPLICATES.validate_python(self._send("PUT", f"/duplicates/{zotero_key}/stand"))
+
+    def merge(self, merge: Merge) -> Merged:
+        """Merge one Duplicate Item into another in Zotero; the other goes to the trash."""
+        return Merged.model_validate(self._send("POST", "/duplicates/merge", merge.model_dump()))
 
     def _get(self, path: str) -> Any:
         response = self._http.get(path)
+        _check(response, path)
+        return response.json()
+
+    def _send(self, method: str, path: str, json: Any = None) -> Any:
+        response = self._http.request(method, path, json=json)
         _check(response, path)
         return response.json()
 
@@ -132,8 +204,8 @@ def _check(response: _Response, path: str) -> None:
     response.raise_for_status()
 
 
-def _events(lines: Iterable[str]) -> Iterator[AnswerEvent]:
-    """The `AnswerEvent` in each server-sent event's data; comments (keep-alives) are skipped.
+def _events[E](lines: Iterable[str], adapter: TypeAdapter[E]) -> Iterator[E]:
+    """The event in each server-sent event's data; comments (keep-alives) are skipped.
 
     The event's name repeats its data's `type`, so the data alone is read.
     """
@@ -141,7 +213,7 @@ def _events(lines: Iterable[str]) -> Iterator[AnswerEvent]:
     for line in lines:
         if not line:
             if data:
-                yield _ANSWER_EVENT.validate_json("\n".join(data))
+                yield adapter.validate_json("\n".join(data))
             data = []
             continue
         field, _, value = line.partition(":")

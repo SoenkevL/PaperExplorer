@@ -22,7 +22,7 @@ from paperexplorer.parsing import Reference
 from paperexplorer.resolution.layers import from_registries
 from paperexplorer.resolution.matching import Candidate, DoiConflict, match
 from paperexplorer.resolution.verification import unregistered
-from paperexplorer.store import ReadersChoices, RegistryResponses, Works
+from paperexplorer.store import ReadersChoices, RegistryResponses, Resolutions, Works
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +61,26 @@ def resolve(
         if r.level is Level.LOW:
             logger.warning("Reference %s resolved at low confidence: %s", r.reference, r.evidence)
     return resolutions
+
+
+def candidates(conn: psycopg.Connection[TupleRow], citing: WorkId, ref: Reference) -> list[Work]:
+    """The Works a reader might choose for a Reference, likeliest first; no registry is asked.
+
+    Its Resolution's Work and DOI Conflict, the Work standing for its printed DOI, then the
+    Works with a near title, a Check's among them.
+    """
+    works = Works(conn)
+    saved = {r.reference: r for r in Resolutions(conn).for_work(citing)}.get(ref.id)
+    ids = [saved.work, saved.doi_conflict] if saved else []
+    ids.append(works.standing_item(normalize_doi(ref.doi)) if ref.doi else None)
+    pool: dict[WorkId, Work] = {}
+    for work in [works.get(i) for i in ids if i is not None]:
+        if work is not None:
+            pool.setdefault(work.id, work)
+    for work in works.title_candidates(ref.title) if ref.title else []:
+        pool.setdefault(work.id, work)
+    pool.pop(citing, None)
+    return list(pool.values())
 
 
 def as_resolved(

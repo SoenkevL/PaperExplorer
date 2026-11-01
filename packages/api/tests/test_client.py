@@ -126,6 +126,9 @@ class CannedHttp:
     def post(self, url: str, *, json: Any = None) -> Canned:
         raise AssertionError("not used")
 
+    def request(self, method: str, url: str, *, json: Any = None) -> Canned:
+        raise AssertionError("not used")
+
     @contextmanager
     def stream(self, method: str, url: str, *, json: Any, timeout: float) -> Iterator[Canned]:
         try:

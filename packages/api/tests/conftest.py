@@ -29,7 +29,7 @@ from paperexplorer.parsing import ParsedWork
 from paperexplorer.store import Chunks, CitationGraphs, StageStatuses, Works, WorkTexts
 from paperexplorer.tracing import Tracing
 from paperexplorer.wiring import Wiring
-from paperexplorer_api.app import Asking, create_app
+from paperexplorer_api.app import Asking, Checking, create_app
 from paperexplorer_api.conversations import Conversations
 
 Conn = psycopg.Connection[TupleRow]
@@ -109,6 +109,7 @@ class AppFactory(Protocol):
         embedder: Embedder | None = None,
         conversations: Conversations | None = None,
         reading: Reading = Reading.RETRIEVAL,
+        checking: Checking | None = None,
     ) -> FastAPI: ...
 
 
@@ -126,6 +127,7 @@ def make_app(store_db: Conn) -> AppFactory:
         embedder: Embedder | None = None,
         conversations: Conversations | None = None,
         reading: Reading = Reading.RETRIEVAL,
+        checking: Checking | None = None,
     ) -> FastAPI:
         settings = Settings(_env_file=None)  # pyright: ignore[reportCallIssue]
         wiring = Wiring.from_settings(
@@ -137,6 +139,7 @@ def make_app(store_db: Conn) -> AppFactory:
                 contexts=lambda conn: wiring.asking(conn, reading=reading),
                 conversations=conversations or Conversations.from_settings(settings),
             ),
+            checking,
         )
 
     return build

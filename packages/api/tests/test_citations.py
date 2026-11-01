@@ -6,10 +6,10 @@ from fastapi.testclient import TestClient
 from psycopg.rows import TupleRow
 
 from paperexplorer.citations import extract
-from paperexplorer.domain import LibraryItem
+from paperexplorer.domain import LibraryItem, Resolution, ResolutionState
 from paperexplorer.parsing import ParsedWork
 from paperexplorer.resolution import InMemoryDoiRegistry, verify
-from paperexplorer.store import CitationGraphs, Works, WorkTexts
+from paperexplorer.store import CitationGraphs, Resolutions, Works, WorkTexts
 
 from .conftest import Stored
 
@@ -55,6 +55,7 @@ def test_a_citation_gives_its_reference_and_the_link_to_it(
         "title": reference.title,
         "doi": reference.doi,
         "doi_registration": None,
+        "resolution": None,
     }
 
 
@@ -107,3 +108,24 @@ def test_a_citation_in_ocr_text_says_so(
     first = _citations(api, scan.work)[0]
 
     assert api.get(f"/citations/{first['id']}").json()["text_origin"] == "ocr"
+
+
+def test_a_citations_reference_carries_its_resolution(
+    api: TestClient, villiger: Stored, store_db: Conn
+) -> None:
+    span = next(c for c in _citations(api, villiger.work) if c["confidence_level"] == "certain")
+    before = api.get(f"/citations/{span['id']}").json()["reference"]
+    Resolutions(store_db).save(
+        villiger.work,
+        Resolution(
+            reference=before["key"], state=ResolutionState.UNRESOLVED, doi_conflict=villiger.work
+        ),
+    )
+
+    after = api.get(f"/citations/{span['id']}").json()["reference"]["resolution"]
+
+    assert before["resolution"] is None
+    conflict = after["doi_conflict"]["zotero_key"]
+    assert (after["state"], after["work"], conflict, after["chosen"]) == (
+        "unresolved", None, "VILL2024", False,
+    )  # fmt: skip

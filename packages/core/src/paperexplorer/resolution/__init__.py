@@ -11,7 +11,7 @@ from paperexplorer.resolution.check import (
     registry_check,
 )
 from paperexplorer.resolution.doi_org import DoiOrgRegistry
-from paperexplorer.resolution.local import counts, resolve
+from paperexplorer.resolution.local import candidates, counts, resolve
 from paperexplorer.resolution.matching import (
     Candidate,
     DoiConflict,
@@ -47,6 +47,7 @@ __all__ = [
     "RegistryCheckFinished",
     "RegistryError",
     "agrees",
+    "candidates",
     "counts",
     "estimate",
     "match",

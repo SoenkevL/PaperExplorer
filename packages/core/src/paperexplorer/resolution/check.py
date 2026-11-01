@@ -15,7 +15,7 @@ import psycopg
 from psycopg.rows import TupleRow
 from pydantic import BaseModel, JsonValue
 
-from paperexplorer.domain import RegistrySource, Resolution, ResolutionState, WorkId
+from paperexplorer.domain import Layer, RegistrySource, Resolution, ResolutionState, WorkId
 from paperexplorer.parsing import Reference
 from paperexplorer.resolution.layers import (
     bibliographic_key,
@@ -123,10 +123,10 @@ async def registry_check(
 ) -> AsyncIterator[RegistryCheckEvent]:
     """Check these References of `citing`, yielding each one's Resolution as it lands.
 
-    The caller syncs the Library first. A Reference the Library matches at certain or high is
-    done without a registry call; `refresh` asks the registries again for the rest, past the
-    cache. Rows are written on `conn` as they land: an autocommit connection keeps them when the
-    Check stops partway, on a spent budget or a `RegistryError`.
+    The caller syncs the Library first. A Reference the Library matches at certain or high, or
+    the reader chose for, is done without a registry call; `refresh` asks the registries again
+    for the rest, past the cache. Rows are written on `conn` as they land: an autocommit
+    connection keeps them when the Check stops partway, on a spent budget or a `RegistryError`.
     """
     cache, saved = RegistryResponses(conn), Resolutions(conn)
     pending = {ref.id: ref for ref, _ in as_resolved(conn, refs)}
@@ -180,7 +180,9 @@ async def registry_check(
                 group.create_task(one(batch))
 
     async with registries:
-        for event in settle(lambda r: r.firm):
+        # On refresh only the Library and the reader settle a Reference before the registries.
+        local = (Layer.LIBRARY, Layer.READER)
+        for event in settle(lambda r: r.firm and (not refresh or r.layer in local)):
             yield event
         try:
             dois = [doi_key(r) for r in pending.values()]

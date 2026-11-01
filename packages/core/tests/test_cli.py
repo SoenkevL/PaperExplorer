@@ -446,19 +446,21 @@ def test_sync_makes_every_library_item_a_work(
     assert set(_works(scratch_database_url)) == {"SEED1111", "ATTN2017", "ATTNCOPY", "NEWW2026"}
 
 
-def test_duplicates_lists_each_doi_with_the_one_that_stands_first(library: InMemoryLibrary) -> None:
+def test_duplicates_lists_each_works_duplicate_items_standing_item_first(
+    library: InMemoryLibrary,
+) -> None:
     CliRunner().invoke(app, ["sync"])
 
     listed = CliRunner().invoke(app, ["duplicates"])
-    CliRunner().invoke(app, ["duplicates", "--use", "ATTN2017"])
-    chosen = CliRunner().invoke(app, ["duplicates"])
+    CliRunner().invoke(app, ["duplicates", "--stand", "ATTN2017"])
+    let = CliRunner().invoke(app, ["duplicates"])
 
     assert listed.exit_code == 0, listed.output
     doi, first, second = listed.stdout.splitlines()[:3]
     assert "10.5555/attention" in doi
     assert first.split()[:2] == ["*", "ATTNCOPY"]  # the one with a PDF stands
     assert second.split()[0] == "ATTN2017"
-    assert chosen.stdout.splitlines()[1].split()[:2] == ["*", "ATTN2017"]
+    assert let.stdout.splitlines()[1].split()[:2] == ["*", "ATTN2017"]
 
 
 def _resolved_seed(url: str) -> None:

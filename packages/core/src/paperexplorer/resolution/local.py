@@ -28,7 +28,7 @@ def resolve(
     """One Resolution per Reference of `citing`, from the Library Items the store holds.
 
     Candidates are the Work that stands for the printed DOI and the Works whose title is near
-    the printed one; a match to one of two Works holding a DOI goes to the one that stands.
+    the printed one; a match to a Duplicate Item goes to its Standing Item.
     """
     works = Works(conn)
     return [_resolve_one(works, citing, ref) for ref in refs]
@@ -36,7 +36,7 @@ def resolve(
 
 def _resolve_one(works: Works, citing: WorkId, ref: Reference) -> Resolution:
     pool: dict[WorkId, Work] = {}
-    stands = works.stand_in(normalize_doi(ref.doi)) if ref.doi else None
+    stands = works.standing_item(normalize_doi(ref.doi)) if ref.doi else None
     if stands is not None and (work := works.get(stands)) is not None:
         pool[work.id] = work
     for work in works.title_candidates(ref.title) if ref.title else []:
@@ -69,8 +69,8 @@ def _resolve_one(works: Works, citing: WorkId, ref: Reference) -> Resolution:
 
 
 def _standing(works: Works, work: Work) -> WorkId:
-    """The Work that stands for this one's DOI, or this one."""
-    return (works.stand_in(work.doi) if work.doi else None) or work.id
+    """The Work of the Standing Item for this one's DOI, or this one."""
+    return (works.standing_item(work.doi) if work.doi else None) or work.id
 
 
 def _candidate(work: Work) -> Candidate:

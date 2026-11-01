@@ -10,7 +10,7 @@ _Avoid_: Paper, article, document, publication
 
 **Version**:
 A Work that is another edition of the same study as some other Work, e.g. a preprint and its published article. Versions are distinct Works; when a Reference could mean either, the published Version is preferred.
-_Avoid_: Duplicate, copy, variant
+_Avoid_: Duplicate (see Duplicate Items), copy, variant
 
 **Library Item**:
 The record of a Work in the Zotero library; the authoritative source of its metadata and attached PDF.
@@ -19,6 +19,14 @@ _Avoid_: Zotero entry, record
 **Library**:
 The reader's Zotero library: every Library Item in it, whether or not an Exploration uses it.
 _Avoid_: Zotero, collection
+
+**Duplicate Items**:
+Two or more Library Items that hold one DOI: one Work recorded twice in the Library. One of them is its Standing Item; merging them in Zotero leaves one. Not Versions, which are distinct Works.
+_Avoid_: Duplicate Work, copy, twin
+
+**Standing Item**:
+The one of a Work's Duplicate Items that stands for its DOI, the one its Resolutions name: the one the reader let stand, else the one with a PDF, else the oldest.
+_Avoid_: Stand-in, primary, master, chosen item
 
 **Exploration**:
 The reading of one Seed together with the Works it cites, mirrored as one Zotero collection.

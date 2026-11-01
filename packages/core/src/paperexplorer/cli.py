@@ -190,8 +190,9 @@ def _key(work: Work | None) -> str:
 
 @app.command("duplicates")
 def duplicates_command(
-    use: Annotated[
-        str | None, typer.Option("--use", metavar="KEY", help="Let this item stand for its DOI.")
+    stand: Annotated[
+        str | None,
+        typer.Option("--stand", metavar="KEY", help="Let this Duplicate Item stand for its DOI."),
     ] = None,
     merge: Annotated[
         tuple[str, str] | None,
@@ -202,7 +203,7 @@ def duplicates_command(
         ),
     ] = None,
 ) -> None:
-    """List the DOIs two Library Items hold, the one that stands first; choose one or merge."""
+    """List each Work's Duplicate Items, its Standing Item first; let another stand, or merge."""
     settings = Settings()
     library = ZoteroLibrary.from_settings(settings)
     with psycopg.connect(settings.database_url, autocommit=True) as conn:
@@ -210,14 +211,14 @@ def duplicates_command(
         works = store.Works(conn)
         with conn.transaction():
             sync(conn, library)
-        if use is not None:
-            chosen = _duplicate(works, use)
+        if stand is not None:
+            standing = _duplicate_item(works, stand)
             with conn.transaction():
-                works.choose(chosen.id)
-            typer.echo(f"{use} now stands for {chosen.doi}")
+                works.let_stand(standing.id)
+            typer.echo(f"{stand} now stands for {standing.doi}")
             return
         if merge is not None:
-            keep, other = (_duplicate(works, key) for key in merge)
+            keep, other = (_duplicate_item(works, key) for key in merge)
             if keep.doi != other.doi or keep.id == other.id:
                 typer.echo(f"{keep.zotero_key} and {other.zotero_key} do not share a DOI", err=True)
                 raise typer.Exit(1)
@@ -236,9 +237,9 @@ def duplicates_command(
                 f" {result.moved} Resolutions moved"
             )
             return
-        groups = works.duplicates()
+        groups = works.duplicate_items()
     if not groups:
-        typer.echo("No DOI is held by two Library Items")
+        typer.echo("No Duplicate Items: no DOI is held by two Library Items")
     for group in groups:
         typer.echo(group[0].doi)
         for i, w in enumerate(group):
@@ -247,15 +248,15 @@ def duplicates_command(
             typer.echo(f"  {'*' if i == 0 else ' '} {_key(w):<10} {pdf:<3} {added:<10} {w.title}")
 
 
-def _duplicate(works: store.Works, key: str) -> Work:
-    """The Work of a Library Item that shares its DOI with another; else exit with why."""
+def _duplicate_item(works: store.Works, key: str) -> Work:
+    """The Work of a Duplicate Item; else exit with why."""
     work = works.find(key)
     if (
         work is None
         or work.doi is None
-        or all(work.id not in {w.id for w in g} for g in works.duplicates())
+        or all(work.id not in {w.id for w in g} for g in works.duplicate_items())
     ):
-        typer.echo(f"{key} is not a Library Item whose DOI another holds", err=True)
+        typer.echo(f"{key} is not a Duplicate Item: no other Library Item holds its DOI", err=True)
         raise typer.Exit(1)
     return work
 

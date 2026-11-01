@@ -2,13 +2,13 @@
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
--- Two Library Items may hold one DOI: both are Works, and one stands for the DOI. This amends
--- ADR 0007, which refused the pair. `doi_chosen` marks the reader's pick; else the one with a
--- PDF stands, then the older (`added_at`, the Library Item's dateAdded).
+-- Duplicate Items (Library Items holding one DOI) each get a row, and one is the Standing Item.
+-- This amends ADR 0007, which refused the pair. `stands_by_reader` marks the one the reader let
+-- stand; else the one with a PDF stands, then the oldest (`added_at`, the item's dateAdded).
 ALTER TABLE works DROP CONSTRAINT works_doi_key;
 CREATE INDEX works_doi ON works (doi);
 ALTER TABLE works ADD COLUMN added_at timestamptz;
-ALTER TABLE works ADD COLUMN doi_chosen boolean NOT NULL DEFAULT false;
+ALTER TABLE works ADD COLUMN stands_by_reader boolean NOT NULL DEFAULT false;
 
 -- Title candidates for a Reference; pg_trgm ignores case and punctuation, `resolution` scores.
 CREATE INDEX works_title_trgm ON works USING gin (title gin_trgm_ops);

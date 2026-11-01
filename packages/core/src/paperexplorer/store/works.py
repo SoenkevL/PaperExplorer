@@ -16,10 +16,10 @@ _WORK = """
 """
 
 
-# Which of the Works holding one DOI stands for it: the reader's pick, a Library Item, one with
-# a PDF, the older.
+# Which of the Works holding one DOI is its Standing Item: the one the reader let stand, a Library
+# Item, one with a PDF, the oldest.
 _STANDING = (
-    "doi_chosen DESC, zotero_key IS NULL, pdf_attachment_key IS NULL, added_at NULLS LAST, id"
+    "stands_by_reader DESC, zotero_key IS NULL, pdf_attachment_key IS NULL, added_at NULLS LAST, id"
 )
 _CANDIDATES = 10
 
@@ -82,24 +82,24 @@ class Works:
                 " ORDER BY id"
             ).fetchall()
 
-    def stand_in(self, doi: str) -> WorkId | None:
-        """The Work that stands for a DOI, in any printed form, when two Library Items hold it."""
+    def standing_item(self, doi: str) -> WorkId | None:
+        """The Work of the Standing Item for a DOI, in any printed form, if anything holds it."""
         row = self._conn.execute(
             f"SELECT id FROM works WHERE doi = %s ORDER BY {_STANDING} LIMIT 1",
             (normalize_doi(doi),),
         ).fetchone()
         return WorkId(row[0]) if row else None
 
-    def choose(self, work: WorkId) -> None:
-        """Make this Work the one that stands for its DOI, as the reader chose."""
+    def let_stand(self, work: WorkId) -> None:
+        """Let this Work's Library Item stand for its DOI, over its other Duplicate Items."""
         self._conn.execute(
-            "UPDATE works SET doi_chosen = (id = %s)"
+            "UPDATE works SET stands_by_reader = (id = %s)"
             " WHERE doi = (SELECT doi FROM works WHERE id = %s)",
             (work, work),
         )
 
-    def duplicates(self) -> list[list[Work]]:
-        """Each DOI that two or more Library Items hold: its Works, the one standing first."""
+    def duplicate_items(self) -> list[list[Work]]:
+        """Each Work's Duplicate Items (Library Items holding one DOI), its Standing Item first."""
         with self._conn.cursor(row_factory=class_row(Work)) as cur:
             rows = cur.execute(
                 _WORK + " WHERE zotero_key IS NOT NULL AND doi IN ("
@@ -142,7 +142,7 @@ class Works:
         if not gone:
             self._conn.execute(
                 "UPDATE works SET zotero_key = NULL, pdf_attachment_key = NULL,"
-                " pdf_filename = NULL, doi_chosen = false WHERE zotero_key = %s",
+                " pdf_filename = NULL, stands_by_reader = false WHERE zotero_key = %s",
                 (zotero_key,),
             )
         return bool(gone)

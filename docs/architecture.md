@@ -72,7 +72,7 @@ PaperExplorer/
 - `embed` embeds only the Work's Chunks without a Vector from the Embedder's model, so running it again embeds none, and a new model re-embeds them all. Re-chunking deletes the Vectors with their Chunks.
 
 ```
-Seed:    fetch → parse → chunk → embed → extract_citations → resolve (local) → catalog
+Seed:    fetch → parse → chunk → embed → extract_citations → verify_dois (doi.org, optional) → resolve (local) → catalog
 Sources: fetch_sources → for each Source: fetch → parse → chunk → embed
 On ask:  Registry Check (a Work or one Reference) → resolutions
 Then:    embed_citing_sentences → report
@@ -80,7 +80,7 @@ Then:    embed_citing_sentences → report
 
 Sources reuse the Seed's stage functions; going one level deeper later is the same chain on another Work.
 
-The `resolve` Stage syncs the Library first (`library.sync`), then resolves every Reference locally. `paperexplorer sync` forces a full read; `paperexplorer duplicates [--stand <key>] [--merge <keep> <other>]` lists each Work's Duplicate Items, its Standing Item first, lets another stand, or merges the pair in Zotero after asking, moving Resolutions to the kept Work; `paperexplorer resolutions <zotero_key> [--low]` lists each Reference's level, Work and DOI Conflict.
+The `verify_dois` Stage asks doi.org whether each printed DOI is registered and caches the verdicts (ADR 0012). It ends `done` even offline, with the unverified DOIs counted and a warning. The `resolve` Stage syncs the Library first (`library.sync`), then resolves every Reference locally. `paperexplorer sync` forces a full read; `paperexplorer duplicates [--stand <key>] [--merge <keep> <other>]` lists each Work's Duplicate Items, its Standing Item first, lets another stand, or merges the pair in Zotero after asking, moving Resolutions to the kept Work; `paperexplorer resolutions <zotero_key> [--low]` lists each Reference's level, Work and DOI Conflict.
 
 ## Retrieval
 

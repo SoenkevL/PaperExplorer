@@ -84,6 +84,10 @@ _Avoid_: Missing source, noSource
 A Reference whose printed DOI names a Work that its printed title, or without one its first surname and year, does not. The title then decides, at low confidence, and the DOI's Work stays the other option for the reader.
 _Avoid_: Mismatch, bad DOI
 
+**Unregistered DOI**:
+A printed DOI that doi.org has no record of, such as one GROBID cut short or joined wrongly. The Reference is resolved as if it printed no DOI. Distinct from a DOI Conflict, whose DOI names a real Work, and from a DOI no Registry Check has found, which may still be registered.
+_Avoid_: Invalid DOI, dead DOI, broken DOI
+
 **Reader's Choice**:
 A Resolution the reader set: the Work they picked for a Reference, or none. Resolving and Registry Checks never overwrite it; only the reader clears it.
 _Avoid_: Override, pin

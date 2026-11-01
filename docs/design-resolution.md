@@ -26,17 +26,27 @@ The `resolve` Stage runs for every Reference of a Work. Its only network call is
 - **Then the cached registry responses** from earlier Registry Checks, matched by the same rules.
 - What is still unmatched is an Unchecked Reference.
 
+## DOI verification: every printed DOI, before resolving
+The optional `verify_dois` Stage (ADR 0012) runs between `extract_citations` and `resolve`. It asks doi.org's Handle API (`GET https://doi.org/api/handles/{doi}?type=URL`) about each printed DOI not already cached. doi.org is free and keyless, and is the record every Registration Agency's DOIs live in ([research](research/2026-11-doi-existence.md)).
+
+- `responseCode` 1 means registered. 100 means an Unregistered DOI. 200 (a Handle with no URL) counts as registered. 2, a 5xx after three tries, or no connection leaves the DOI unverified.
+- Requests run 10 at a time (`PE_DOI_ORG_CONCURRENCY`).
+- Each answer goes to `registry_responses` as `doi:handle`, under the same rules as the registries' answers.
+- The Stage always ends `done` with `{registered, unregistered, unverified}`. When any DOI is unverified it logs a WARNING (`N DOIs unverified, doi.org unreachable; rerun verify_dois`). Running it again asks only about those, and makes `resolve` pending.
+- `resolve` resolves a Reference with an Unregistered DOI as if it printed no DOI: the title rules run at their usual levels, and a Library Item with another DOI can be the match. The evidence names the DOI. An unverified DOI counts as printed.
+- The side panel marks a printed DOI "DOI registered" or "Unregistered DOI". A Reference with a registered DOI and no Library Item is still Unchecked.
+
 ## Registry Checks: only when the reader asks
 A Registry Check (ADR 0011) looks References up in Crossref and OpenAlex. It runs the local pass first, then the layers below for what is still unmatched, and saves each Resolution as it lands.
 
-- **Layer 1: DOI batches**, 100 DOIs per call to Crossref (`filter=doi:a,doi:b,…`) and OpenAlex (`filter=doi:a|b|…`) at the same time.
+- **Layer 1: DOI batches** of every printed DOI except Unregistered DOIs, which go straight to layer 2 as if no DOI were printed. 100 DOIs per call to Crossref (`filter=doi:a,doi:b,…`) and OpenAlex (`filter=doi:a|b|…`) at the same time.
   - Crossref decides which Work a DOI is: the printed DOI wins. `posted-content` makes a preprint its own Version; its `is-preprint-of` stays in the cached response until the reader shows Versions. An alias DOI (JSTOR, APA's `//` form) is the same Work.
   - OpenAlex adds open-access links, the abstract and the OpenAlex ID, and supplies the record for DOIs Crossref does not know (DataCite, such as arXiv's).
   - Every DOI hit is checked by the same agreement rule as against the Library. Agreement: `certain`. A DOI Conflict goes on to layer 2 as if it printed no DOI; a title match there is capped at `low`, and with none left after layer 3 it is Unresolved, the DOI's record kept as the other option.
 - **Layer 2: OpenAlex title search** (`filter=title.search:`), 5 candidates per Reference, no year filter, scored as against the Library.
 - **Layer 3: Crossref `query.bibliographic`** on the printed string, for References with no usable title or only a `low` title match. A hit is `low`.
 - Nothing matched: an Unresolved Reference.
-- Never used: doi.org (it passes Crossref DOIs on to Crossref), a separate arXiv path (OpenAlex covers arXiv; no fixture prints an arXiv ID), Semantic Scholar.
+- Never used for metadata: doi.org's content negotiation (it passes Crossref DOIs on to Crossref); doi.org only verifies, above. Also never used: a separate arXiv path (OpenAlex covers arXiv; no fixture prints an arXiv ID), Semantic Scholar.
 - **Starting one.** The Work page's "Check N Unchecked References" button shows the cost first (batch calls, title searches, share of today's OpenAlex budget from a free singleton's headers), then streams each Reference's result. The side panel shows each Reference as resolved (level, and Library, Crossref or OpenAlex), Unchecked or Unresolved, with "Check" on Unchecked and "Check again" on Unresolved or `low`, which skips the cache for that Reference. A grouped marker shows one button per Reference. The CLI: `paperexplorer check <zotero_key> [--reference <key>] [--refresh]`.
 
 ## Speed and limits
@@ -55,7 +65,7 @@ A Registry Check (ADR 0011) looks References up in Crossref and OpenAlex. It run
 - A Seed's first full Check: ~5–10 s. Anything after it from the cache: no registry calls.
 
 ## Store
-- `registry_responses`: one row per source and key (`crossref:doi`, `openalex:doi`, `openalex:title`, `crossref:bibliographic`) with the raw JSON (a batch split per DOI), hit or miss, and `fetched_at`. Keys are normalized DOIs (lowercase; `https://doi.org/`, `doi:` and trailing `.` or `,` stripped; `//` kept) or normalized query strings. Rows commit as they land, on their own connection. Misses are retried after 30 days; hits stay until `--refresh`.
+- `registry_responses`: one row per source and key (`doi:handle`, `crossref:doi`, `openalex:doi`, `openalex:title`, `crossref:bibliographic`) with the raw JSON (a batch split per DOI), hit or miss, and `fetched_at`. Keys are normalized DOIs (lowercase; `https://doi.org/`, `doi:` and trailing `.` or `,` stripped; `//` kept) or normalized query strings. Rows commit as they land, on their own connection. Misses are retried after 30 days; hits stay until `--refresh`.
 - `resolutions`: one row per Reference: resolved, Unchecked or Unresolved, with confidence, level (`certain`, `high`, `low`), evidence, the layer that matched, and the DOI's Work on a DOI Conflict. A re-parse replaces a Work's References, and their Resolutions go with them.
 - `readers_choices` (PR 4): one row per Reader's Choice, keyed by the Work and the Reference's printed text rather than its row, so a re-parse that prints the Reference the same keeps it. No resolve or Check (`--refresh` included) overwrites one; it wins over the Resolution until the reader clears it.
 - A Work found by a Registry Check gets a `works` row with its DOI, OpenAlex ID and the registry's title, creators and year until `catalog` gives it a Library Item; a null `synced_at` marks metadata not yet from Zotero.

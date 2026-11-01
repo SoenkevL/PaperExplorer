@@ -1,4 +1,4 @@
-"""The Seed's Stages: fetch, parse, chunk and embed its text, link its Citations, resolve."""
+"""The Seed's Stages: fetch, parse, chunk, embed, link Citations, verify DOIs, resolve."""
 
 import logging
 from collections import Counter
@@ -92,6 +92,17 @@ def extract_citations(ctx: StageContext, work: WorkId) -> StageResult:
         counts={"citations": len(graph.citations)}
         | {lv.value: levels[lv] for lv in ConfidenceLevel}
     )
+
+
+def verify_dois(ctx: StageContext, work: WorkId) -> StageResult:
+    """Ask the DOI registry whether each printed DOI is registered; optional (ADR 0012).
+
+    Offline it still succeeds: the DOIs it could not ask are counted unverified.
+    """
+    parsed = WorkTexts(ctx.conn).get(work)
+    if parsed is None:
+        raise StageError(f"Work {work} has no text yet; run parse first")
+    return StageResult(counts=resolution.verify(ctx.conn, ctx.doi_registry, parsed.references))
 
 
 def resolve(ctx: StageContext, work: WorkId) -> StageResult:

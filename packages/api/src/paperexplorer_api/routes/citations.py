@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 
 from paperexplorer.citations import confidence_level
 from paperexplorer.domain import CitationId
+from paperexplorer.resolution import Registration, registration
 from paperexplorer.store import CitationGraphs, Works
 from paperexplorer_api import schemas
 from paperexplorer_api.routes import Connections
@@ -18,6 +19,8 @@ def router(connections: Connections) -> APIRouter:
         with connections() as conn:
             detail = CitationGraphs(conn).get(CitationId(citation_id))
             work = Works(conn).get(detail.work) if detail else None
+            ref = detail.reference if detail else None
+            registered = registration(conn, ref.doi) if ref and ref.doi else None
         if detail is None or work is None or work.text_origin is None:
             raise HTTPException(404, f"No Citation {citation_id}")
         c, r = detail.citation, detail.reference
@@ -44,6 +47,9 @@ def router(connections: Connections) -> APIRouter:
                 year=r.year,
                 title=r.title,
                 doi=r.doi,
+                doi_registration=None
+                if registered in (None, Registration.UNVERIFIED)
+                else registered.value,
             )
             if r
             else None,

@@ -19,7 +19,9 @@
     {% if r.surnames %}<dt>Authors read</dt><dd>{{ r.surnames | join(", ") }}</dd>{% endif %}
     {% if r.year %}<dt>Year read</dt><dd>{{ r.year }}</dd>{% endif %}
     {% if r.title %}<dt>Title read</dt><dd>{{ r.title }}</dd>{% endif %}
-    {% if r.doi %}<dt>DOI</dt><dd><a href="https://doi.org/{{ r.doi }}">{{ r.doi }}</a></dd>{% endif %}
+    {% if r.doi %}<dt>DOI</dt><dd><a href="https://doi.org/{{ r.doi }}">{{ r.doi }}</a>
+      {%- if r.doi_registration == "registered" %} <span class="note">DOI registered</span>
+      {%- elif r.doi_registration == "unregistered" %} <span class="note">Unregistered DOI: doi.org has no record of it</span>{% endif %}</dd>{% endif %}
     <dt>Printed on page</dt><dd>{{ r.page }}</dd>
   </dl>
   {% else %}

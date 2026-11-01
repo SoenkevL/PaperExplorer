@@ -11,18 +11,20 @@ from paperexplorer.config import Settings
 from paperexplorer.domain import WorkId
 from paperexplorer.embedding import Embedder
 from paperexplorer.library import Library
+from paperexplorer.resolution import DoiRegistry
 from paperexplorer.tracing import Tracing
 
 
 @dataclass(frozen=True)
 class StageContext:
-    """What a Stage works with: the store, the settings, the Library, the Embedder and tracing."""
+    """What a Stage works with: store, settings, Library, Embedder, tracing, DOI registry."""
 
     conn: psycopg.Connection[TupleRow]
     settings: Settings
     library: Library
     embedder: Embedder
     tracing: Tracing
+    doi_registry: DoiRegistry
 
 
 class StageResult(BaseModel):

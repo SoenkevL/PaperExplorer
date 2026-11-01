@@ -84,6 +84,9 @@ class Reference(BaseModel):
     year: str | None
     title: str | None
     doi: str | None
+    doi_registration: Literal["registered", "unregistered"] | None = Field(
+        default=None, description="What doi.org said of the DOI; None until verify_dois asked."
+    )
 
 
 class CitationLink(BaseModel):

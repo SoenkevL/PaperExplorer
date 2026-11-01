@@ -20,6 +20,7 @@ from paperexplorer.embedding import FakeEmbedder
 from paperexplorer.library import InMemoryLibrary
 from paperexplorer.parsing import ParsedWork, Reference, TextOrigin
 from paperexplorer.pipeline import StageContext, StageError, run_stage
+from paperexplorer.resolution import InMemoryDoiRegistry
 from paperexplorer.store import Resolutions, StageStatuses, Works, WorkTexts
 from paperexplorer.tracing import Tracing
 
@@ -55,6 +56,7 @@ def ctx(store_db: Conn, library: InMemoryLibrary) -> StageContext:
         library=library,
         embedder=FakeEmbedder(),
         tracing=Tracing.off(),
+        doi_registry=InMemoryDoiRegistry(offline=True),
     )
 
 

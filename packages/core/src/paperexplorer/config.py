@@ -98,6 +98,10 @@ class Settings(BaseSettings):
         default=None, description="OpenAlex API key: 1,000 title searches a day instead of 100."
     )
 
+    doi_org_concurrency: int = Field(
+        default=10, gt=0, description="Requests to doi.org in flight at once (verify_dois)."
+    )
+
     grobid_url: str = "http://localhost:8070"
     tessdata_dir: Path | None = Field(
         default=None,

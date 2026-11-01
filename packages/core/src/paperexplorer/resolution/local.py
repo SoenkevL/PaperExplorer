@@ -33,17 +33,18 @@ def resolve(
     DOI is an Unregistered DOI is matched as if it printed none (ADR 0012).
     """
     works = Works(conn)
-    unknown = unregistered(conn, [r.doi for r in refs if r.doi])
-    resolved: list[Resolution] = []
+    unregistered_dois = unregistered(conn, [r.doi for r in refs if r.doi])
+    resolutions: list[Resolution] = []
     for ref in refs:
-        if ref.doi and normalize_doi(ref.doi) in unknown:
-            found = _resolve_one(works, citing, ref.model_copy(update={"doi": None}))
-            note = f"unregistered DOI {normalize_doi(ref.doi)}"
-            found = found.model_copy(update={"evidence": [*found.evidence, note]})
+        doi = normalize_doi(ref.doi) if ref.doi else None
+        if doi in unregistered_dois:
+            resolution = _resolve_one(works, citing, ref.model_copy(update={"doi": None}))
+            note = f"unregistered DOI {doi}"
+            resolution = resolution.model_copy(update={"evidence": [*resolution.evidence, note]})
         else:
-            found = _resolve_one(works, citing, ref)
-        resolved.append(found)
-    return resolved
+            resolution = _resolve_one(works, citing, ref)
+        resolutions.append(resolution)
+    return resolutions
 
 
 def _resolve_one(works: Works, citing: WorkId, ref: Reference) -> Resolution:

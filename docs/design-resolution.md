@@ -30,9 +30,9 @@ The `resolve` Stage runs for every Reference of a Work. Its only network call is
 The optional `verify_dois` Stage (ADR 0012) runs between `extract_citations` and `resolve`. It asks doi.org's Handle API (`GET https://doi.org/api/handles/{doi}?type=URL`) about each printed DOI not already cached. doi.org is free and keyless, and is the record every Registration Agency's DOIs live in ([research](research/2026-11-doi-existence.md)).
 
 - `responseCode` 1 means registered. 100 means an Unregistered DOI. 200 (a Handle with no URL) counts as registered. 2, a 5xx after three tries, or no connection leaves the DOI unverified.
-- Requests run 10 at a time (`PE_DOI_ORG_CONCURRENCY`).
-- Each answer goes to `registry_responses` as `doi:handle`, under the same rules as the registries' answers.
-- The Stage always ends `done` with `{registered, unregistered, unverified}`. When any DOI is unverified it logs a WARNING (`N DOIs unverified, doi.org unreachable; rerun verify_dois`). Running it again asks only about those, and makes `resolve` pending.
+- Requests run 10 at a time (`PE_DOI_ORG_CONCURRENCY`). After the first failed connection no further DOI is asked, so an offline run ends at once.
+- Each answer goes to `registry_responses` as `doi:handle`, under the same rules as the registries' answers. A stale Unregistered verdict still counts until a rerun asks again; `--refresh`, which asks about registered DOIs again, comes with the Registry Check.
+- The Stage always ends `done` with `{registered, unregistered, unverified}`. When any DOI is unverified it logs a WARNING (`N DOIs unverified, doi.org unreachable or did not answer; rerun verify_dois`). Running it again asks only about those, and makes `resolve` pending.
 - `resolve` resolves a Reference with an Unregistered DOI as if it printed no DOI: the title rules run at their usual levels, and a Library Item with another DOI can be the match. The evidence names the DOI. An unverified DOI counts as printed.
 - The side panel marks a printed DOI "DOI registered" or "Unregistered DOI". A Reference with a registered DOI and no Library Item is still Unchecked.
 

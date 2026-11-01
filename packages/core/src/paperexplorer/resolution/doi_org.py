@@ -31,7 +31,8 @@ class DoiOrgRegistry:
     """`GET https://doi.org/api/handles/{doi}?type=URL`, `concurrency` at a time.
 
     responseCode 1 is registered (200, a Handle with no URL, too) and 100 unregistered;
-    2, a 5xx after `TRIES` tries, or no connection leaves the DOI unverified.
+    2, a 5xx after `TRIES` tries, or no connection leaves the DOI unverified. After the first
+    failed connection no DOI is asked: offline, every request would wait for its own timeout.
     """
 
     def __init__(
@@ -57,18 +58,23 @@ class DoiOrgRegistry:
 
     async def _records(self, dois: Sequence[str]) -> dict[str, DoiRecord]:
         limit = asyncio.Semaphore(self._concurrency)
+        offline = asyncio.Event()
         async with httpx.AsyncClient(
-            base_url="https://doi.org", transport=self._transport, timeout=10.0
+            base_url="https://doi.org",
+            transport=self._transport,
+            timeout=httpx.Timeout(10.0, connect=3.0),
         ) as http:
 
             async def one(doi: str) -> DoiRecord:
                 async with limit:
-                    return await self._record(http, doi)
+                    if offline.is_set():
+                        return DoiRecord(registration=Registration.UNVERIFIED)
+                    return await self._record(http, doi, offline)
 
             found = await asyncio.gather(*(one(d) for d in dois))
         return dict(zip(dois, found, strict=True))
 
-    async def _record(self, http: httpx.AsyncClient, doi: str) -> DoiRecord:
+    async def _record(self, http: httpx.AsyncClient, doi: str, offline: asyncio.Event) -> DoiRecord:
         unverified = DoiRecord(registration=Registration.UNVERIFIED)
         for attempt in range(TRIES):
             if attempt:
@@ -79,6 +85,7 @@ class DoiOrgRegistry:
                 )
             except httpx.TransportError as e:
                 logger.debug("doi.org unreachable for %s: %s", doi, e)
+                offline.set()
                 return unverified
             if response.status_code >= 500:
                 continue

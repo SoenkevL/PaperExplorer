@@ -43,7 +43,8 @@ def verify(
     }
     if counts["unverified"]:
         logger.warning(
-            "%d DOIs unverified, doi.org unreachable; rerun verify_dois", counts["unverified"]
+            "%d DOIs unverified, doi.org unreachable or did not answer; rerun verify_dois",
+            counts["unverified"],
         )
     logger.info("Verified %d DOIs asking %d: %s", len(dois), len(asked), counts)
     return counts
@@ -51,7 +52,8 @@ def verify(
 
 def registration(conn: psycopg.Connection[TupleRow], doi: str) -> Registration:
     """What the registry last said of this DOI; `unverified` when it was never answered."""
-    hit = RegistryResponses(conn).hits(SOURCE, [normalize_doi(doi)]).get(normalize_doi(doi))
+    key = normalize_doi(doi)
+    hit = RegistryResponses(conn).hits(SOURCE, [key]).get(key)
     if hit is None:
         return Registration.UNVERIFIED
     return Registration.REGISTERED if hit else Registration.UNREGISTERED

@@ -71,13 +71,19 @@ def test_a_5xx_is_tried_three_times_then_left_unverified() -> None:
     assert always.records(["10.5555/a"])["10.5555/a"].registration is Registration.UNVERIFIED
 
 
-def test_no_connection_leaves_every_doi_unverified() -> None:
+def test_no_connection_leaves_every_doi_unverified_and_stops_asking() -> None:
+    calls = 0
+
     def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
         raise httpx.ConnectError("No route to host", request=request)
 
-    records = _registry(httpx.MockTransport(handler)).records(["10.5555/a", "10.5555/b"])
+    dois = [f"10.5555/{n}" for n in range(50)]
+    records = _registry(httpx.MockTransport(handler), concurrency=1).records(dois)
 
     assert {r.registration for r in records.values()} == {Registration.UNVERIFIED}
+    assert calls == 1
 
 
 def test_a_doi_with_reserved_characters_is_sent_escaped() -> None:

@@ -98,7 +98,8 @@ def test_offline_the_stage_is_done_with_its_dois_unverified_and_a_warning(
 
     assert counts == {"dois": 2, "registered": 0, "unregistered": 0, "unverified": 2}
     assert StageStatuses(ctx.conn).for_work(seed)["verify_dois"].state is StageState.DONE
-    assert "2 DOIs unverified, doi.org unreachable; rerun verify_dois" in caplog.text
+    warning = "2 DOIs unverified, doi.org unreachable or did not answer; rerun verify_dois"
+    assert warning in caplog.text
 
 
 def test_verifying_again_makes_resolve_pending(
@@ -133,6 +134,17 @@ def test_an_unregistered_doi_is_resolved_as_if_none_were_printed(ctx: StageConte
         ResolutionState.RESOLVED, neuron.id, Level.HIGH,
     )  # fmt: skip
     assert f"unregistered DOI {CUT_SHORT}" in found.evidence
+
+
+def test_a_registered_doi_in_no_library_item_stays_unchecked(ctx: StageContext) -> None:
+    seed = _seed(ctx.conn, [_ref("b0", title="Attention", doi="10.5555/attention")])
+    run_stage(ctx, "verify_dois", seed)
+
+    run_stage(ctx, "resolve", seed)
+
+    [found] = Resolutions(ctx.conn).for_work(seed)
+    assert found.state is ResolutionState.UNCHECKED
+    assert found.evidence == []
 
 
 def test_an_unverified_doi_still_counts_as_printed(

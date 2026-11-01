@@ -1,0 +1,8 @@
+{#- How a Check ended, replacing the running Check with the References it landed; the cost and
+    button load again below it. -#}
+<div class="check-ended">
+  <p class="{{ 'failed' if failed else 'done' }}">{{ message }}</p>
+  {% if landed %}<ol class="checked">{% for res in landed %}{% include "check_reference.html" %}{% endfor %}</ol>{% endif %}
+  {% if not failed %}<p class="note">Open a Citation again to see its Reference's Resolution.</p>{% endif %}
+  {% if work_id is not none %}<div hx-get="/works/{{ work_id }}/check" hx-trigger="load"></div>{% endif %}
+</div>

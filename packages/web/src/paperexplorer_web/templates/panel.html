@@ -24,6 +24,7 @@
       {%- elif r.doi_registration == "unregistered" %} <span class="note">Unregistered DOI: doi.org has no record of it</span>{% endif %}</dd>{% endif %}
     <dt>Printed on page</dt><dd>{{ r.page }}</dd>
   </dl>
+  {% with work_id = d.work_id, citation_id = d.id, key = r.key, res = r.resolution, message = none %}{% include "resolution.html" %}{% endwith %}
   {% else %}
   <p class="unlinked">Unlinked Citation: no evidence ties it to a Reference.</p>
   {% endif %}

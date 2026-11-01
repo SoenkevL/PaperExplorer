@@ -1,7 +1,7 @@
 """Relay a Question's events from the API to the browser, as server-sent events carrying HTML.
 
 The browser's EventSource can only GET, and the API takes a Question by POST. So the sidebar
-posts its Question to the web app, which holds it (`PendingQuestions`) until the page's
+posts its Question to the web app, which holds it (`Pending`) until the page's
 EventSource GETs its stream; `relay` then asks the API and re-sends each event as HTML.
 """
 
@@ -32,7 +32,8 @@ from paperexplorer_web.answers import answer_runs
 
 logger = logging.getLogger(__name__)
 
-# Questions posted but never streamed (a page closed at once) are forgotten beyond this many.
+# Questions or Checks posted but never streamed (a page closed at once) are forgotten beyond this
+# many.
 PENDING_MAX = 64
 LOST = (
     "This Question is no longer waiting for its Answer (the page lost its stream, or the web"
@@ -53,30 +54,31 @@ class PendingQuestion(BaseModel):
     text: str
 
 
-class PendingQuestions:
-    """Questions posted and not yet streamed, by id, in the web app's memory.
+class Pending[T]:
+    """Questions or Checks posted and not yet streamed, by id, in the web app's memory.
 
-    Each is taken once, so a reconnecting EventSource does not ask its Question twice.
+    Each is taken once, so a reconnecting EventSource does not ask its Question, or start its
+    Check, twice.
     """
 
     def __init__(self, capacity: int = PENDING_MAX) -> None:
         self._capacity = capacity
-        self._held: OrderedDict[str, PendingQuestion] = OrderedDict()
+        self._held: OrderedDict[str, T] = OrderedDict()
         self._lock = threading.Lock()
 
-    def put(self, question: PendingQuestion) -> str:
-        """Hold the Question until its stream takes it; its id names that stream."""
-        question_id = uuid.uuid4().hex
+    def put(self, held: T) -> str:
+        """Hold it until its stream takes it; its id names that stream."""
+        held_id = uuid.uuid4().hex
         with self._lock:
-            self._held[question_id] = question
+            self._held[held_id] = held
             while len(self._held) > self._capacity:
                 self._held.popitem(last=False)
-        return question_id
+        return held_id
 
-    def take(self, question_id: str) -> PendingQuestion | None:
-        """The Question, the first time; None after that, or for an id never given."""
+    def take(self, held_id: str) -> T | None:
+        """What was held, the first time; None after that, or for an id never given."""
         with self._lock:
-            return self._held.pop(question_id, None)
+            return self._held.pop(held_id, None)
 
 
 class Views:

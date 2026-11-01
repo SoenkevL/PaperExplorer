@@ -1,0 +1,16 @@
+{#- The Work page's Registry Check: its cost first, then the button that starts it. -#}
+{%- if message %}
+<p class="note">{{ message }}</p>
+{%- elif cost.unchecked == 0 %}
+<p class="note">No Unchecked References: your Library or an earlier Check knows every Reference's Work, or knows that no registry does.</p>
+{%- else %}
+<p class="cost">A Check asks {{ plural(cost.crossref_batches, "Crossref batch", "Crossref batches") }}, {{ plural(cost.openalex_batches, "OpenAlex batch", "OpenAlex batches") }},
+  and up to {{ plural(cost.title_searches, "title search", "title searches") }} and {{ plural(cost.bibliographic_searches, "bibliographic search", "bibliographic searches") }}:
+  {% if cost.budget_usd is none -%}
+  at most ${{ usd(cost.openalex_usd) }} of OpenAlex's day; OpenAlex did not say what is left of its day.
+  {%- else -%}
+  at most ${{ usd(cost.openalex_usd) }} of the ${{ usd(cost.budget_usd) }} left of OpenAlex's day.
+  {%- if cost.budget_usd < cost.openalex_usd %} That is more than is left, so the Check may stop before it is done; what it lands is kept.{% endif %}
+  {%- endif %}</p>
+<button type="button" hx-post="/works/{{ work_id }}/checks" hx-target="#check" hx-disabled-elt="this">Check {{ plural(cost.unchecked, "Unchecked Reference", "Unchecked References") }}</button>
+{%- endif %}

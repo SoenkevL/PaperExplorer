@@ -7,11 +7,10 @@ import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from pydantic_ai.messages import ModelResponse
 from pydantic_evals.evaluators import Evaluator, EvaluatorContext, EvaluatorOutput
 
-from paperexplorer import asking, retrieval
-from paperexplorer.domain import Answer, ChunkId, Scope, Work
+from paperexplorer import asking
+from paperexplorer.domain import Answer, ChunkId, Work
 from paperexplorer.evals.models import (
     Hit,
     Mode,
@@ -21,7 +20,7 @@ from paperexplorer.evals.models import (
     QuoteCheck,
     Turn,
 )
-from paperexplorer.store import StoredChunk
+from paperexplorer.store import ScoredChunk, StoredChunk
 
 logger = logging.getLogger(__name__)
 
@@ -76,8 +75,7 @@ async def ask_turn(
     The mode follows `ctx.reading`; the turn says how it read the Seed, and which `repeat` of
     the Question it is. `blocks` are the Seed's
     block texts, for the places Pointers and Quotes land on. A turn that read by retrieval has
-    its forced search run once more outside its trace, as `retrieval.search(question, k=8)`,
-    the same call with the same result.
+    its forced search's Chunks from its last event.
     """
     mode = Mode.of(ctx.reading)
     conversation = asking.Conversation(work=work)
@@ -87,6 +85,8 @@ async def ask_turn(
     reading: asking.Reading | None = None
     steps: list[str] = []
     redrafted = False
+    requests, tool_calls = 0, 0
+    forced_search: list[ScoredChunk] | None = None
     first_delta: float | None = None
     started = time.monotonic()
     async for event in asking.ask(ctx, conversation, question):
@@ -101,22 +101,20 @@ async def ask_turn(
             case asking.AnsweredEvent():
                 answer, trace_id, reading = event.answer, event.trace_id, event.reading
                 redrafted = event.redrafted
+                requests, tool_calls = event.model_requests, event.tool_calls
+                forced_search = event.forced_search
             case asking.ErrorEvent():
                 error, trace_id, reading = event.message, event.trace_id, event.reading
+                requests, tool_calls = event.model_requests, event.tool_calls
+                forced_search = event.forced_search
     latency = time.monotonic() - started
-    searched = reading is asking.Reading.RETRIEVAL
     search = None
-    if searched:
-        found = retrieval.search(ctx.conn, ctx.embedder, question, Scope.of(work.id), k=HIT_K)
+    if forced_search is not None:
         search = [
             Hit(rank=i, chunk_id=r.id, place=Place.of(r.chunk), rrf=r.rrf)
-            for i, r in enumerate(found, start=1)
+            for i, r in enumerate(forced_search, start=1)
         ]
-    # The forced search is the server's call, not the model's: it is neither a request nor a tool.
-    # A redraft's response replaces the first in the Conversation, yet it was a request too.
-    forced = 1 if searched else 0
-    requests = sum(isinstance(m, ModelResponse) for m in conversation.messages) - forced
-    requests += redrafted
+    forced = 1 if reading is asking.Reading.RETRIEVAL else 0  # the forced search's step
     chunks = {c.id: c for c in conversation.handles.values()}
     logger.info(
         "Asked %r (%s, %s) in %.1f s: %s",
@@ -141,7 +139,7 @@ async def ask_turn(
         says_not_covered=answer is not None and says_not_covered(answer.text),
         redrafted=redrafted,
         model_requests=requests if answer else None,
-        tool_calls=len(steps) - forced,
+        tool_calls=tool_calls,
         tools=steps[forced:],
         latency_s=round(latency, 3),
         first_delta_s=round(first_delta, 3) if first_delta is not None else None,

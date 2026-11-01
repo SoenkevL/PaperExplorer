@@ -11,7 +11,6 @@ from typing import Annotated
 
 import psycopg
 import typer
-from pydantic_ai.messages import ModelResponse
 
 from paperexplorer import __version__, asking, citations, evals, parsing, pipeline, retrieval, store
 from paperexplorer.citations import ConfidenceLevel, confidence_level
@@ -194,16 +193,11 @@ def ask_command(
         conversation = asking.Conversation(work=found)
         try:
             started = time.monotonic()
-            answered, steps = asyncio.run(_stream_answer(ctx, conversation, question))
+            answered = asyncio.run(_stream_answer(ctx, conversation, question))
             latency = time.monotonic() - started
         finally:
             tracing.flush()
         blocks = [b.text for b in (store.WorkTexts(conn).get(found.id) or _NO_TEXT).blocks]
-    # The forced search is the server's call, not the model's: it is neither a request nor a tool.
-    # A redraft's response replaces the first in the Conversation, yet it was a request too.
-    forced = 1 if answered.reading is asking.Reading.RETRIEVAL else 0
-    requests = sum(isinstance(m, ModelResponse) for m in conversation.messages) - forced
-    requests += answered.redrafted
     _print_answer(answered.answer, conversation, blocks)
     counts = answered.answer.counts()
     coverage = "-" if counts.pointer_coverage is None else f"{counts.pointer_coverage:.2f}"
@@ -214,7 +208,8 @@ def ask_command(
         f" pointer coverage {coverage}, close {counts.pointers_close},"
         f" weak {counts.pointers_weak}, quotes exact {counts.quotes_exact},"
         f" not exact {counts.quotes_not_exact}, unknown handles {counts.unknown_handles},"
-        f" model requests {requests}, tool calls {steps - forced}, latency {latency:.1f} s"
+        f" model requests {answered.model_requests}, tool calls {answered.tool_calls},"
+        f" latency {latency:.1f} s"
     )
 
 
@@ -331,14 +326,12 @@ def eval_command(
 
 async def _stream_answer(
     ctx: asking.AskingContext, conversation: asking.Conversation, question: str
-) -> tuple[asking.AnsweredEvent, int]:
-    """Print each step and the draft as they come; the Answer and how many steps it took."""
-    steps = 0
+) -> asking.AnsweredEvent:
+    """Print each step and the draft as they come; the Answer."""
     line_open = False
     async for event in asking.ask(ctx, conversation, question):
         match event:
             case asking.StepEvent(tool=tool, args=args):
-                steps += 1
                 if line_open:
                     typer.echo()
                 typer.echo(f"→ {tool} {json.dumps(args, ensure_ascii=False)}")
@@ -354,7 +347,7 @@ async def _stream_answer(
             case asking.AnsweredEvent():
                 if line_open:
                     typer.echo()
-                return event, steps
+                return event
             case asking.ErrorEvent(message=message):
                 if line_open:
                     typer.echo()

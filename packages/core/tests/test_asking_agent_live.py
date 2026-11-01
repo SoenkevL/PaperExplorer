@@ -24,6 +24,7 @@ from paperexplorer.asking import (
     DeltaEvent,
     Reading,
     StepEvent,
+    TextPiece,
     ask,
     chat_model,
 )
@@ -96,7 +97,13 @@ def test_the_chat_model_answers_from_what_it_read_and_its_thinking_stays_in_the_
     counts = answer.counts()
     assert counts.pointers_close + counts.pointers_weak >= 1, answer
     assert counts.unknown_handles == 0, answer
-    draft = "".join(e.text for e in events if isinstance(e, DeltaEvent))
+    draft = "".join(
+        p.text
+        for e in events
+        if isinstance(e, DeltaEvent)
+        for p in e.pieces
+        if isinstance(p, TextPiece)
+    )
     thinking = [
         part["content"]
         for span in exporter.get_finished_spans()

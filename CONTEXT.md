@@ -121,8 +121,12 @@ What the reader asks in a Conversation.
 _Avoid_: Query, prompt
 
 **Answer**:
-A model's reply to a Question; the only text written by a model that PaperExplorer shows.
+A model's reply to a Question, with its Pointers and Quotes; with its Draft, the only text written by a model that PaperExplorer shows.
 _Avoid_: Response, summary
+
+**Draft**:
+The Answer as the model writes it, shown while it streams, before its Pointers and Quotes are resolved; the Answer replaces it.
+_Avoid_: Partial answer, preview
 
 **Pointer**:
 A mark that ties one sentence of an Answer to the place in a Chunk the model read that best bears it out, with its Support.

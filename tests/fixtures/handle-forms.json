@@ -1,5 +1,5 @@
 {
-  "about": "The handle forms Answers are read with (design-asking.md, Answers), shared by core's and the web's tests: the web cannot import core's grammar. Each draft is written anew around a form an eval run recorded (run, trace), or a plain one; `handles` are the numbers read from it, in order, and `text` the draft without them, as `asking.resolve_answer` gives it. A form with no `#` is the Seed's own marker and stays text.",
+  "about": "The handle forms Answers are read with (design-asking.md, Answers), read by core's `asking.resolve_answer` and its streamed `DraftCut`. Each draft is written anew around a form an eval run recorded (run, trace), or a plain one; `handles` are the numbers read from it, in order, and `text` the draft without them, as `asking.resolve_answer` gives it. A form with no `#` is the Seed's own marker and stays text. A form with `bare_handles` is read again with bare handles on (a Seed that numbers no Reference): those are the numbers read then, and `bare_text` the draft without them.",
   "forms": [
     {
       "name": "plain",
@@ -128,6 +128,46 @@
       "draft": "Richness is hard to measure ().",
       "handles": [],
       "text": "Richness is hard to measure ()."
+    },
+    {
+      "name": "bare",
+      "draft": "Entropy rose [13].",
+      "handles": [],
+      "text": "Entropy rose [13].",
+      "bare_handles": [13],
+      "bare_text": "Entropy rose."
+    },
+    {
+      "name": "bare-grouped",
+      "draft": "It rose [13, 14], then fell [13–15].",
+      "handles": [],
+      "text": "It rose [13, 14], then fell [13–15].",
+      "bare_handles": [13, 14, 13, 15],
+      "bare_text": "It rose, then fell."
+    },
+    {
+      "name": "bare-beside-hash",
+      "draft": "It rose. [3][#4]",
+      "handles": [4],
+      "text": "It rose. [3]",
+      "bare_handles": [3, 4],
+      "bare_text": "It rose."
+    },
+    {
+      "name": "bare-only-in-square-brackets",
+      "draft": "Its themes are (1) entropy and (2) richness, {13} and <14>, [<13>] and [13 a].",
+      "handles": [],
+      "text": "Its themes are (1) entropy and (2) richness, {13} and <14>, [<13>] and [13 a].",
+      "bare_handles": [],
+      "bare_text": "Its themes are (1) entropy and (2) richness, {13} and <14>, [<13>] and [13 a]."
+    },
+    {
+      "name": "bare-by-author-and-year",
+      "draft": "Entropy was computed from each recording [3]. The sample was small [5].",
+      "handles": [],
+      "text": "Entropy was computed from each recording [3]. The sample was small [5].",
+      "bare_handles": [3, 5],
+      "bare_text": "Entropy was computed from each recording. The sample was small."
     }
   ]
 }

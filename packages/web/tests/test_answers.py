@@ -1,19 +1,5 @@
-import json
-import time
-from pathlib import Path
-
-import pytest
-
 from paperexplorer_api.schemas import Answer, AnswerSentence, Pointer, Quote
-from paperexplorer_web.answers import Draft, DraftPiece, answer_runs
-
-
-def _chip(n: int) -> DraftPiece:
-    return DraftPiece(text=f"#{n}", handle=n)
-
-
-def _plain(text: str) -> DraftPiece:
-    return DraftPiece(text=text, handle=None)
+from paperexplorer_web.answers import answer_runs
 
 
 def _pointer(block: int, support: str = "close") -> Pointer:
@@ -21,91 +7,6 @@ def _pointer(block: int, support: str = "close") -> Pointer:
         {"block_id": block, "start": 4, "end": 30, "support": support, "chunk_start": 0,
          "chunk_end": 80}
     )  # fmt: skip
-
-
-def test_a_drafts_handles_become_placeholder_chips() -> None:
-    pieces = Draft().add("Entropy rose. [#3] It fell [#4][#5].")
-
-    assert pieces == [
-        _plain("Entropy rose. "),
-        _chip(3),
-        _plain(" It fell "),
-        _chip(4),
-        _chip(5),
-        _plain("."),
-    ]
-
-
-def test_a_handle_group_gives_one_chip_per_handle() -> None:
-    assert Draft().add("Both [#3, #5] and [#7; #8].") == [
-        _plain("Both "),
-        _chip(3),
-        _chip(5),
-        _plain(" and "),
-        _chip(7),
-        _chip(8),
-        _plain("."),
-    ]
-
-
-def test_a_handle_split_across_deltas_waits_until_it_is_whole() -> None:
-    draft = Draft()
-
-    assert draft.add("Entropy rose. [") == [_plain("Entropy rose. ")]
-    assert draft.add("#1") == []
-    assert draft.add("2, #") == []
-    assert draft.add("4] Then") == [_chip(12), _chip(4), _plain(" Then")]
-
-
-def test_the_seeds_own_markers_stay_text() -> None:
-    draft = Draft()
-
-    assert draft.add("As printed [12] and (3), see [") == [_plain("As printed [12] and (3), see ")]
-    assert draft.add("1\u20133].") == [_plain("[1\u20133].")]
-
-
-# The handle forms core and web both read, each rebuilt around a form an eval run recorded.
-HANDLE_FORMS = json.loads(
-    (Path(__file__).parents[3] / "tests" / "fixtures" / "handle-forms.json").read_text("utf-8")
-)["forms"]
-
-
-def _chips(pieces: list[DraftPiece]) -> list[int]:
-    return [p.handle for p in pieces if p.handle is not None]
-
-
-def _words(pieces: list[DraftPiece]) -> str:
-    return "".join(p.text for p in pieces if p.handle is None)
-
-
-@pytest.mark.parametrize("form", HANDLE_FORMS, ids=lambda form: form["name"])
-def test_regression_eval_handle_forms_become_one_chip_per_number(form: dict[str, object]) -> None:
-    """Eval runs 20261029T191529Z-94e980b and 20261029T202214Z-2b41752, the traces named.
-
-    Every form core reads as handles is a chip in the draft, whole or streamed a character at a
-    time; groups without a `#` stay text.
-    """
-    draft, numbers = str(form["draft"]), form["handles"]
-
-    whole = Draft().add(draft)
-    streamed = Draft()
-    pieces = [piece for character in draft for piece in streamed.add(character)]
-
-    assert _chips(whole) == _chips(pieces) == numbers
-    assert _words(whole) == _words(pieces)
-    if not numbers:
-        assert _words(whole) == draft
-
-
-def test_text_that_only_starts_like_a_handle_is_cut_at_once() -> None:
-    # Whatever the model streams, looking for a handle's start must not backtrack for long.
-    text = "[#1" + ", " * 24 + "and so on."
-    started = time.monotonic()
-
-    pieces = Draft().add(text)
-
-    assert time.monotonic() - started < 0.5
-    assert pieces == [_plain(text)]
 
 
 def test_an_answer_is_cut_into_its_sentences_with_their_pointers() -> None:

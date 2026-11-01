@@ -19,7 +19,7 @@ from pydantic_ai.messages import ModelMessage
 from pydantic_ai.models import Model
 from pydantic_ai.models.function import AgentInfo, DeltaToolCall, FunctionModel
 
-from paperexplorer.asking import AskingContext, Reading
+from paperexplorer.asking import Reading
 from paperexplorer.chunking import chunk
 from paperexplorer.citations import CitationGraph, extract
 from paperexplorer.config import Settings
@@ -28,6 +28,7 @@ from paperexplorer.embedding import Embedder, FakeEmbedder
 from paperexplorer.parsing import ParsedWork
 from paperexplorer.store import Chunks, CitationGraphs, StageStatuses, Works, WorkTexts
 from paperexplorer.tracing import Tracing
+from paperexplorer.wiring import Wiring
 from paperexplorer_api.app import Asking, create_app
 from paperexplorer_api.conversations import Conversations
 
@@ -127,18 +128,13 @@ def make_app(store_db: Conn) -> AppFactory:
         reading: Reading = Reading.RETRIEVAL,
     ) -> FastAPI:
         settings = Settings(_env_file=None)  # pyright: ignore[reportCallIssue]
-        fake = embedder or FakeEmbedder()
+        wiring = Wiring.from_settings(
+            settings, tracing=Tracing.off(), embedder=embedder or FakeEmbedder(), model=model
+        )
         return create_app(
             lambda: nullcontext(store_db),
             Asking(
-                contexts=lambda conn: AskingContext(
-                    conn=conn,
-                    embedder=fake,
-                    model=model,
-                    settings=settings,
-                    tracing=Tracing.off(),
-                    reading=reading,
-                ),
+                contexts=lambda conn: wiring.asking(conn, reading=reading),
                 conversations=conversations or Conversations.from_settings(settings),
             ),
         )

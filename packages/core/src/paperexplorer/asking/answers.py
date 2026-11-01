@@ -6,6 +6,7 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
+from paperexplorer.asking.handles import GROUP, handle_numbers
 from paperexplorer.asking.quotes import find_quotes
 from paperexplorer.domain import Answer, AnswerSentence, Pointer, Support, Vector
 from paperexplorer.embedding import Embedder
@@ -14,28 +15,6 @@ from paperexplorer.store import StoredChunk
 
 logger = logging.getLogger(__name__)
 
-# A handle ties a sentence to a Chunk (design-asking.md, Answers): a group in `[]`, `()`, `{}`
-# or `<>`, nested one deep (`[<#3><#4>]`), holding only numbers, at least one with a `#`. They
-# stand apart by commas, semicolons, spaces, middle dots or `#` (`[#5, 6]`, `[#65·66]`,
-# `[#59##60]`). A range `#5-#7`, any dash, reads as its two ends: handles number Chunks in the
-# order first shown, not in reading order.
-# A group without `#`, `[74]` or `(5)`, is the Seed's own marker. The web app reads the same
-# grammar; tests/fixtures/handle-forms.json holds the forms both are tested with.
-# A Seed that numbers no Reference prints no `[74]` of its own, so there a bare group in square
-# brackets, not nested, is a handle too (`bare_handles`): the model wrote `[13]` for `[#13]`.
-_NUMBER = r"#*\d+"
-_ITEM = rf"{_NUMBER}(?:[ \t]*[-\u2010-\u2014][ \t]*{_NUMBER})?"
-_BRACKETS = ("[]", "()", "{}", "<>")
-
-
-def _group(item: str) -> str:
-    """A bracketed group of `item`s; without a separator, the next starts with `#` or a bracket."""
-    items = rf"(?:{item})(?:(?:[ \t,;·]+|(?=[#\[({{<]))(?:{item}))*"
-    return "|".join(rf"{re.escape(o)}[ \t]*{items}[ \t]*{re.escape(c)}" for o, c in _BRACKETS)
-
-
-_HANDLE = re.compile(_group(rf"{_group(_ITEM)}|{_ITEM}"))
-_NESTED = re.compile(r"[(){}<>\[\]]")
 # A sentence ends at . ! or ?, perhaps inside closing quotes or brackets, before a capital.
 _SENTENCE_END = re.compile(r"[.!?][\"\u201d\u2019')\]]*(?=\s+[\"\u201c\u2018(\[]?[A-Z])")
 _WORD = re.compile(r"[^\W_]+")
@@ -121,8 +100,8 @@ def _without_handles(draft: str, bare: bool) -> tuple[str, list[_Handle]]:
     text = ""
     written: list[_Handle] = []
     last = 0
-    for m in _HANDLE.finditer(draft):
-        if "#" not in m.group() and not (bare and _bare(m.group())):
+    for m in GROUP.finditer(draft):
+        if (numbers := handle_numbers(m.group(), bare=bare)) is None:
             continue  # the Seed's own marker, such as [74]
         text = (text + draft[last : m.start()]).rstrip(" \t")
         last = m.end()
@@ -130,13 +109,8 @@ def _without_handles(draft: str, bare: bool) -> tuple[str, list[_Handle]]:
             last += len(draft[last:]) - len(draft[last:].lstrip())
             if last == len(draft):
                 text = text.rstrip()
-        written += [_Handle(int(n), len(text)) for n in re.findall(r"\d+", m.group())]
+        written += [_Handle(n, len(text)) for n in numbers]
     return text + draft[last:], written
-
-
-def _bare(group: str) -> bool:
-    """Whether a group without `#` is a bare handle: in square brackets, nothing nested."""
-    return group.startswith("[") and not _NESTED.search(group[1:-1])
 
 
 def _sentences(text: str) -> list[Span]:

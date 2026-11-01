@@ -20,15 +20,22 @@ class Resolutions:
                 "INSERT INTO resolutions (work_id, reference_key, state, resolved_work_id, level,"
                 " confidence, evidence, layer, doi_conflict_work_id)"
                 " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                [
-                    (
-                        work, r.reference, r.state.value, r.work,
-                        r.level.value if r.level else None, r.confidence, r.evidence,
-                        r.layer.value if r.layer else None, r.doi_conflict,
-                    )
-                    for r in resolutions
-                ],
-            )  # fmt: skip
+                [_row(work, r) for r in resolutions],
+            )
+
+    def save(self, work: WorkId, resolution: Resolution) -> None:
+        """Store one Reference's Resolution over its earlier one, as a Registry Check lands it."""
+        self._conn.execute(
+            "INSERT INTO resolutions (work_id, reference_key, state, resolved_work_id, level,"
+            " confidence, evidence, layer, doi_conflict_work_id)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+            " ON CONFLICT (work_id, reference_key) DO UPDATE SET state = EXCLUDED.state,"
+            " resolved_work_id = EXCLUDED.resolved_work_id, level = EXCLUDED.level,"
+            " confidence = EXCLUDED.confidence, evidence = EXCLUDED.evidence,"
+            " layer = EXCLUDED.layer, doi_conflict_work_id = EXCLUDED.doi_conflict_work_id,"
+            " resolved_at = now()",
+            _row(work, resolution),
+        )
 
     def for_work(self, work: WorkId) -> list[Resolution]:
         """The Work's Resolutions, in the order its References are printed."""
@@ -54,3 +61,10 @@ class Resolutions:
             " WHERE %(old)s IN (resolved_work_id, doi_conflict_work_id)",
             {"old": old, "new": new},
         ).rowcount
+
+
+def _row(work: WorkId, r: Resolution) -> tuple[object, ...]:
+    return (
+        work, r.reference, r.state.value, r.work, r.level.value if r.level else None,
+        r.confidence, r.evidence, r.layer.value if r.layer else None, r.doi_conflict,
+    )  # fmt: skip

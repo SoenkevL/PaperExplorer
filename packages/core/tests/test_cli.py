@@ -522,3 +522,10 @@ def test_resolutions_of_an_unknown_work_fail(library: InMemoryLibrary) -> None:
 
     assert result.exit_code == 1
     assert "NOPE2345" in result.output
+
+
+def test_check_refuses_a_work_not_yet_parsed(cli_env: None) -> None:
+    result = CliRunner().invoke(app, ["check", "NOSUCHKY"])
+
+    assert result.exit_code == 1
+    assert "run `paperexplorer run parse NOSUCHKY` first" in result.output

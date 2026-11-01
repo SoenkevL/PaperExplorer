@@ -312,6 +312,62 @@ def _placing(placing: retrieval.Placing | None) -> str:
     return f"{placing.rank:>2} {placing.score:.3f}" if placing else " -     -"
 
 
+@app.command("check")
+def check_command(
+    work: Annotated[str, typer.Argument(help="The Work's Zotero item key, e.g. YAAC9XCX.")],
+    reference: Annotated[
+        str | None, typer.Option("--reference", help="Check only this Reference, by its key.")
+    ] = None,
+    refresh: Annotated[
+        bool, typer.Option("--refresh", help="Ask the registries again, past the cache.")
+    ] = False,
+) -> None:
+    """Look a Work's References up in Crossref and OpenAlex: a Registry Check (ADR 0011)."""
+    settings = Settings()
+    with psycopg.connect(settings.database_url, autocommit=True) as conn:
+        store.migrate(conn)
+        found = store.Works(conn).find(work)
+        parsed = store.WorkTexts(conn).get(found.id) if found else None
+        if found is None or parsed is None:
+            typer.echo(
+                f"No parsed Work {work}; run `paperexplorer run parse {work}` first", err=True
+            )
+            raise typer.Exit(1)
+        refs = [r for r in parsed.references if reference is None or r.id == reference]
+        if not refs:
+            typer.echo(f"{work} prints no Reference {reference}", err=True)
+            raise typer.Exit(1)
+        with conn.transaction():
+            if sync(conn, ZoteroLibrary.from_settings(settings)).stale:
+                typer.echo("Zotero could not be reached; checking against the last copy", err=True)
+        registries = resolution.Registries(settings)
+
+        async def run() -> resolution.RegistryCheckEvent | None:
+            last: resolution.RegistryCheckEvent | None = None
+            checking = resolution.registry_check(conn, found.id, refs, registries, refresh=refresh)
+            async for event in checking:
+                if isinstance(event, resolution.ReferenceChecked):
+                    r = event.resolution
+                    layer = r.layer.value if r.layer else "-"
+                    typer.echo(f"{r.reference:<6} {_state(r):<10} {layer}")
+                last = event
+            return last
+
+        started = time.monotonic()
+        try:
+            last = asyncio.run(run())
+        except resolution.RegistryError as e:
+            typer.echo(f"Check stopped: {e}; what landed is kept", err=True)
+            raise typer.Exit(1) from e
+    if isinstance(last, resolution.BudgetSpent):
+        typer.echo(last.message, err=True)
+        raise typer.Exit(1)
+    if isinstance(last, resolution.RegistryCheckFinished):
+        summary = ", ".join(f"{n} {k}" for k, n in last.counts.items() if k != "references")
+        typer.echo(f"Checked {last.counts['references']} References in "
+                   f"{time.monotonic() - started:.1f} s: {summary}")  # fmt: skip
+
+
 @app.command("search")
 def search_command(
     ctx: typer.Context,

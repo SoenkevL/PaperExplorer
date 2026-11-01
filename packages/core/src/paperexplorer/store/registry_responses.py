@@ -1,4 +1,4 @@
-"""Registry responses: what doi.org (later Crossref and OpenAlex) answered, per source and key."""
+"""Registry responses: what doi.org, Crossref and OpenAlex answered, per source and key."""
 
 from collections.abc import Sequence
 from datetime import timedelta
@@ -6,10 +6,17 @@ from datetime import timedelta
 import psycopg
 from psycopg.rows import TupleRow
 from psycopg.types.json import Jsonb
-from pydantic import JsonValue
+from pydantic import BaseModel, JsonValue
 
 # A miss may be a DOI registered late or a registry's gap, so it is asked again after this long.
 MISS_TTL = timedelta(days=30)
+
+
+class RegistryResponse(BaseModel):
+    """A cached answer: whether it was a hit, and the record or list the registry returned."""
+
+    hit: bool
+    response: JsonValue = None
 
 
 class RegistryResponses:
@@ -25,6 +32,15 @@ class RegistryResponses:
             (source, list(keys)),
         ).fetchall()
         return {key: hit for key, hit in rows}
+
+    def get(self, source: str, keys: Sequence[str]) -> dict[str, RegistryResponse]:
+        """The answers that need not be asked again (as `fresh`), with what each returned."""
+        rows = self._conn.execute(
+            "SELECT key, hit, response FROM registry_responses WHERE source = %s"
+            " AND key = ANY(%s) AND (hit OR fetched_at > now() - %s)",
+            (source, list(keys), MISS_TTL),
+        ).fetchall()
+        return {key: RegistryResponse(hit=hit, response=response) for key, hit, response in rows}
 
     def fresh(self, source: str, keys: Sequence[str]) -> set[str]:
         """The keys that need not be asked again: hits, and misses younger than `MISS_TTL`."""

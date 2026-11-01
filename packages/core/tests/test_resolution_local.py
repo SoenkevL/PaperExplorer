@@ -12,6 +12,7 @@ from paperexplorer.domain import (
     Layer,
     Level,
     LibraryItem,
+    RegistrySource,
     Resolution,
     ResolutionState,
     WorkId,
@@ -21,7 +22,13 @@ from paperexplorer.library import InMemoryLibrary
 from paperexplorer.parsing import ParsedWork, Reference, TextOrigin
 from paperexplorer.pipeline import StageContext, StageError, run_stage
 from paperexplorer.resolution import InMemoryDoiRegistry
-from paperexplorer.store import Resolutions, StageStatuses, Works, WorkTexts
+from paperexplorer.store import (
+    RegistryResponses,
+    Resolutions,
+    StageStatuses,
+    Works,
+    WorkTexts,
+)
 from paperexplorer.tracing import Tracing
 
 Conn = psycopg.Connection[TupleRow]
@@ -103,7 +110,8 @@ def test_references_resolve_against_the_library_by_doi_and_by_title(ctx: StageCo
         Resolution(reference="b2", state=ResolutionState.UNCHECKED),
     ]  # fmt: skip
     assert result.counts == {
-        "references": 3, "certain": 1, "high": 1, "low": 0, "unchecked": 1, "doi_conflicts": 0,
+        "references": 3, "certain": 1, "high": 1, "low": 0, "unchecked": 1, "unresolved": 0,
+        "doi_conflicts": 0,
     }  # fmt: skip
 
 
@@ -194,3 +202,24 @@ def test_a_work_whose_library_item_went_no_longer_matches(
         ResolutionState.UNCHECKED,
         ResolutionState.UNCHECKED,
     ]
+
+
+def test_a_reference_a_registry_check_resolved_stays_resolved_from_the_cache(
+    ctx: StageContext,
+) -> None:
+    # What a Check left: Crossref's record for the printed DOI, no Library Item holding it.
+    RegistryResponses(ctx.conn).record(
+        RegistrySource.CROSSREF_DOI,
+        "10.5555/elsewhere",
+        {"DOI": "10.5555/elsewhere", "title": ["Held elsewhere"], "author": [{"family": "Lee"}]},
+        hit=True,
+    )
+    RegistryResponses(ctx.conn).record(
+        RegistrySource.OPENALEX_DOI, "10.5555/elsewhere", None, hit=False
+    )
+    seed = _seed(ctx.conn, [_ref("b0", doi="10.5555/elsewhere", title="Held elsewhere")])
+
+    run_stage(ctx, "resolve", seed)
+
+    [resolution] = Resolutions(ctx.conn).for_work(seed)
+    assert (resolution.level, resolution.layer) == (Level.CERTAIN, Layer.CROSSREF)

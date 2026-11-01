@@ -240,7 +240,6 @@ def test_ask_searches_a_seed_over_the_whole_seed_budget(
 
 @pytest.mark.usefixtures("embedded_seed")
 def test_ask_marks_a_quote_that_is_not_the_authors_words() -> None:
-
     result = CliRunner().invoke(
         app,
         ["ask", "YAAC9XCX", "How was entropy measured?"],
@@ -327,7 +326,6 @@ def test_eval_asks_every_question_live_and_by_retrieval_and_writes_the_run(
 def test_eval_without_retrieval_asks_only_as_the_reader_does(
     eval_files: Path,
 ) -> None:
-
     result = CliRunner().invoke(
         app,
         [

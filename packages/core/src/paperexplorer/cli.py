@@ -133,8 +133,9 @@ def run_command(
     with psycopg.connect(settings.database_url, autocommit=True) as conn:
         store.migrate(conn)
         work_id = store.Works(conn).ensure(work)
-        wiring = _wiring(ctx, settings)
+        wiring = None
         try:
+            wiring = _wiring(ctx, settings)
             stage_ctx = pipeline.StageContext(
                 conn=conn,
                 settings=settings,
@@ -147,7 +148,8 @@ def run_command(
             typer.echo(f"{stage.value} failed for {work}: {e}", err=True)
             raise typer.Exit(1) from e
         finally:
-            wiring.tracing.flush()
+            if wiring is not None:
+                wiring.tracing.flush()
     counts = ", ".join(f"{k} {v}" for k, v in result.counts.items())
     typer.echo(f"{stage.value} {work}: {counts}")
 

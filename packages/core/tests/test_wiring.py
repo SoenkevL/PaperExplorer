@@ -43,12 +43,11 @@ def test_a_turns_context_holds_its_connection_and_the_wiring(
     settings = _settings()
     wiring = Wiring.from_settings(settings, embedder=FakeEmbedder())
 
-    ctx = wiring.asking(store_db, tags=("run:r1",), reading=Reading.RETRIEVAL)
+    ctx = wiring.asking(store_db, reading=Reading.RETRIEVAL)
 
     assert ctx.conn is store_db
     assert (ctx.embedder, ctx.model, ctx.tracing) == (wiring.embedder, wiring.model, wiring.tracing)
     assert ctx.settings is settings
-    assert ctx.tags == ("run:r1",)
     assert ctx.reading is Reading.RETRIEVAL
 
 
@@ -57,4 +56,4 @@ def test_a_turns_context_reads_the_seed_as_fits_by_default(
 ) -> None:
     ctx = Wiring.from_settings(_settings(), embedder=FakeEmbedder()).asking(store_db)
 
-    assert (ctx.tags, ctx.reading) == ((), Reading.AUTO)
+    assert ctx.reading is Reading.AUTO

@@ -32,19 +32,21 @@ class Wiring:
         model: Model | None = None,
     ) -> Self:
         """Each adapter not given is built from `settings`; the Embedder traces to `tracing`."""
-        tracing = tracing or configure_tracing(settings)
+        if tracing is None:
+            tracing = configure_tracing(settings)
+        if embedder is None:
+            embedder = OpenAICompatibleEmbedder.from_settings(settings, tracing)
         return cls(
             settings=settings,
             tracing=tracing,
-            embedder=embedder or OpenAICompatibleEmbedder.from_settings(settings, tracing),
-            model=model or chat_model(settings),
+            embedder=embedder,
+            model=chat_model(settings) if model is None else model,
         )
 
     def asking(
         self,
         conn: psycopg.Connection[TupleRow],
         *,
-        tags: tuple[str, ...] = (),
         reading: Reading = Reading.AUTO,
     ) -> AskingContext:
         """A turn's `AskingContext` around the store connection it answers over."""
@@ -54,6 +56,5 @@ class Wiring:
             model=self.model,
             settings=self.settings,
             tracing=self.tracing,
-            tags=tags,
             reading=reading,
         )

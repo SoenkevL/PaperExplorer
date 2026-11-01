@@ -534,8 +534,9 @@ def test_the_cost_of_a_check_counts_the_calls_the_cache_does_not_answer(store_db
     cost = estimate(store_db, seed, refs)
 
     assert cost.model_copy(update={"openalex_usd": round(cost.openalex_usd, 6)}) == CheckCost(
+        # b1 has no title; b0's title search, not yet asked, may come back low.
         unchecked=2, crossref_batches=1, openalex_batches=1, title_searches=1,
-        bibliographic_searches=1, openalex_usd=0.0011,
+        bibliographic_searches=2, openalex_usd=0.0011,
     )  # fmt: skip
     assert estimate(store_db, seed, refs[:1], refresh=True).title_searches == 1
 
@@ -567,3 +568,29 @@ def test_refresh_asks_again_for_a_reference_the_cache_resolved_certain(
 
     assert len(registry.sent("api.crossref.org")) == asked + 1
     assert _checked(events)["b0"].layer is Layer.CROSSREF
+
+
+def test_the_cost_counts_a_bibliographic_search_for_a_low_title_match(store_db: Conn) -> None:
+    title = "deep residual learning for image recognitions"  # near RESNET_OA's title: low
+    RegistryResponses(store_db).record(RegistrySource.OPENALEX_TITLE, title, [RESNET_OA], hit=True)
+    refs = [_ref("b0", title=title)]
+    seed = _seed(store_db, refs)
+
+    cost = estimate(store_db, seed, refs)
+
+    assert (cost.title_searches, cost.bibliographic_searches) == (0, 1)
+
+
+def test_the_cost_on_refresh_asks_again_what_the_cache_resolved(store_db: Conn) -> None:
+    cache = RegistryResponses(store_db)
+    for source, record in (
+        (RegistrySource.CROSSREF_DOI, RESNET),
+        (RegistrySource.OPENALEX_DOI, RESNET_OA),
+    ):
+        cache.record(source, "10.1109/cvpr.2016.90", record, hit=True)
+    refs = [_ref("b0", doi="10.1109/CVPR.2016.90", title=RESNET["title"][0], surnames=["He"])]
+    seed = _seed(store_db, refs)
+
+    cost = estimate(store_db, seed, refs, refresh=True)
+
+    assert (cost.crossref_batches, cost.openalex_batches, cost.title_searches) == (1, 1, 1)

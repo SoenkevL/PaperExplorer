@@ -81,7 +81,7 @@ def app_from_env() -> FastAPI:
     try:
         library = ZoteroLibrary.from_settings(settings)
     except ValueError as e:
-        logger.warning("No Registry Checks or merges: %s", e)
+        logger.info("No Registry Checks or merges: %s", e)
         library = None
     return create_app(
         lambda: psycopg.connect(settings.database_url, autocommit=True),

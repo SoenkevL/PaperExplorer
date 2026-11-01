@@ -50,6 +50,10 @@ class Resolutions:
                 (work,),
             ).fetchall()
 
+    def get(self, work: WorkId, reference: str) -> Resolution | None:
+        """One Reference's Resolution, by its key, if it has one."""
+        return next((r for r in self.for_work(work) if r.reference == reference), None)
+
     def repoint(self, old: WorkId, new: WorkId) -> int:
         """Point every Resolution naming `old` at `new`, as after a merge; how many changed."""
         return self._conn.execute(

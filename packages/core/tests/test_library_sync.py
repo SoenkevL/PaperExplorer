@@ -9,7 +9,7 @@ from psycopg.rows import TupleRow
 from paperexplorer.domain import Level, LibraryChanges, LibraryItem, Resolution, ResolutionState
 from paperexplorer.library import InMemoryLibrary, LibraryUnavailableError, sync
 from paperexplorer.parsing import ParsedWork, Reference, TextOrigin
-from paperexplorer.store import Resolutions, StageStatuses, Works, WorkTexts
+from paperexplorer.store import ReadersChoices, Resolutions, StageStatuses, Works, WorkTexts
 
 from .test_library import SyncingZotero, _zitem, _zpdf  # pyright: ignore[reportPrivateUsage]
 
@@ -157,3 +157,32 @@ def test_a_merge_moves_the_resolutions_to_the_kept_item_and_its_work_goes(store_
     assert moved.work == works.ensure("KEEP1111")
     assert works.find("GONE2222") is None
     assert result.moved == 1
+
+
+def test_a_merge_moves_a_readers_choice_to_the_kept_item(store_db: Conn) -> None:
+    library = CountingLibrary([_item("SEED1111"), _item("KEEP1111"), _item("GONE2222")])
+    sync(store_db, library)
+    works = Works(store_db)
+    seed, gone = works.ensure("SEED1111"), works.ensure("GONE2222")
+    ReadersChoices(store_db).choose(seed, "Printed b0", gone)
+    library.merge("KEEP1111", "GONE2222")
+
+    sync(store_db, library)
+
+    assert ReadersChoices(store_db).for_work(seed) == {"Printed b0": works.ensure("KEEP1111")}
+    assert works.find("GONE2222") is None
+
+
+def test_a_deleted_library_item_a_reader_chose_keeps_its_work(store_db: Conn) -> None:
+    library = CountingLibrary([_item("SEED1111"), _item("GONE2222")])
+    sync(store_db, library)
+    works = Works(store_db)
+    seed, gone = works.ensure("SEED1111"), works.ensure("GONE2222")
+    ReadersChoices(store_db).choose(seed, "Printed b0", gone)
+    library.remove("GONE2222")
+
+    sync(store_db, library)
+
+    assert ReadersChoices(store_db).for_work(seed) == {"Printed b0": gone}
+    kept = works.get(gone)
+    assert kept is not None and kept.zotero_key is None

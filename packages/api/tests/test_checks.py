@@ -166,8 +166,19 @@ def test_the_cost_of_a_check_comes_with_whats_left_of_the_openalex_day(
     # The Library has not been synced yet, so b0 is Unchecked too.
     assert cost == {
         "unchecked": 2, "crossref_batches": 1, "openalex_batches": 1, "title_searches": 2,
-        "bibliographic_searches": 0, "openalex_usd": pytest.approx(0.0021), "budget_usd": 0.042,
+        "bibliographic_searches": 2, "openalex_usd": pytest.approx(0.0021), "budget_usd": 0.042,
     }  # fmt: skip
+
+
+def test_the_cost_of_a_check_says_when_the_openalex_day_is_spent(
+    checks: TestClient, seed: WorkId, registry: Registry
+) -> None:
+    registry.remaining_usd = "0"
+
+    response = checks.get(f"/works/{seed}/checks/cost")
+
+    assert response.status_code == 200
+    assert response.json()["budget_usd"] == 0
 
 
 def test_one_reference_checked_again_asks_the_registries_past_the_cache(

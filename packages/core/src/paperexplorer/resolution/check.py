@@ -91,26 +91,46 @@ def estimate(
     """What a Registry Check of these References of `citing` would ask; no registry is called."""
     cache = RegistryResponses(conn)
     current = {r.reference: r for r in resolve(conn, citing, refs)}
-    pending = [ref for ref, _ in as_resolved(conn, refs) if not current[ref.id].firm]
+    pending = [ref for ref, _ in as_resolved(conn, refs) if not _settled(current[ref.id], refresh)]
 
-    def unanswered(source: RegistrySource, keys: Collection[str | None]) -> int:
-        wanted = sorted({k for k in keys if k is not None})
-        return len(wanted) - (0 if refresh else len(cache.fresh(source, wanted)))
+    def asked(source: RegistrySource, keys: Collection[str | None]) -> list[str]:
+        return _unanswered(cache, source, keys, refresh=refresh)
 
     dois = [doi_key(r) for r in pending]
-    titles = [title_key(r) for r in pending]
-    printed = [bibliographic_key(r) for r in pending if title_key(r) is None]
-    crossref = ceil(unanswered(RegistrySource.CROSSREF_DOI, dois) / BATCH)
-    openalex = ceil(unanswered(RegistrySource.OPENALEX_DOI, dois) / BATCH)
-    searches = unanswered(RegistrySource.OPENALEX_TITLE, titles)
+    titles = asked(RegistrySource.OPENALEX_TITLE, [title_key(r) for r in pending])
+    # Layer 3 is for a low title match, and an unasked title search may yet bring one.
+    printed = [
+        bibliographic_key(r)
+        for r in pending
+        if needs_bibliographic(r, current[r.id]) or title_key(r) in titles
+    ]
+    crossref = ceil(len(asked(RegistrySource.CROSSREF_DOI, dois)) / BATCH)
+    openalex = ceil(len(asked(RegistrySource.OPENALEX_DOI, dois)) / BATCH)
     return CheckCost(
         unchecked=sum(r.state is ResolutionState.UNCHECKED for r in current.values()),
         crossref_batches=crossref,
         openalex_batches=openalex,
-        title_searches=searches,
-        bibliographic_searches=unanswered(RegistrySource.CROSSREF_BIBLIOGRAPHIC, printed),
-        openalex_usd=openalex * OPENALEX_LIST_COST + searches * OPENALEX_SEARCH_COST,
+        title_searches=len(titles),
+        bibliographic_searches=len(asked(RegistrySource.CROSSREF_BIBLIOGRAPHIC, printed)),
+        openalex_usd=openalex * OPENALEX_LIST_COST + len(titles) * OPENALEX_SEARCH_COST,
     )
+
+
+def _settled(r: Resolution, refresh: bool) -> bool:
+    """Whether the local pass settles a Reference before any registry is asked.
+
+    On refresh only the Library and the reader do: what the cache resolved is asked again.
+    """
+    return r.firm and (not refresh or r.layer in (Layer.LIBRARY, Layer.READER))
+
+
+def _unanswered(
+    cache: RegistryResponses, source: RegistrySource, keys: Collection[str | None], *, refresh: bool
+) -> list[str]:
+    """The keys to ask: all of them on refresh, else those the cache does not answer."""
+    wanted = sorted({k for k in keys if k is not None})
+    answered: set[str] = set() if refresh else cache.fresh(source, wanted)
+    return [k for k in wanted if k not in answered]
 
 
 async def registry_check(
@@ -144,10 +164,7 @@ async def registry_check(
         return landed
 
     def unanswered(source: RegistrySource, keys: Collection[str | None]) -> list[str]:
-        """The keys to ask: all of them on refresh, else those the cache does not answer."""
-        wanted = sorted({k for k in keys if k is not None})
-        answered: set[str] = set() if refresh else cache.fresh(source, wanted)
-        return [k for k in wanted if k not in answered]
+        return _unanswered(cache, source, keys, refresh=refresh)
 
     async def ask_each(
         source: RegistrySource,
@@ -180,9 +197,7 @@ async def registry_check(
                 group.create_task(one(batch))
 
     async with registries:
-        # On refresh only the Library and the reader settle a Reference before the registries.
-        local = (Layer.LIBRARY, Layer.READER)
-        for event in settle(lambda r: r.firm and (not refresh or r.layer in local)):
+        for event in settle(lambda r: _settled(r, refresh)):
             yield event
         try:
             dois = [doi_key(r) for r in pending.values()]

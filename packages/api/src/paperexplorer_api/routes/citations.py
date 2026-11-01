@@ -8,7 +8,7 @@ from paperexplorer.resolution import Registration, registration
 from paperexplorer.store import CitationGraphs, Resolutions, Works
 from paperexplorer_api import schemas
 from paperexplorer_api.routes import Connections
-from paperexplorer_api.routes.checks import resolution_view
+from paperexplorer_api.routes.views import resolution_view
 
 
 def router(connections: Connections) -> APIRouter:
@@ -22,11 +22,7 @@ def router(connections: Connections) -> APIRouter:
             work = Works(conn).get(detail.work) if detail else None
             ref = detail.reference if detail else None
             registered = registration(conn, ref.doi) if ref and ref.doi else None
-            resolved = (
-                {r.reference: r for r in Resolutions(conn).for_work(detail.work)}.get(ref.id)
-                if detail and ref
-                else None
-            )
+            resolved = Resolutions(conn).get(detail.work, ref.id) if detail and ref else None
             resolved_view = resolution_view(conn, resolved) if resolved else None
         if detail is None or work is None or work.text_origin is None:
             raise HTTPException(404, f"No Citation {citation_id}")

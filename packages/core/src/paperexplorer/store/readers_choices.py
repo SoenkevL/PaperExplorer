@@ -36,3 +36,9 @@ class ReadersChoices:
             "SELECT printed, chosen_work_id FROM readers_choices WHERE work_id = %s", (work,)
         ).fetchall()
         return {printed: None if chosen is None else WorkId(chosen) for printed, chosen in rows}
+
+    def repoint(self, old: WorkId, new: WorkId) -> int:
+        """Point every choice of `old` at `new`, as after a merge; how many changed."""
+        return self._conn.execute(
+            "UPDATE readers_choices SET chosen_work_id = %s WHERE chosen_work_id = %s", (new, old)
+        ).rowcount

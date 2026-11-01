@@ -70,7 +70,7 @@ def candidates(conn: psycopg.Connection[TupleRow], citing: WorkId, ref: Referenc
     Works with a near title, a Check's among them.
     """
     works = Works(conn)
-    saved = {r.reference: r for r in Resolutions(conn).for_work(citing)}.get(ref.id)
+    saved = Resolutions(conn).get(citing, ref.id)
     ids = [saved.work, saved.doi_conflict] if saved else []
     ids.append(works.standing_item(normalize_doi(ref.doi)) if ref.doi else None)
     pool: dict[WorkId, Work] = {}

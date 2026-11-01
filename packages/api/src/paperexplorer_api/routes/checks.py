@@ -9,12 +9,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 
 from paperexplorer import resolution
-from paperexplorer.domain import Layer, RegistryRecord, Resolution, Work, WorkId, normalize_doi
-from paperexplorer.library import Library, sync
+from paperexplorer.domain import RegistryRecord, Resolution, Work, WorkId, normalize_doi
+from paperexplorer.library import Library, NotDuplicateItemsError, sync
+from paperexplorer.library import merge as merge_items
 from paperexplorer.parsing import Reference
 from paperexplorer.store import ReadersChoices, Resolutions, Works, WorkTexts
 from paperexplorer_api import schemas
 from paperexplorer_api.routes import Conn, Connections
+from paperexplorer_api.routes.views import brief, resolution_view
 
 logger = logging.getLogger(__name__)
 
@@ -25,35 +27,6 @@ class Checking:
 
     library: Library
     registries: Callable[[], resolution.Registries]
-
-
-def brief(work: Work) -> schemas.WorkBrief:
-    """A Work as a Resolution names it."""
-    return schemas.WorkBrief(
-        id=work.id, zotero_key=work.zotero_key, title=work.title, creators=work.creators,
-        year=work.year, doi=work.doi,
-    )  # fmt: skip
-
-
-def resolution_view(conn: Conn, r: Resolution) -> schemas.Resolution:
-    """A Resolution with the Works it names."""
-    works = Works(conn)
-
-    def named(work: WorkId | None) -> schemas.WorkBrief | None:
-        found = works.get(work) if work is not None else None
-        return brief(found) if found else None
-
-    return schemas.Resolution(
-        reference=r.reference,
-        state=r.state.value,
-        work=named(r.work),
-        level=r.level.value if r.level else None,
-        confidence=r.confidence,
-        evidence=r.evidence,
-        layer=r.layer.value if r.layer else None,
-        doi_conflict=named(r.doi_conflict),
-        chosen=r.layer is Layer.READER,
-    )
 
 
 def router(connections: Connections, checking: Checking) -> APIRouter:
@@ -92,6 +65,8 @@ def router(connections: Connections, checking: Checking) -> APIRouter:
         try:
             async with registries:
                 budget = await registries.budget()
+        except resolution.BudgetSpentError:
+            budget = 0.0
         except resolution.RegistryError:
             logger.warning("OpenAlex did not say what is left of its budget", exc_info=True)
             budget = None
@@ -105,11 +80,11 @@ def router(connections: Connections, checking: Checking) -> APIRouter:
         work, refs = found
         with connections() as conn:
             synced(conn)
-            checking_ = resolution.registry_check(
+            events = resolution.registry_check(
                 conn, work, refs, checking.registries(), refresh=check.refresh if check else False
             )
             try:
-                async for event in checking_:
+                async for event in events:
                     sent = _event(conn, event)
                     yield ServerSentEvent(event=sent.type, raw_data=sent.model_dump_json())
             except resolution.RegistryError as e:
@@ -185,9 +160,8 @@ def router(connections: Connections, checking: Checking) -> APIRouter:
         ]
 
     def duplicate_item(conn: Conn, key: str) -> Work:
-        works = Works(conn)
-        found = works.find(key)
-        if found is None or not any(found.id in {w.id for w in g} for g in works.duplicate_items()):
+        found = Works(conn).duplicate_item(key)
+        if found is None:
             raise HTTPException(
                 404, f"{key} is not a Duplicate Item: no other Library Item holds its DOI"
             )
@@ -206,12 +180,10 @@ def router(connections: Connections, checking: Checking) -> APIRouter:
         with connections() as conn:
             synced(conn)
             keep, other = duplicate_item(conn, pair.keep), duplicate_item(conn, pair.other)
-            if keep.doi != other.doi or keep.id == other.id:
-                raise HTTPException(422, f"{pair.keep} and {pair.other} do not share a DOI")
-            checking.library.merge(pair.keep, pair.other)
-            with conn.transaction():
-                moved = sync(conn, checking.library).moved  # follows dc:replaces
-        logger.info("Merged %s into %s; %d Resolutions moved", pair.other, pair.keep, moved)
+            try:
+                moved = merge_items(conn, checking.library, keep, other)
+            except NotDuplicateItemsError as e:
+                raise HTTPException(422, str(e)) from e
         return schemas.Merged(moved=moved)
 
     return routes

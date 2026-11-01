@@ -16,6 +16,14 @@ type Vector = list[float]
 """An embedding of one text, as an `Embedder` returns it."""
 
 
+def normalize_doi(doi: str) -> str:
+    """A DOI as a key: lowercase, no `https://doi.org/` or `doi:`, no trailing `.` or `,`."""
+    key = doi.strip().lower()
+    for prefix in ("https://doi.org/", "http://doi.org/", "https://dx.doi.org/", "doi:"):
+        key = key.removeprefix(prefix)
+    return key.strip().rstrip(".,")
+
+
 class Attachment(BaseModel):
     """A PDF attached to a Library Item: its own Zotero key and file name."""
 
@@ -35,6 +43,7 @@ class LibraryItem(BaseModel):
     doi: str | None = None
     pdf: Attachment | None = None
     added: datetime | None = None  # when it entered the Library; the older of two stands
+    replaces: list[str] = []  # keys of items merged into it (`dc:replaces`)
 
 
 class LibraryChanges(BaseModel):

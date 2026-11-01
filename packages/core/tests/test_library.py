@@ -15,6 +15,7 @@ from paperexplorer.library import (
     InMemoryLibrary,
     ItemNotFoundError,
     Library,
+    LibraryUnavailableError,
     ZoteroLibrary,
 )
 
@@ -204,6 +205,7 @@ def test_a_merge_gives_the_kept_item_the_others_pdf_and_trashes_the_other() -> N
     library.merge("KEEP1111", "GONE2222")
 
     assert library.item("KEEP1111").pdf == PDF
+    assert library.item("KEEP1111").replaces == ["GONE2222"]
     with pytest.raises(ItemNotFoundError):
         library.item("GONE2222")
     changes = library.changes(before)
@@ -392,6 +394,7 @@ def test_a_zotero_merge_moves_collections_tags_and_children_and_trashes_the_othe
     }
     assert zotero.writes[3][:2] == ("GONE2222", {"deleted": 1})
     assert library.item("KEEP1111").pdf == Attachment(key="PDFG2222", filename="PDFG2222.pdf")
+    assert library.item("KEEP1111").replaces == ["GONE2222"]
     assert library.changes(100).deleted == ["GONE2222"]
 
 
@@ -402,3 +405,24 @@ def test_a_zotero_merge_of_an_unknown_item_writes_nothing() -> None:
         zotero.library().merge("KEEP1111", "NOPE2345")
 
     assert zotero.writes == []
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        lambda r: (_ for _ in ()).throw(httpx.ConnectError("No route to host", request=r)),
+        lambda r: httpx.Response(503, text="Service unavailable"),
+        lambda r: httpx.Response(200, json=[]),  # no Last-Modified-Version
+    ],
+    ids=["unreachable", "5xx", "no-version"],
+)
+def test_zotero_that_cannot_say_what_changed_is_unavailable(
+    reply: Callable[[httpx.Request], httpx.Response],
+) -> None:
+    api = httpx.Client(
+        base_url="https://api.zotero.org/users/1234567", transport=httpx.MockTransport(reply)
+    )
+    library = ZoteroLibrary(api, httpx.Client(), storage_dir=None, cache_dir=Path("unused"))
+
+    with pytest.raises(LibraryUnavailableError):
+        library.changes(None)

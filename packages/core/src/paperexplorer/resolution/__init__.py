@@ -1,14 +1,13 @@
 """Resolving References: matching each to the Work it names (design-resolution.md)."""
 
-from paperexplorer.domain import Level
-from paperexplorer.resolution.local import resolve
+from paperexplorer.domain import Level, normalize_doi
+from paperexplorer.resolution.local import counts, resolve
 from paperexplorer.resolution.matching import (
     Candidate,
     DoiConflict,
     Match,
     agrees,
     match,
-    normalize_doi,
 )
 
 __all__ = [
@@ -17,6 +16,7 @@ __all__ = [
     "Level",
     "Match",
     "agrees",
+    "counts",
     "match",
     "normalize_doi",
     "resolve",

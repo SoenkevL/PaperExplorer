@@ -2,13 +2,12 @@
 
 import logging
 
-import httpx
 import psycopg
 from psycopg.rows import TupleRow
 from pydantic import BaseModel
 
-from paperexplorer.library.port import Library
-from paperexplorer.store import LibraryVersions, Works
+from paperexplorer.library.port import ItemNotFoundError, Library, LibraryUnavailableError
+from paperexplorer.store import LibraryVersions, Resolutions, Works
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +18,7 @@ class SyncResult(BaseModel):
     full: bool
     items: int
     removed: int
+    moved: int = 0  # Resolutions moved to the item a merged one went into
     stale: bool = False  # the Library was unreachable; the last copy stands
 
 
@@ -31,18 +31,32 @@ def sync(conn: psycopg.Connection[TupleRow], library: Library, *, full: bool = F
     since = None if full else versions.last()
     try:
         changes = library.changes(since)
-    except httpx.HTTPError as e:
+    except LibraryUnavailableError as e:
         logger.warning("The Library could not be read (%s); the last copy stands", e)
         return SyncResult(full=False, items=0, removed=0, stale=True)
-    for item in changes.items:
-        works.record_library_item(works.ensure(item.key), item)
+    items = {i.key: i for i in changes.items}
     gone = set(changes.deleted)
+    # A trashed or deleted PDF arrives as its own key; its parent's version stays as it was.
+    for work in works.with_pdf_attachment(gone):
+        if work.zotero_key is not None and work.zotero_key not in items.keys() | gone:
+            try:
+                items[work.zotero_key] = library.item(work.zotero_key)
+            except ItemNotFoundError:
+                gone.add(work.zotero_key)
+    moved = 0
+    for item in items.values():
+        work = works.ensure(item.key)
+        works.record_library_item(work, item)
+        # A merge (ours or Zotero desktop's): the References the other item had are this one's.
+        for replaced in item.replaces:
+            if (old := works.find(replaced)) is not None and old.id != work:
+                moved += Resolutions(conn).repoint(old.id, work)
     if changes.full:
-        gone |= works.zotero_keys() - {i.key for i in changes.items}
+        gone |= works.zotero_keys() - items.keys()
     removed = sum(works.remove_library_item(key) for key in sorted(gone))
     versions.record(changes.version)
     logger.info(
         "Library synced to version %d: %d items recorded, %d gone, %d Works removed",
-        changes.version, len(changes.items), len(gone), removed,
+        changes.version, len(items), len(gone), removed,
     )  # fmt: skip
-    return SyncResult(full=changes.full, items=len(changes.items), removed=removed)
+    return SyncResult(full=changes.full, items=len(items), removed=removed, moved=moved)

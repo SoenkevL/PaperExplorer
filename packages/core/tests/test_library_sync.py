@@ -2,14 +2,16 @@
 
 import logging
 
-import httpx
 import psycopg
 import pytest
 from psycopg.rows import TupleRow
 
-from paperexplorer.domain import LibraryChanges, LibraryItem
-from paperexplorer.library import InMemoryLibrary, sync
-from paperexplorer.store import StageStatuses, Works
+from paperexplorer.domain import Level, LibraryChanges, LibraryItem, Resolution, ResolutionState
+from paperexplorer.library import InMemoryLibrary, LibraryUnavailableError, sync
+from paperexplorer.parsing import ParsedWork, Reference, TextOrigin
+from paperexplorer.store import Resolutions, StageStatuses, Works, WorkTexts
+
+from .test_library import SyncingZotero, _zitem, _zpdf  # pyright: ignore[reportPrivateUsage]
 
 Conn = psycopg.Connection[TupleRow]
 
@@ -102,7 +104,7 @@ def test_a_full_sync_also_drops_works_whose_items_left_unnoticed(store_db: Conn)
 
 class UnreachableLibrary(InMemoryLibrary):
     def changes(self, since: int | None) -> LibraryChanges:
-        raise httpx.ConnectError("No route to host")
+        raise LibraryUnavailableError("No route to host")
 
 
 def test_an_unreachable_library_leaves_the_last_copy_and_warns(
@@ -116,3 +118,42 @@ def test_an_unreachable_library_leaves_the_last_copy_and_warns(
     assert result.stale
     assert [w.zotero_key for w in Works(store_db).list()] == ["AAAA1111"]
     assert "last copy" in caplog.text
+
+
+def test_a_trashed_pdf_leaves_its_items_work_without_one(store_db: Conn) -> None:
+    zotero = SyncingZotero(100, [_zitem("ITEM1111", 10), _zpdf("PDF11111", 11, parent="ITEM1111")])
+    sync(store_db, zotero.library())
+    zotero.trashed.add("PDF11111")  # its parent's version stays as it was
+    zotero.touch("PDF11111")
+
+    sync(store_db, zotero.library())
+
+    work = Works(store_db).find("ITEM1111")
+    assert work is not None and work.pdf is None
+
+
+def test_a_merge_moves_the_resolutions_to_the_kept_item_and_its_work_goes(store_db: Conn) -> None:
+    library = CountingLibrary([_item("SEED1111"), _item("KEEP1111"), _item("GONE2222")])
+    sync(store_db, library)
+    works = Works(store_db)
+    seed, gone = works.ensure("SEED1111"), works.ensure("GONE2222")
+    WorkTexts(store_db).replace(
+        seed,
+        ParsedWork(
+            text_origin=TextOrigin.PRINTED,
+            blocks=[],
+            references=[Reference(id="b0", text="x", page=1)],
+        ),
+    )
+    Resolutions(store_db).replace(
+        seed,
+        [Resolution(reference="b0", state=ResolutionState.RESOLVED, work=gone, level=Level.HIGH)],
+    )
+    library.merge("KEEP1111", "GONE2222")  # as Zotero desktop would: dc:replaces on the kept one
+
+    result = sync(store_db, library)
+
+    [moved] = Resolutions(store_db).for_work(seed)
+    assert moved.work == works.ensure("KEEP1111")
+    assert works.find("GONE2222") is None
+    assert result.moved == 1

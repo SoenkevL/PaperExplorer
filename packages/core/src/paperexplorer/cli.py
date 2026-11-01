@@ -13,10 +13,20 @@ import psycopg
 import typer
 from pydantic_ai.messages import ModelResponse
 
-from paperexplorer import __version__, asking, citations, evals, parsing, pipeline, retrieval, store
+from paperexplorer import (
+    __version__,
+    asking,
+    citations,
+    evals,
+    parsing,
+    pipeline,
+    resolution,
+    retrieval,
+    store,
+)
 from paperexplorer.citations import ConfidenceLevel, confidence_level
 from paperexplorer.config import Settings
-from paperexplorer.domain import Answer, Level, Resolution, ResolutionState, Scope, Work
+from paperexplorer.domain import Answer, Level, Resolution, Scope, Work
 from paperexplorer.embedding import OpenAICompatibleEmbedder
 from paperexplorer.library import ZoteroLibrary, sync
 from paperexplorer.logs import configure_logging
@@ -134,20 +144,17 @@ def _items(n: int) -> str:
 
 
 @app.command("sync")
-def sync_command(
-    full: Annotated[bool, typer.Option("--full", help="Read the whole Library again.")] = False,
-) -> None:
-    """Bring the Works up to date with the Zotero Library; after the first, only its changes."""
+def sync_command() -> None:
+    """Read the whole Zotero Library again into the Works; `resolve` syncs only its changes."""
     settings = Settings()
     with psycopg.connect(settings.database_url, autocommit=True) as conn:
         store.migrate(conn)
         with conn.transaction():
-            result = sync(conn, ZoteroLibrary.from_settings(settings), full=full)
+            result = sync(conn, ZoteroLibrary.from_settings(settings), full=True)
     if result.stale:
         typer.echo("Zotero could not be reached; the last copy of the Library stands", err=True)
         raise typer.Exit(1)
-    read = "whole Library read" if result.full else "changes since the last sync"
-    typer.echo(f"Synced ({read}): {_items(result.items)} recorded, {result.removed} Works removed")
+    typer.echo(f"Synced: {_items(result.items)} recorded, {result.removed} Works removed")
 
 
 def _key(work: Work | None) -> str:
@@ -198,10 +205,10 @@ def duplicates_command(
             assert keep.zotero_key is not None and other.zotero_key is not None
             library.merge(keep.zotero_key, other.zotero_key)
             with conn.transaction():
-                moved = store.Resolutions(conn).repoint(other.id, keep.id)
-                sync(conn, library)
+                result = sync(conn, library)  # follows dc:replaces, moving the Resolutions
             typer.echo(
-                f"Merged {other.zotero_key} into {keep.zotero_key}; {moved} Resolutions moved"
+                f"Merged {other.zotero_key} into {keep.zotero_key};"
+                f" {result.moved} Resolutions moved"
             )
             return
         groups = works.duplicates()
@@ -256,11 +263,11 @@ def resolutions_command(
     if not resolutions:
         typer.echo(f"No Resolutions for {work} yet; run `paperexplorer run resolve {work}`")
         return
-    counts = {lv.value: sum(r.level is lv for r in resolutions) for lv in Level} | {
-        "unchecked": sum(r.state is ResolutionState.UNCHECKED for r in resolutions),
-        "DOI Conflicts": sum(r.doi_conflict is not None for r in resolutions),
-    }
-    summary = ", ".join(f"{n} {name}" for name, n in counts.items())
+    counts = resolution.counts(resolutions)
+    del counts["references"]
+    summary = ", ".join(
+        f"{n} {name.replace('doi_conflicts', 'DOI Conflicts')}" for name, n in counts.items()
+    )
     typer.echo(f"{len(resolutions)} References of {work}: {summary}")
     for r in resolutions:
         if low and r.level is not Level.LOW and r.doi_conflict is None:

@@ -48,9 +48,13 @@ class InMemoryLibrary:
         )
 
     def merge(self, keep: str, other: str) -> None:
-        """`keep` takes `other`'s PDF if it has none of its own; `other` is removed."""
+        """`keep` takes `other`'s PDF if it has none of its own and replaces it; `other` goes."""
         kept, gone = self.item(keep), self.item(other)
-        self.put(kept.model_copy(update={"pdf": kept.pdf or gone.pdf}))
+        self.put(
+            kept.model_copy(
+                update={"pdf": kept.pdf or gone.pdf, "replaces": [*kept.replaces, other]}
+            )
+        )
         self.remove(other)
 
     def put(self, item: LibraryItem) -> None:

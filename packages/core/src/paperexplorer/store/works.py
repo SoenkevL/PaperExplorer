@@ -1,9 +1,11 @@
 """Works: one row per Work, holding its Library Item's metadata snapshot (ADR 0001)."""
 
+from collections.abc import Collection
+
 import psycopg
 from psycopg.rows import TupleRow, class_row
 
-from paperexplorer.domain import LibraryItem, Work, WorkId
+from paperexplorer.domain import LibraryItem, Work, WorkId, normalize_doi
 
 _WORK = """
     SELECT id, zotero_key, title, creators, year, doi, synced_at, text_origin, added_at AS added,
@@ -42,14 +44,14 @@ class Works:
     def record_library_item(self, work: WorkId, item: LibraryItem) -> None:
         """Replace the Work's metadata snapshot with what its Library Item says now."""
         self._conn.execute(
-            "UPDATE works SET title = %s, creators = %s, year = %s, doi = lower(%s),"
+            "UPDATE works SET title = %s, creators = %s, year = %s, doi = %s,"
             " pdf_attachment_key = %s, pdf_filename = %s, added_at = %s, synced_at = now()"
             " WHERE id = %s",
             (
                 item.title,
                 item.creators,
                 item.year,
-                item.doi,
+                normalize_doi(item.doi) if item.doi else None,
                 item.pdf.key if item.pdf else None,
                 item.pdf.filename if item.pdf else None,
                 item.added,
@@ -81,9 +83,10 @@ class Works:
             ).fetchall()
 
     def stand_in(self, doi: str) -> WorkId | None:
-        """The Work that stands for a DOI, when two Library Items hold it."""
+        """The Work that stands for a DOI, in any printed form, when two Library Items hold it."""
         row = self._conn.execute(
-            f"SELECT id FROM works WHERE doi = lower(%s) ORDER BY {_STANDING} LIMIT 1", (doi,)
+            f"SELECT id FROM works WHERE doi = %s ORDER BY {_STANDING} LIMIT 1",
+            (normalize_doi(doi),),
         ).fetchone()
         return WorkId(row[0]) if row else None
 
@@ -143,3 +146,10 @@ class Works:
                 (zotero_key,),
             )
         return bool(gone)
+
+    def with_pdf_attachment(self, attachment_keys: Collection[str]) -> list[Work]:
+        """The Works whose recorded PDF is one of these attachments."""
+        with self._conn.cursor(row_factory=class_row(Work)) as cur:
+            return cur.execute(
+                _WORK + " WHERE pdf_attachment_key = ANY(%s) ORDER BY id", (list(attachment_keys),)
+            ).fetchall()

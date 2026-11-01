@@ -20,7 +20,7 @@ from paperexplorer.embedding import FakeEmbedder
 from paperexplorer.library import InMemoryLibrary
 from paperexplorer.parsing import ParsedWork, Reference, TextOrigin
 from paperexplorer.pipeline import StageContext, StageError, run_stage
-from paperexplorer.store import Resolutions, Works, WorkTexts
+from paperexplorer.store import Resolutions, StageStatuses, Works, WorkTexts
 from paperexplorer.tracing import Tracing
 
 Conn = psycopg.Connection[TupleRow]
@@ -173,3 +173,22 @@ def test_an_unparsed_work_cannot_be_resolved(ctx: StageContext) -> None:
 
     with pytest.raises(StageError, match="run parse first"):
         run_stage(ctx, "resolve", work)
+
+
+def test_a_work_whose_library_item_went_no_longer_matches(
+    ctx: StageContext, library: InMemoryLibrary
+) -> None:
+    seed = _seed(
+        ctx.conn,
+        [_ref("b0", doi="10.5555/resnet"), _ref("b1", title=RESNET.title, surnames=["He"])],
+    )
+    run_stage(ctx, "resolve", seed)
+    StageStatuses(ctx.conn).start(_work(ctx.conn, RESNET.key), "fetch")  # kept: a Stage ran
+    library.remove(RESNET.key)
+
+    run_stage(ctx, "resolve", seed)
+
+    assert [r.state for r in Resolutions(ctx.conn).for_work(seed)] == [
+        ResolutionState.UNCHECKED,
+        ResolutionState.UNCHECKED,
+    ]

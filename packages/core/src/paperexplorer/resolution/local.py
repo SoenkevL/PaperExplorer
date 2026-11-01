@@ -6,9 +6,17 @@ from collections.abc import Sequence
 import psycopg
 from psycopg.rows import TupleRow
 
-from paperexplorer.domain import Layer, Level, Resolution, ResolutionState, Work, WorkId
+from paperexplorer.domain import (
+    Layer,
+    Level,
+    Resolution,
+    ResolutionState,
+    Work,
+    WorkId,
+    normalize_doi,
+)
 from paperexplorer.parsing import Reference
-from paperexplorer.resolution.matching import Candidate, DoiConflict, match, normalize_doi
+from paperexplorer.resolution.matching import Candidate, DoiConflict, match
 from paperexplorer.store import Works
 
 logger = logging.getLogger(__name__)
@@ -17,7 +25,7 @@ logger = logging.getLogger(__name__)
 def resolve(
     conn: psycopg.Connection[TupleRow], citing: WorkId, refs: Sequence[Reference]
 ) -> list[Resolution]:
-    """One Resolution per Reference of `citing`, from the Works the store holds.
+    """One Resolution per Reference of `citing`, from the Library Items the store holds.
 
     Candidates are the Work that stands for the printed DOI and the Works whose title is near
     the printed one; a match to one of two Works holding a DOI goes to the one that stands.
@@ -33,8 +41,8 @@ def _resolve_one(works: Works, citing: WorkId, ref: Reference) -> Resolution:
         pool[work.id] = work
     for work in works.title_candidates(ref.title) if ref.title else []:
         pool.setdefault(work.id, work)
-    pool.pop(citing, None)
-    candidates = list(pool.values())
+    # Only Library Items: a Work kept after its item left the Library is not in it.
+    candidates = [w for w in pool.values() if w.id != citing and w.zotero_key is not None]
     found = match(ref, [_candidate(w) for w in candidates])
     if found is None:
         return Resolution(reference=ref.id, state=ResolutionState.UNCHECKED)
@@ -69,3 +77,15 @@ def _candidate(work: Work) -> Candidate:
     """A Work as the matching rules see it; creators are `Last, First`."""
     surnames = [c.split(",", 1)[0].strip() for c in work.creators]
     return Candidate(title=work.title, surnames=surnames, year=work.year, doi=work.doi)
+
+
+def counts(resolutions: Sequence[Resolution]) -> dict[str, int]:
+    """References by level, Unchecked ones and DOI Conflicts, as the Stage and the CLI report."""
+    return (
+        {"references": len(resolutions)}
+        | {lv.value: sum(r.level is lv for r in resolutions) for lv in Level}
+        | {
+            "unchecked": sum(r.state is ResolutionState.UNCHECKED for r in resolutions),
+            "doi_conflicts": sum(r.doi_conflict is not None for r in resolutions),
+        }
+    )

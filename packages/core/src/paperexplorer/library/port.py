@@ -10,6 +10,10 @@ class ItemNotFoundError(LookupError):
     """The library has no item with this key."""
 
 
+class LibraryUnavailableError(Exception):
+    """The library cannot be read now (unreachable, failing, or answering out of protocol)."""
+
+
 class Library(Protocol):
     """A reference library holding Library Items and their attached PDFs."""
 
@@ -22,7 +26,10 @@ class Library(Protocol):
         ...
 
     def changes(self, since: int | None) -> LibraryChanges:
-        """The Library Items changed and the keys deleted since a version; `None` reads it all."""
+        """The Library Items changed and the keys deleted since a version; `None` reads it all.
+
+        Raises `LibraryUnavailableError` when the library cannot be read.
+        """
         ...
 
     def merge(self, keep: str, other: str) -> None:

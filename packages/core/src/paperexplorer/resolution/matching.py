@@ -7,7 +7,7 @@ from collections.abc import Sequence
 
 from pydantic import BaseModel
 
-from paperexplorer.domain import Level
+from paperexplorer.domain import Level, normalize_doi
 from paperexplorer.parsing import Reference
 
 # Until calibrated live on fixture References that print a DOI (design-resolution.md).
@@ -39,14 +39,6 @@ class DoiConflict(BaseModel):
     """The printed DOI names a candidate the Reference does not agree with, and no title matched."""
 
     candidate: int
-
-
-def normalize_doi(doi: str) -> str:
-    """A DOI as a key: lowercase, no `https://doi.org/` or `doi:`, no trailing `.` or `,`."""
-    key = doi.strip().lower()
-    for prefix in ("https://doi.org/", "http://doi.org/", "https://dx.doi.org/", "doi:"):
-        key = key.removeprefix(prefix)
-    return key.strip().rstrip(".,")
 
 
 def normalize_title(title: str) -> str:

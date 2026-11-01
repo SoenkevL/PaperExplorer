@@ -5,7 +5,7 @@ from collections import Counter
 
 from paperexplorer import chunking, citations, parsing, resolution
 from paperexplorer.citations import ConfidenceLevel, confidence_level
-from paperexplorer.domain import ChunkFlag, Level, ResolutionState, WorkId
+from paperexplorer.domain import ChunkFlag, WorkId
 from paperexplorer.library import ItemNotFoundError, sync
 from paperexplorer.pipeline.stage import StageContext, StageError, StageResult
 from paperexplorer.store import Chunks, CitationGraphs, Resolutions, Works, WorkTexts
@@ -105,12 +105,4 @@ def resolve(ctx: StageContext, work: WorkId) -> StageResult:
     sync(ctx.conn, ctx.library)
     found = resolution.resolve(ctx.conn, work, parsed.references)
     Resolutions(ctx.conn).replace(work, found)
-    levels = Counter(r.level for r in found if r.level is not None)
-    return StageResult(
-        counts={"references": len(found)}
-        | {lv.value: levels[lv] for lv in Level}
-        | {
-            "unchecked": sum(r.state is ResolutionState.UNCHECKED for r in found),
-            "doi_conflicts": sum(r.doi_conflict is not None for r in found),
-        }
-    )
+    return StageResult(counts=resolution.counts(found))

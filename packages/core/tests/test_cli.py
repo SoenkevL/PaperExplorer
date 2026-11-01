@@ -436,7 +436,7 @@ def test_sync_makes_every_library_item_a_work(
 
     assert first.exit_code == 0, first.output
     assert "3 Library Items" in first.stdout
-    assert "1 Library Item" in second.stdout
+    assert "4 Library Items" in second.stdout  # `sync` always reads the whole Library
     assert set(_works(scratch_database_url)) == {"SEED1111", "ATTN2017", "ATTNCOPY", "NEWW2026"}
 
 

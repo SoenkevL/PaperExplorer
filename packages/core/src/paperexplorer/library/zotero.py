@@ -8,7 +8,7 @@ import httpx
 
 from paperexplorer.config import Settings
 from paperexplorer.domain import Attachment, LibraryChanges, LibraryItem
-from paperexplorer.library.port import ItemNotFoundError
+from paperexplorer.library.port import ItemNotFoundError, LibraryUnavailableError
 
 logger = logging.getLogger(__name__)
 
@@ -52,13 +52,7 @@ class ZoteroLibrary:
 
     def item(self, key: str) -> LibraryItem:
         """The Library Item with this key, with its stored PDF attachment if it has one."""
-        response = self._api.get(f"/items/{key}")
-        if response.status_code == 404:
-            raise ItemNotFoundError(f"Zotero has no item {key}")
-        response.raise_for_status()
-        children = self._api.get(f"/items/{key}/children")
-        children.raise_for_status()
-        return _library_item(response.json(), children.json())
+        return _library_item(self._raw(key), self._children(key))
 
     def changes(self, since: int | None) -> LibraryChanges:
         """Zotero's sync: items changed since a version, then the trashed and deleted keys.
@@ -66,6 +60,12 @@ class ZoteroLibrary:
         A full read takes each item's PDF from the attachments in the same listing; after one,
         a changed item's children are read, and so is an attachment's parent that did not change.
         """
+        try:
+            return self._changes(since)
+        except (httpx.HTTPError, KeyError, ValueError) as e:
+            raise LibraryUnavailableError(f"Zotero could not say what changed: {e!r}") from e
+
+    def _changes(self, since: int | None) -> LibraryChanges:
         version, listed = self._listing(since)
         regular = {i["key"]: i for i in listed if _is_regular(i)}
         children: dict[str, list[dict[str, Any]]] = {}
@@ -84,9 +84,7 @@ class ZoteroLibrary:
                 regular[parent] = response.json()
         items: list[LibraryItem] = []
         for key, item in regular.items():
-            kids = self._api.get(f"/items/{key}/children")
-            kids.raise_for_status()
-            items.append(_library_item(item, kids.json()))
+            items.append(_library_item(item, self._children(key)))
         trash = self._api.get("/items/trash", params={"since": since, "format": "keys"})
         trash.raise_for_status()
         deleted = self._api.get("/deleted", params={"since": since})
@@ -101,8 +99,7 @@ class ZoteroLibrary:
         relation; its own fields win.
         """
         kept, gone = self._raw(keep), self._raw(other)
-        children = self._api.get(f"/items/{other}/children")
-        children.raise_for_status()
+        children = self._children(other)
         k: dict[str, Any] = kept["data"]
         g: dict[str, Any] = gone["data"]
         relations = {p: _uris(v) for p, v in k.get("relations", {}).items()}
@@ -117,10 +114,15 @@ class ZoteroLibrary:
                 "relations": relations,
             },
         )
-        for child in children.json():
+        for child in children:
             self._patch(child, {"parentItem": keep})
         self._patch(gone, {"deleted": 1})
         logger.info("Merged Zotero item %s into %s; %s is in the trash", other, keep, other)
+
+    def _children(self, key: str) -> list[dict[str, Any]]:
+        response = self._api.get(f"/items/{key}/children")
+        response.raise_for_status()
+        return response.json()
 
     def _raw(self, key: str) -> dict[str, Any]:
         response = self._api.get(f"/items/{key}")
@@ -203,6 +205,9 @@ def _library_item(item: dict[str, Any], children: list[dict[str, Any]]) -> Libra
         doi=data.get("DOI") or None,
         pdf=_stored_pdf(children),
         added=data.get("dateAdded") or None,
+        replaces=[
+            u.rsplit("/", 1)[-1] for u in _uris(data.get("relations", {}).get("dc:replaces", []))
+        ],
     )
 
 

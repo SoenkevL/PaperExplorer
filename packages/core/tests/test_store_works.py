@@ -161,3 +161,14 @@ def test_works_are_listed_in_the_order_they_were_first_seen(store_db: Conn) -> N
     first, second = works.ensure("FIRST"), works.ensure("SECOND")
 
     assert [w.id for w in works.list()] == [first, second]
+
+
+def test_a_library_doi_is_recorded_as_a_key_so_any_printed_form_finds_it(store_db: Conn) -> None:
+    works = Works(store_db)
+    url_form = _record(
+        works, LibraryItem(key="URLFORM1", title="T", doi="https://doi.org/10.5555/ABC.")
+    )
+    _record(works, LibraryItem(key="BAREFORM", title="T", doi="10.5555/abc"))
+
+    assert works.stand_in("10.5555/abc") == url_form
+    assert [[w.zotero_key for w in d] for d in works.duplicates()] == [["URLFORM1", "BAREFORM"]]

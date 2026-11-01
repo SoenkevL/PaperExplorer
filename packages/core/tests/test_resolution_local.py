@@ -21,6 +21,7 @@ from paperexplorer.embedding import FakeEmbedder
 from paperexplorer.library import InMemoryLibrary
 from paperexplorer.parsing import ParsedWork, Reference, TextOrigin
 from paperexplorer.pipeline import StageContext, StageError, run_stage
+from paperexplorer.resolution import InMemoryDoiRegistry
 from paperexplorer.store import (
     RegistryResponses,
     Resolutions,
@@ -62,6 +63,7 @@ def ctx(store_db: Conn, library: InMemoryLibrary) -> StageContext:
         library=library,
         embedder=FakeEmbedder(),
         tracing=Tracing.off(),
+        doi_registry=InMemoryDoiRegistry(offline=True),
     )
 
 
@@ -206,12 +208,15 @@ def test_a_reference_a_registry_check_resolved_stays_resolved_from_the_cache(
     ctx: StageContext,
 ) -> None:
     # What a Check left: Crossref's record for the printed DOI, no Library Item holding it.
-    RegistryResponses(ctx.conn).put(
+    RegistryResponses(ctx.conn).record(
         RegistrySource.CROSSREF_DOI,
         "10.5555/elsewhere",
         {"DOI": "10.5555/elsewhere", "title": ["Held elsewhere"], "author": [{"family": "Lee"}]},
+        hit=True,
     )
-    RegistryResponses(ctx.conn).put(RegistrySource.OPENALEX_DOI, "10.5555/elsewhere", None)
+    RegistryResponses(ctx.conn).record(
+        RegistrySource.OPENALEX_DOI, "10.5555/elsewhere", None, hit=False
+    )
     seed = _seed(ctx.conn, [_ref("b0", doi="10.5555/elsewhere", title="Held elsewhere")])
 
     run_stage(ctx, "resolve", seed)

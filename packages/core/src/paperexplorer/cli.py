@@ -129,6 +129,7 @@ class StageName(StrEnum):
     CHUNK = "chunk"
     EMBED = "embed"
     EXTRACT_CITATIONS = "extract_citations"
+    VERIFY_DOIS = "verify_dois"
     RESOLVE = "resolve"
 
 
@@ -152,6 +153,7 @@ def run_command(
                 library=ZoteroLibrary.from_settings(settings),
                 embedder=wiring.embedder,
                 tracing=wiring.tracing,
+                doi_registry=resolution.DoiOrgRegistry.from_settings(settings),
             )
             result = pipeline.run_stage(stage_ctx, stage.value, work_id)
         except Exception as e:
@@ -335,11 +337,15 @@ def check_command(
         if not refs:
             typer.echo(f"{work} prints no Reference {reference}", err=True)
             raise typer.Exit(1)
+        with conn.transaction():
+            if sync(conn, ZoteroLibrary.from_settings(settings)).stale:
+                typer.echo("Zotero could not be reached; checking against the last copy", err=True)
         registries = resolution.Registries(settings)
 
-        async def run() -> resolution.CheckEvent | None:
-            last: resolution.CheckEvent | None = None
-            async for event in resolution.check(conn, found.id, refs, registries, refresh=refresh):
+        async def run() -> resolution.RegistryCheckEvent | None:
+            last: resolution.RegistryCheckEvent | None = None
+            checking = resolution.registry_check(conn, found.id, refs, registries, refresh=refresh)
+            async for event in checking:
                 if isinstance(event, resolution.ReferenceChecked):
                     r = event.resolution
                     layer = r.layer.value if r.layer else "-"
@@ -356,7 +362,7 @@ def check_command(
     if isinstance(last, resolution.BudgetSpent):
         typer.echo(last.message, err=True)
         raise typer.Exit(1)
-    if isinstance(last, resolution.CheckFinished):
+    if isinstance(last, resolution.RegistryCheckFinished):
         summary = ", ".join(f"{n} {k}" for k, n in last.counts.items() if k != "references")
         typer.echo(f"Checked {last.counts['references']} References in "
                    f"{time.monotonic() - started:.1f} s: {summary}")  # fmt: skip

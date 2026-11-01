@@ -11,6 +11,7 @@ from paperexplorer.pipeline.stages import (
     fetch,
     parse,
     resolve,
+    verify_dois,
 )
 from paperexplorer.store import StageStatuses
 
@@ -25,6 +26,7 @@ STAGES: dict[str, Stage] = {
     "chunk": chunk,
     "embed": embed,
     "extract_citations": extract_citations,
+    "verify_dois": verify_dois,
     "resolve": resolve,
 }
 

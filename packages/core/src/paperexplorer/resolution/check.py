@@ -6,23 +6,24 @@ Library nor the cache answers, keeps every response as it lands, and runs the lo
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Collection, Sequence
 from itertools import batched
-from typing import Any, Literal
+from typing import Literal
 
 import psycopg
 from psycopg.rows import TupleRow
-from pydantic import BaseModel
+from pydantic import BaseModel, JsonValue
 
-from paperexplorer.domain import Level, RegistrySource, Resolution, ResolutionState, WorkId
+from paperexplorer.domain import RegistrySource, Resolution, WorkId
 from paperexplorer.parsing import Reference
-from paperexplorer.resolution.local import (
+from paperexplorer.resolution.layers import (
     bibliographic_key,
-    counts,
+    bibliographic_query,
     doi_key,
-    resolve,
+    needs_bibliographic,
     title_key,
 )
+from paperexplorer.resolution.local import as_resolved, counts, resolve
 from paperexplorer.resolution.registries import BATCH, BudgetSpentError, Registries
 from paperexplorer.store import RegistryResponses, Resolutions
 
@@ -30,14 +31,14 @@ logger = logging.getLogger(__name__)
 
 
 class ReferenceChecked(BaseModel):
-    """One Reference's Resolution, saved as the Check lands it."""
+    """One Reference's Resolution, saved as the Registry Check lands it."""
 
     kind: Literal["reference"] = "reference"
     resolution: Resolution
 
 
-class CheckFinished(BaseModel):
-    """The Check went through every layer: its References by level and state."""
+class RegistryCheckFinished(BaseModel):
+    """The Registry Check went through every layer: its References by level and state."""
 
     kind: Literal["finished"] = "finished"
     counts: dict[str, int]
@@ -55,30 +56,32 @@ class BudgetSpent(BaseModel):
         return f"OpenAlex budget spent, {self.left} References left, try after 00:00 UTC"
 
 
-CheckEvent = ReferenceChecked | CheckFinished | BudgetSpent
+RegistryCheckEvent = ReferenceChecked | RegistryCheckFinished | BudgetSpent
 
 
-async def check(
+async def registry_check(
     conn: psycopg.Connection[TupleRow],
     citing: WorkId,
     refs: Sequence[Reference],
     registries: Registries,
     *,
     refresh: bool = False,
-) -> AsyncIterator[CheckEvent]:
+) -> AsyncIterator[RegistryCheckEvent]:
     """Check these References of `citing`, yielding each one's Resolution as it lands.
 
-    `refresh` asks the registries again for all of them, past the cache, and lets even a
-    Reference the Library matched go through the layers. Rows are written on `conn` as they
-    land: an autocommit connection keeps them when the Check stops partway.
+    The caller syncs the Library first. A Reference the Library matches at certain or high is
+    done without a registry call; `refresh` asks the registries again for the rest, past the
+    cache. Rows are written on `conn` as they land: an autocommit connection keeps them when the
+    Check stops partway, on a spent budget or a `RegistryError`.
     """
     cache, saved = RegistryResponses(conn), Resolutions(conn)
-    pending = {ref.id: ref for ref in refs}
+    pending = {ref.id: ref for ref, _ in as_resolved(conn, refs)}
     done: list[Resolution] = []
 
     def settle(final: Callable[[Resolution], bool]) -> list[ReferenceChecked]:
+        """Run the local pass on what is pending; save and hand back what it settled."""
         landed: list[ReferenceChecked] = []
-        for r in resolve(conn, citing, list(pending.values())):
+        for r in resolve(conn, citing, [ref for ref in refs if ref.id in pending]):
             if final(r):
                 saved.save(citing, r)
                 done.append(r)
@@ -86,82 +89,86 @@ async def check(
                 landed.append(ReferenceChecked(resolution=r))
         return landed
 
-    def certain_or_high(r: Resolution) -> bool:
-        return r.state is ResolutionState.RESOLVED and r.level is not Level.LOW
-
-    async def fill(
-        source: RegistrySource,
-        keys: Iterable[str | None],
-        ask: Callable[[str], Awaitable[Any]],
-    ) -> None:
-        """Ask for each key the cache does not answer (all on refresh), keeping each answer."""
+    def unanswered(source: RegistrySource, keys: Collection[str | None]) -> list[str]:
+        """The keys to ask: all of them on refresh, else those the cache does not answer."""
         wanted = sorted({k for k in keys if k is not None})
-        cached = {} if refresh else cache.get(source, wanted)
-        missing = [k for k in wanted if k not in cached]
+        answered: set[str] = set() if refresh else cache.fresh(source, wanted)
+        return [k for k in wanted if k not in answered]
+
+    async def ask_each(
+        source: RegistrySource,
+        keys: Collection[str | None],
+        search: Callable[[str], Awaitable[JsonValue]],
+    ) -> None:
+        """One search per key the cache does not answer, each answer kept as it lands."""
 
         async def one(key: str) -> None:
-            found = await ask(key)
-            cache.put(source, key, found or None)
+            found = await search(key)
+            cache.record(source, key, found or None, hit=bool(found))
 
-        await asyncio.gather(*(one(k) for k in missing))
+        async with asyncio.TaskGroup() as group:  # one failing cancels the rest
+            for key in unanswered(source, keys):
+                group.create_task(one(key))
 
-    async def fill_dois(source: RegistrySource, dois: Iterable[str | None]) -> None:
-        wanted = sorted({d for d in dois if d is not None})
-        cached = {} if refresh else cache.get(source, wanted)
-        ask = (
-            registries.crossref_dois
-            if source is RegistrySource.CROSSREF_DOI
-            else (registries.openalex_dois)
-        )
+    async def ask_batches(
+        source: RegistrySource,
+        keys: Collection[str | None],
+        lookup: Callable[[Collection[str]], Awaitable[dict[str, JsonValue]]],
+    ) -> None:
+        """DOIs the cache does not answer, a hundred to a call, each record kept as it lands."""
 
-        async def batch(dois: tuple[str, ...]) -> None:
-            for doi, record in (await ask(dois)).items():
-                cache.put(source, doi, record)
+        async def one(batch: tuple[str, ...]) -> None:
+            for doi, record in (await lookup(batch)).items():
+                cache.record(source, doi, record, hit=record is not None)
 
-        await asyncio.gather(
-            *(
-                batch(b)
-                for b in batched([d for d in wanted if d not in cached], BATCH, strict=False)
-            )
-        )
+        async with asyncio.TaskGroup() as group:
+            for batch in batched(unanswered(source, keys), BATCH, strict=False):
+                group.create_task(one(batch))
 
     async with registries:
-        if not refresh:
-            for event in settle(certain_or_high):
-                yield event
+        for event in settle(lambda r: r.firm):
+            yield event
         try:
             dois = [doi_key(r) for r in pending.values()]
-            await asyncio.gather(
-                fill_dois(RegistrySource.CROSSREF_DOI, dois),
-                fill_dois(RegistrySource.OPENALEX_DOI, dois),
-            )
-            for event in settle(certain_or_high):
+            async with asyncio.TaskGroup() as group:
+                group.create_task(
+                    ask_batches(RegistrySource.CROSSREF_DOI, dois, registries.crossref_dois)
+                )
+                group.create_task(
+                    ask_batches(RegistrySource.OPENALEX_DOI, dois, registries.openalex_dois)
+                )
+            for event in settle(lambda r: r.firm):
                 yield event
-            await fill(
-                RegistrySource.OPENALEX_TITLE,
-                (title_key(r) for r in pending.values()),
-                registries.openalex_title,
-            )
-            for event in settle(certain_or_high):
+            titles = [title_key(r) for r in pending.values()]
+            await ask_each(RegistrySource.OPENALEX_TITLE, titles, registries.openalex_title)
+            for event in settle(lambda r: r.firm):
                 yield event
-            await fill(
+            current = {r.reference: r for r in resolve(conn, citing, list(pending.values()))}
+            printed = {
+                bibliographic_key(ref): bibliographic_query(ref)
+                for ref in pending.values()
+                if needs_bibliographic(ref, current.get(ref.id))
+            }
+            await ask_each(
                 RegistrySource.CROSSREF_BIBLIOGRAPHIC,
-                (bibliographic_key(r) for r in pending.values()),
-                lambda key: registries.crossref_bibliographic(_printed(pending, key)),
+                list(printed),
+                lambda key: registries.crossref_bibliographic(printed[key]),
             )
-        except BudgetSpentError:
-            left = len(pending)
-            logger.warning("OpenAlex budget spent with %d References left", left)
-            for event in settle(certain_or_high):
+        except ExceptionGroup as group:
+            if group.subgroup(BudgetSpentError) is None:
+                raise _first(group) from group
+            logger.warning("OpenAlex budget spent with %d References left", len(pending))
+            for event in settle(lambda r: r.firm):
                 yield event
             yield BudgetSpent(left=len(pending))
             return
         for event in settle(lambda _: True):
             yield event
     logger.info("Registry Check of Work %s: %s", citing, counts(done))
-    yield CheckFinished(counts=counts(done))
+    yield RegistryCheckFinished(counts=counts(done))
 
 
-def _printed(pending: dict[str, Reference], key: str) -> str:
-    """The printed string a bibliographic key was made from, as Crossref is sent it."""
-    return next(" ".join(r.text.split()) for r in pending.values() if bibliographic_key(r) == key)
+def _first(group: BaseExceptionGroup[Exception]) -> Exception:
+    """The first error a task group collected, out of any nesting."""
+    first = group.exceptions[0]
+    return _first(first) if isinstance(first, BaseExceptionGroup) else first

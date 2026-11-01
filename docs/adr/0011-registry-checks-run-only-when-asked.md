@@ -16,3 +16,5 @@ A Registry Check is not a Stage. It runs the local pass, then the registry layer
 - The Stage contract (one transaction, none of a failed run's writes kept) holds for every Stage; Registry Checks are the one writer outside it.
 - Downstream Stages (`catalog`) read whatever Resolutions exist when they run; a Check does not make them pending.
 - v1's definition of done counts Sources resolved locally or by a Check; the report lists Unchecked References beside Unresolved and low-confidence ones.
+
+Amended 2026-11-01 by [ADR 0012](0012-verify-dois-stage.md): the optional `verify_dois` Stage asks doi.org, which spends no registry limit, whether each printed DOI is registered.

@@ -1,8 +1,6 @@
 """Crossref and OpenAlex records read as `RegistryRecord`s and as matching `Candidate`s."""
 
-from typing import Any
-
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, JsonValue
 
 from paperexplorer.domain import RegistryRecord, normalize_doi
 from paperexplorer.resolution.matching import Candidate
@@ -42,7 +40,7 @@ class _OpenAlexWork(BaseModel):
     authorships: list[_OpenAlexAuthorship] = []
 
 
-def from_crossref(item: dict[str, Any]) -> RegistryRecord:
+def from_crossref(item: JsonValue) -> RegistryRecord:
     """A Crossref `/works` item: its DOI, first title, authors and the year it was issued."""
     it = _CrossrefItem.model_validate(item)
     parts = it.issued.date_parts if it.issued else []
@@ -55,7 +53,7 @@ def from_crossref(item: dict[str, Any]) -> RegistryRecord:
     )
 
 
-def from_openalex(work: dict[str, Any]) -> RegistryRecord:
+def from_openalex(work: JsonValue) -> RegistryRecord:
     """An OpenAlex Work: its DOI, short OpenAlex ID, title, authors and publication year."""
     w = _OpenAlexWork.model_validate(work)
     names = [a.author.display_name for a in w.authorships if a.author and a.author.display_name]

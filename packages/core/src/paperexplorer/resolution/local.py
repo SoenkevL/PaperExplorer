@@ -12,7 +12,6 @@ from psycopg.rows import TupleRow
 from paperexplorer.domain import (
     Layer,
     Level,
-    RegistrySource,
     Resolution,
     ResolutionState,
     Work,
@@ -20,16 +19,9 @@ from paperexplorer.domain import (
     normalize_doi,
 )
 from paperexplorer.parsing import Reference
-from paperexplorer.resolution.matching import (
-    Candidate,
-    DoiConflict,
-    Match,
-    agrees,
-    bibliographic_match,
-    match,
-    normalize_title,
-)
-from paperexplorer.resolution.records import candidate, from_crossref, from_openalex
+from paperexplorer.resolution.layers import from_registries
+from paperexplorer.resolution.matching import Candidate, DoiConflict, match
+from paperexplorer.resolution.verification import unregistered
 from paperexplorer.store import RegistryResponses, Works
 
 logger = logging.getLogger(__name__)
@@ -43,17 +35,22 @@ def resolve(
     Library candidates are the Work that stands for the printed DOI and the Works whose title is
     near the printed one; a match to a Duplicate Item goes to its Standing Item. A Reference the
     Library leaves unmatched, or matched at low, goes through the cached responses layer by layer
-    (DOI, title search, bibliographic); with one of them not yet asked, it stays Unchecked.
+    (DOI, title search, bibliographic); with one of them not yet asked, it stays Unchecked. A
+    Reference whose DOI is an Unregistered DOI is matched as if it printed none (ADR 0012).
     """
     works, cache = Works(conn), RegistryResponses(conn)
     resolutions: list[Resolution] = []
-    for ref in refs:
+    for ref, note in as_resolved(conn, refs):
         library = _from_library(works, citing, ref)
-        if library.state is ResolutionState.RESOLVED and library.level is not Level.LOW:
-            resolutions.append(library)
-            continue
-        registry = _from_registries(works, cache, citing, ref, library.doi_conflict)
-        resolutions.append(_better(library, registry))
+        if library.firm:
+            resolution = library
+        else:
+            resolution = _better(
+                library, from_registries(works, cache, citing, ref, library.doi_conflict)
+            )
+        if note:
+            resolution = resolution.model_copy(update={"evidence": [*resolution.evidence, note]})
+        resolutions.append(resolution)
     for r in resolutions:
         if r.doi_conflict is not None and r.state is ResolutionState.RESOLVED:
             logger.warning("Reference %s prints a DOI its title disagrees with", r.reference)
@@ -62,19 +59,19 @@ def resolve(
     return resolutions
 
 
-def doi_key(ref: Reference) -> str | None:
-    """The key a Reference's printed DOI is cached under."""
-    return normalize_doi(ref.doi) if ref.doi else None
-
-
-def title_key(ref: Reference) -> str | None:
-    """The key, and the query sent, for a Reference's title search."""
-    return normalize_title(ref.title) if ref.title and normalize_title(ref.title) else None
-
-
-def bibliographic_key(ref: Reference) -> str:
-    """The key a Reference's printed string is cached under for Crossref's bibliographic query."""
-    return " ".join(ref.text.split()).lower()
+def as_resolved(
+    conn: psycopg.Connection[TupleRow], refs: Sequence[Reference]
+) -> list[tuple[Reference, str | None]]:
+    """Each Reference as it is matched, with a note when its Unregistered DOI was set aside."""
+    gone = unregistered(conn, [r.doi for r in refs if r.doi])
+    matched: list[tuple[Reference, str | None]] = []
+    for ref in refs:
+        doi = normalize_doi(ref.doi) if ref.doi else None
+        if doi in gone:
+            matched.append((ref.model_copy(update={"doi": None}), f"unregistered DOI {doi}"))
+        else:
+            matched.append((ref, None))
+    return matched
 
 
 def _from_library(works: Works, citing: WorkId, ref: Reference) -> Resolution:
@@ -107,92 +104,11 @@ def _from_library(works: Works, citing: WorkId, ref: Reference) -> Resolution:
     )
 
 
-def _from_registries(
-    works: Works,
-    cache: RegistryResponses,
-    citing: WorkId,
-    ref: Reference,
-    conflict: WorkId | None,
-) -> Resolution:
-    """The cached registry layers for one Reference; Unchecked while a layer it needs is unasked."""
-    unchecked = Resolution(reference=ref.id, state=ResolutionState.UNCHECKED, doi_conflict=conflict)
-    if (doi := doi_key(ref)) is not None:
-        crossref = cache.get(RegistrySource.CROSSREF_DOI, [doi]).get(doi)
-        openalex = cache.get(RegistrySource.OPENALEX_DOI, [doi]).get(doi)
-        # Crossref decides which Work a DOI is: the printed DOI wins.
-        if crossref is not None and crossref.hit:
-            record, layer = from_crossref(crossref.body), Layer.CROSSREF
-        elif openalex is not None and openalex.hit:
-            record, layer = from_openalex(openalex.body), Layer.OPENALEX
-        elif crossref is None or openalex is None:
-            return unchecked
-        else:
-            record = layer = None
-        if record is not None and layer is not None:
-            work = works.record_registry_work(record)
-            if agrees(ref, candidate(record)) and work != citing:
-                return Resolution(
-                    reference=ref.id, state=ResolutionState.RESOLVED, work=work,
-                    level=Level.CERTAIN, confidence=1.0, evidence=["doi"], layer=layer,
-                )  # fmt: skip
-            if work != citing:
-                conflict = conflict or work
-    bare = ref.model_copy(update={"doi": None})
-    found: tuple[Match, WorkId, Layer] | None = None
-    if (title := title_key(ref)) is not None:
-        rows = cache.get(RegistrySource.OPENALEX_TITLE, [title]).get(title)
-        if rows is None:
-            return unchecked
-        found = _pick(works, citing, bare, rows.body or [], Layer.OPENALEX, title=True)
-    if found is None or found[0].level is Level.LOW:
-        key = bibliographic_key(ref)
-        rows = cache.get(RegistrySource.CROSSREF_BIBLIOGRAPHIC, [key]).get(key)
-        if rows is None and found is None:
-            return unchecked
-        guess = _pick(works, citing, bare, rows.body or [], Layer.CROSSREF) if rows else None
-        if found is None:
-            found = guess
-        elif guess is not None and guess[1] == found[1]:
-            found[0].evidence.append("bibliographic")
-    if found is None:
-        return Resolution(reference=ref.id, state=ResolutionState.UNRESOLVED, doi_conflict=conflict)
-    m, work, layer = found
-    return Resolution(
-        reference=ref.id,
-        state=ResolutionState.RESOLVED,
-        work=work,
-        level=Level.LOW if conflict is not None else m.level,
-        confidence=m.confidence,
-        evidence=[*m.evidence, "doi_conflict"] if conflict is not None else m.evidence,
-        layer=layer,
-        doi_conflict=conflict,
-    )
-
-
-def _pick(
-    works: Works,
-    citing: WorkId,
-    ref: Reference,
-    rows: list[dict[str, object]],
-    layer: Layer,
-    *,
-    title: bool = False,
-) -> tuple[Match, WorkId, Layer] | None:
-    """The search result the Reference names, by the title rules or Crossref's bibliographic one."""
-    records = [from_openalex(r) if layer is Layer.OPENALEX else from_crossref(r) for r in rows]
-    candidates = [candidate(r) for r in records]
-    found = match(ref, candidates) if title else bibliographic_match(ref, candidates)
-    if not isinstance(found, Match):
-        return None
-    work = works.record_registry_work(records[found.candidate])
-    return None if work == citing else (found, work, layer)
-
-
 def _better(library: Resolution, registry: Resolution) -> Resolution:
     """A low Library match stands unless a registry matched higher."""
     if library.state is not ResolutionState.RESOLVED:
         return registry
-    if registry.state is ResolutionState.RESOLVED and registry.level is not Level.LOW:
+    if registry.firm:
         return registry
     return library
 

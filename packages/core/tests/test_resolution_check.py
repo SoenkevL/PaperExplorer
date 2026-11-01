@@ -11,17 +11,17 @@ import pytest
 from psycopg.rows import TupleRow
 
 from paperexplorer.config import Settings
-from paperexplorer.domain import Layer, Level, Resolution, ResolutionState, WorkId
+from paperexplorer.domain import Layer, Level, LibraryItem, Resolution, ResolutionState, WorkId
 from paperexplorer.parsing import ParsedWork, Reference, TextOrigin
 from paperexplorer.resolution import (
     BudgetSpent,
-    CheckEvent,
     ReferenceChecked,
     Registries,
+    RegistryCheckEvent,
     RegistryError,
-    check,
+    registry_check,
 )
-from paperexplorer.store import Resolutions, Works, WorkTexts
+from paperexplorer.store import RegistryResponses, Resolutions, Works, WorkTexts
 
 Conn = psycopg.Connection[TupleRow]
 Json = dict[str, Any]
@@ -144,14 +144,14 @@ def _seed(conn: Conn, refs: list[Reference]) -> WorkId:
 
 def _check(
     conn: Conn, seed: WorkId, refs: list[Reference], registries: Registries, **kw: bool
-) -> list[CheckEvent]:
-    async def collect() -> list[CheckEvent]:
-        return [e async for e in check(conn, seed, refs, registries, **kw)]
+) -> list[RegistryCheckEvent]:
+    async def collect() -> list[RegistryCheckEvent]:
+        return [e async for e in registry_check(conn, seed, refs, registries, **kw)]
 
     return asyncio.run(collect())
 
 
-def _checked(events: list[CheckEvent]) -> dict[str, Resolution]:
+def _checked(events: list[RegistryCheckEvent]) -> dict[str, Resolution]:
     return {e.resolution.reference: e.resolution for e in events if isinstance(e, ReferenceChecked)}
 
 
@@ -425,3 +425,62 @@ def test_an_apa_double_slash_doi_finds_the_record_under_one_slash(
     resolution = _checked(_check(store_db, seed, refs, registries))["b0"]
 
     assert (resolution.level, resolution.layer) == (Level.CERTAIN, Layer.OPENALEX)
+
+
+def test_a_reference_the_library_matches_is_never_sent_even_on_refresh(
+    store_db: Conn, registry: Registry, registries: Registries
+) -> None:
+    works = Works(store_db)
+    held = works.ensure("RESN2016")
+    works.record_library_item(
+        held,
+        LibraryItem(key="RESN2016", title=RESNET["title"][0], creators=["He, A."], year=2016,
+                    doi="10.1109/cvpr.2016.90"),
+    )  # fmt: skip
+    refs = [_ref("b0", doi="10.1109/cvpr.2016.90", title=RESNET["title"][0], surnames=["He"])]
+    seed = _seed(store_db, refs)
+
+    resolution = _checked(_check(store_db, seed, refs, registries, refresh=True))["b0"]
+
+    assert (resolution.work, resolution.layer) == (held, Layer.LIBRARY)
+    assert registry.requests == []
+
+
+def test_a_titled_reference_no_title_search_matches_is_not_sent_to_crossref(
+    store_db: Conn, registry: Registry, registries: Registries
+) -> None:
+    refs = [_ref("b0", title="A title no registry holds", surnames=["Nobody"])]
+    seed = _seed(store_db, refs)
+
+    resolution = _checked(_check(store_db, seed, refs, registries))["b0"]
+
+    assert resolution.state is ResolutionState.UNRESOLVED
+    assert registry.sent("api.crossref.org") == []
+
+
+def test_a_registry_refusing_a_request_stops_the_check(
+    store_db: Conn, registry: Registry, registries: Registries
+) -> None:
+    registry.responses.append(
+        lambda r: httpx.Response(400) if r.url.host == "api.crossref.org" else None
+    )
+    refs = [_ref("b0", doi="10.5555/x")]
+    seed = _seed(store_db, refs)
+
+    with pytest.raises(RegistryError, match="answered 400"):
+        _check(store_db, seed, refs, registries)
+
+
+def test_an_unregistered_doi_is_not_sent_and_its_title_is_searched(
+    store_db: Conn, registry: Registry, registries: Registries
+) -> None:
+    RegistryResponses(store_db).record("doi:handle", "10.5555/typo", {}, hit=False)
+    refs = [_ref("b0", doi="10.5555/typo", title="Attention is all you need")]
+    seed = _seed(store_db, refs)
+
+    resolution = _checked(_check(store_db, seed, refs, registries))["b0"]
+
+    assert [r.url.params["filter"] for r in registry.requests] == [
+        "title.search:attention is all you need"
+    ]
+    assert "unregistered DOI 10.5555/typo" in resolution.evidence

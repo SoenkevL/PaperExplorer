@@ -59,7 +59,7 @@ class Works:
             ),
         )
 
-    def record_registry_work(self, record: RegistryRecord) -> WorkId:
+    def ensure_registry_work(self, record: RegistryRecord) -> WorkId:
         """The Work a registry record names, made from its metadata if no Work holds it yet.
 
         That is the Work standing for its DOI, else the one holding its OpenAlex ID; a new one keeps

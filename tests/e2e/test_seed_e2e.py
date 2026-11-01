@@ -11,6 +11,7 @@ from paperexplorer.config import Settings
 from paperexplorer.embedding import OpenAICompatibleEmbedder
 from paperexplorer.library import ZoteroLibrary
 from paperexplorer.pipeline import STAGES, StageContext, run_stage
+from paperexplorer.resolution import DoiOrgRegistry
 from paperexplorer.store import Works
 from paperexplorer.tracing import Tracing
 from paperexplorer_api.app import create_app
@@ -32,6 +33,7 @@ def test_the_seed_reaches_the_api_with_its_citations(
         library=ZoteroLibrary.from_settings(settings),
         embedder=OpenAICompatibleEmbedder.from_settings(settings, Tracing.off()),
         tracing=Tracing.off(),
+        doi_registry=DoiOrgRegistry.from_settings(settings),
     )
     work = Works(store_db).ensure(SEED)
 

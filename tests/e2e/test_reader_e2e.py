@@ -22,6 +22,7 @@ from paperexplorer.domain import Attachment, CitationId, LibraryItem, WorkId
 from paperexplorer.embedding import FakeEmbedder
 from paperexplorer.library import InMemoryLibrary
 from paperexplorer.pipeline import STAGES, StageContext, run_stage
+from paperexplorer.resolution import InMemoryDoiRegistry
 from paperexplorer.store import CitationGraphs, Works
 from paperexplorer.tracing import Tracing
 from paperexplorer_api.app import Asking
@@ -58,6 +59,7 @@ def explored(
         library=library,
         embedder=FakeEmbedder(),
         tracing=Tracing.off(),
+        doi_registry=InMemoryDoiRegistry(offline=True),
     )
     works: dict[str, WorkId] = {}
     for name, item in ITEMS.items():

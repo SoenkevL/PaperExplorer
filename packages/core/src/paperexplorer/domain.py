@@ -133,6 +133,11 @@ class Resolution(BaseModel):
     layer: Layer | None = None
     doi_conflict: WorkId | None = None
 
+    @property
+    def firm(self) -> bool:
+        """Resolved at certain or high: nothing later is asked for it."""
+        return self.state is ResolutionState.RESOLVED and self.level is not Level.LOW
+
     @model_validator(mode="after")
     def _resolved_has_its_work(self) -> Self:
         resolved = self.state is ResolutionState.RESOLVED

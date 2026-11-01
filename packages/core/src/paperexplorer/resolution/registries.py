@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import httpx
+from pydantic import JsonValue
 
 from paperexplorer.config import Settings
 from paperexplorer.domain import normalize_doi
@@ -67,6 +68,10 @@ class _Limiter:
                 self._running -= 1
                 self._free.notify_all()
 
+    def hold(self, seconds: float) -> None:
+        """Make the next call wait at least this long, as a 429's `Retry-After` asks."""
+        self._next = max(self._next, self._clock() + seconds)
+
     def tighten(self, rate: float | None, concurrency: int | None) -> None:
         if rate is not None and 0 < rate < self.rate:
             logger.info("Registry limit tightened to %.2f/s", rate)
@@ -108,27 +113,30 @@ class Registries:
             await self._client.aclose()
             self._client = None
 
-    async def crossref_dois(self, dois: Collection[str]) -> dict[str, Json | None]:
+    async def crossref_dois(self, dois: Collection[str]) -> dict[str, JsonValue]:
         """Crossref's item for each of up to 100 normalized DOIs, `None` where it has none."""
         found = await self._crossref_list({"filter": ",".join(f"doi:{d}" for d in dois)}, BATCH)
         return _by_doi(dois, found, "DOI")
 
-    async def openalex_dois(self, dois: Collection[str]) -> dict[str, Json | None]:
+    async def openalex_dois(self, dois: Collection[str]) -> dict[str, JsonValue]:
         """OpenAlex's Work for each of up to 100 normalized DOIs, `None` where it has none."""
         found = await self._openalex_list(
             {"filter": "doi:" + "|".join(dois), "per-page": str(BATCH)}, OPENALEX_LIST_COST
         )
         return _by_doi(dois, found, "doi")
 
-    async def openalex_title(self, title: str) -> list[Json]:
+    async def openalex_title(self, title: str) -> list[JsonValue]:
         """OpenAlex's Works whose title matches the search, five at most."""
-        return await self._openalex_list(
-            {"filter": f"title.search:{title}", "per-page": str(CANDIDATES)}, OPENALEX_SEARCH_COST
-        )
+        return [
+            *await self._openalex_list(
+                {"filter": f"title.search:{title}", "per-page": str(CANDIDATES)},
+                OPENALEX_SEARCH_COST,
+            )
+        ]
 
-    async def crossref_bibliographic(self, text: str) -> list[Json]:
+    async def crossref_bibliographic(self, text: str) -> list[JsonValue]:
         """Crossref's items for a printed Reference string, five at most."""
-        return await self._crossref_list({"query.bibliographic": text}, CANDIDATES)
+        return [*await self._crossref_list({"query.bibliographic": text}, CANDIDATES)]
 
     async def _crossref_list(self, params: dict[str, str], rows: int) -> list[Json]:
         params = params | {"rows": str(rows)} | ({"mailto": self._mailto} if self._mailto else {})
@@ -141,14 +149,16 @@ class Registries:
             self._crossref.tighten(float(limit) / max(int(interval[:-1]), 1), None)
         if concurrency and concurrency.isdigit():
             self._crossref.tighten(None, int(concurrency))
-        return response.json()["message"]["items"]
+        items: list[Json] = response.json()["message"]["items"]
+        return items
 
     async def _openalex_list(self, params: dict[str, str], cost: float) -> list[Json]:
         if self.budget_usd is not None and self.budget_usd < cost:
             raise BudgetSpentError
         params = params | ({"api_key": self._api_key} if self._api_key else {})
         response = await self._get(self._openalex, OPENALEX, params, budgeted=True)
-        return response.json()["results"]
+        results: list[Json] = response.json()["results"]
+        return results
 
     async def _get(
         self, limiter: _Limiter, url: str, params: dict[str, str], *, budgeted: bool = False
@@ -169,18 +179,20 @@ class Registries:
                     raise BudgetSpentError
                 wait = response.headers.get("retry-after", "1")
                 logger.warning("%s asked to wait %ss (try %d)", url, wait, attempt + 1)
-                await self._sleep(float(wait) if wait.replace(".", "", 1).isdigit() else 1)
+                # Every call to this host waits, not only this one.
+                limiter.hold(float(wait) if wait.replace(".", "", 1).isdigit() else 1)
                 continue
             if response.status_code >= 500:
                 logger.warning("%s answered %d (try %d)", url, response.status_code, attempt + 1)
                 await self._sleep(2**attempt)
                 continue
-            response.raise_for_status()
+            if response.is_error:
+                raise RegistryError(f"{url} answered {response.status_code}")
             return response
         raise RegistryError(f"{url} failed {TRIES} times")
 
 
-def _by_doi(dois: Collection[str], records: list[Json], field: str) -> dict[str, Json | None]:
+def _by_doi(dois: Collection[str], records: list[Json], field: str) -> dict[str, JsonValue]:
     """Each asked DOI's record; APA's `//` form also finds a record under the single slash."""
     found: dict[str, Json] = {}
     for record in records:

@@ -1,0 +1,5 @@
+{#- A Check under way: each Reference as it lands, until an ending replaces it all. -#}
+<div class="check-running" hx-ext="sse" sse-connect="/checks/{{ check_id }}/stream" sse-swap="finished,budget_spent,error" hx-swap="outerHTML">
+  <p class="waiting">Checking with Crossref and OpenAlex…</p>
+  <ol class="checked" sse-swap="reference" hx-swap="beforeend"></ol>
+</div>

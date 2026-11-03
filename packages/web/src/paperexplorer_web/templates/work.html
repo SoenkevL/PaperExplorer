@@ -27,6 +27,7 @@
       <li><span class="citation unlinked">dotted</span> an Unlinked Citation</li>
     </ul>
   </details>
+  <section id="check" class="check" aria-label="Registry Check" aria-live="polite" hx-get="/works/{{ work.id }}/check" hx-trigger="load"></section>
   {% if work.text_origin == "ocr" %}
   <p class="banner ocr">This is OCR Text, read from a scan. It may misread the authors' words.</p>
   {% endif %}

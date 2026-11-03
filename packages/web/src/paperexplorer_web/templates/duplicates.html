@@ -1,0 +1,29 @@
+{#- Each DOI two Library Items hold, its Standing Item first: let another stand, or merge it into
+    the Standing Item in Zotero once the reader confirms. Swapped whole by its buttons. -#}
+<section id="duplicates" class="duplicates" aria-live="polite">
+{% if groups or message %}
+  <h2>Duplicate Items</h2>
+  {% if message %}<p class="{{ 'failed' if failed else 'done' }}">{{ message }}</p>{% endif %}
+  {% if groups %}
+  <p class="note">Two Library Items hold one DOI: one Work recorded twice. The Standing Item stands for the DOI.</p>
+  {% endif %}
+  {% for g in groups %}
+  {%- set standing = g.items[0] %}
+  <ul class="pair">
+    {% for item in g.items %}
+    <li class="duplicate{% if loop.first %} standing{% endif %}">
+      <span class="key">{{ item.zotero_key }}</span> {{ item.title or item.doi }}
+      <span class="byline">{{ item.creators | join("; ") }}{% if item.year %} ({{ item.year }}){% endif %}</span>
+      <span class="note">{{ "with its PDF" if item.pdf else "no PDF" }}{% if item.added %}, added {{ item.added }}{% endif %}</span>
+      {% if loop.first %}<span class="stands">stands for {{ g.doi }}</span>
+      {% else %}
+      <button type="button" hx-put="/duplicates/{{ item.zotero_key }}/stand" hx-target="#duplicates" hx-swap="outerHTML">Let stand</button>
+      <button type="button" hx-post="/duplicates/merge" hx-vals='{{ {"keep": standing.zotero_key, "other": item.zotero_key} | tojson }}' hx-target="#duplicates" hx-swap="outerHTML"
+        hx-confirm="Merge {{ item.zotero_key }} into {{ standing.zotero_key }} in Zotero? {{ standing.zotero_key }} takes its collections, tags, notes and attachments, and its own fields win; {{ item.zotero_key }} goes to Zotero's trash.">Merge into {{ standing.zotero_key }}</button>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endfor %}
+{% endif %}
+</section>

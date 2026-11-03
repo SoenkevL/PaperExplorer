@@ -1,0 +1,5 @@
+<li><span class="key">{{ res.reference }}</span>
+{%- if res.state == "resolved" %} <span class="level {{ res.level }}">{{ res.level }}</span> {{ res.work.title or res.work.zotero_key or res.work.doi }} ({{ sources[res.layer] }})
+{%- elif res.state == "unchecked" %} Unchecked
+{%- else %} Unresolved{% endif %}
+{%- if res.doi_conflict %} · DOI Conflict{% endif %}</li>

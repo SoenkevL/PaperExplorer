@@ -13,7 +13,7 @@ from paperexplorer import __version__
 from paperexplorer.config import Settings
 from paperexplorer.library import ZoteroLibrary
 from paperexplorer.logs import configure_logging
-from paperexplorer.resolution import Registries
+from paperexplorer.resolution import shared_registries
 from paperexplorer.wiring import Wiring
 from paperexplorer_api.asking_thread import AskingContexts, AskingThread
 from paperexplorer_api.conversations import Conversations
@@ -89,5 +89,5 @@ def app_from_env() -> FastAPI:
             contexts=wiring.asking,
             conversations=Conversations.from_settings(settings),
         ),
-        Checking(library=library, registries=lambda: Registries(settings)) if library else None,
+        Checking(library=library, registries=shared_registries(settings)) if library else None,
     )

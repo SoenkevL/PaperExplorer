@@ -25,7 +25,13 @@ from paperexplorer.resolution.registration import (
     InMemoryDoiRegistry,
     Registration,
 )
-from paperexplorer.resolution.registries import BudgetSpentError, Registries, RegistryError
+from paperexplorer.resolution.registries import (
+    BudgetSpentError,
+    Registries,
+    RegistryError,
+    RegistryLimits,
+    shared_registries,
+)
 from paperexplorer.resolution.verification import registration, unregistered, verify
 
 __all__ = [
@@ -46,6 +52,7 @@ __all__ = [
     "RegistryCheckEvent",
     "RegistryCheckFinished",
     "RegistryError",
+    "RegistryLimits",
     "agrees",
     "candidates",
     "counts",
@@ -55,6 +62,7 @@ __all__ = [
     "registration",
     "registry_check",
     "resolve",
+    "shared_registries",
     "unregistered",
     "verify",
 ]

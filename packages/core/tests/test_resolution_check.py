@@ -1,9 +1,12 @@
 """Registry Checks: References looked up in Crossref and OpenAlex, only when the reader asks."""
 
 import asyncio
+import csv
 import json
+import re
 from collections.abc import Callable
 from typing import Any
+from urllib.parse import unquote
 
 import httpx
 import psycopg
@@ -30,6 +33,7 @@ from paperexplorer.resolution import (
     RegistryError,
     estimate,
     registry_check,
+    shared_registries,
 )
 from paperexplorer.store import ReadersChoices, RegistryResponses, Resolutions, Works, WorkTexts
 
@@ -88,7 +92,15 @@ class Registry:
         if request.url.host == "api.crossref.org":
             if "query.bibliographic" in params:
                 return httpx.Response(200, json={"message": {"items": self.bibliographic}})
-            dois = [d.removeprefix("doi:") for d in params["filter"].split(",")]
+            if request.url.path != "/works":  # a single record, by its DOI
+                record = self.crossref.get(unquote(request.url.path.split("/")[-1]))
+                if record is None:
+                    return httpx.Response(404, text="Resource not found.")
+                return httpx.Response(200, json={"message": record})
+            pairs = params["filter"].split(",")
+            if not all(p.startswith("doi:") for p in pairs):  # as Crossref answers a bare comma
+                return httpx.Response(400, json={"message-type": "validation-failure"})
+            dois = [d.removeprefix("doi:") for d in pairs]
             items = [self.crossref[d.lower()] for d in dois if d.lower() in self.crossref]
             return httpx.Response(200, json={"message": {"items": items}})
         headers = {"x-ratelimit-remaining-usd": self.remaining_usd}
@@ -98,8 +110,11 @@ class Registry:
         if filter_.startswith("title.search:"):
             found = self.titles.get(filter_.removeprefix("title.search:"), [])
             return httpx.Response(200, json={"results": found}, headers=headers)
+        values = next(csv.reader([filter_.removeprefix("doi:")], delimiter="|"))
+        if "," in re.sub(r'"[^"]*"', "", filter_):  # as OpenAlex answers a bare comma
+            return httpx.Response(400, json={"error": "Invalid request rejected at the API edge"})
         # OpenAlex files APA's `10.1037//` form under the single slash, and answers it so.
-        dois = [d.lower().replace("//", "/", 1) for d in filter_.removeprefix("doi:").split("|")]
+        dois = [d.lower().replace("//", "/", 1) for d in values]
         results = [self.openalex[d] for d in dois if d in self.openalex]
         return httpx.Response(200, json={"results": results}, headers=headers)
 
@@ -594,3 +609,154 @@ def test_the_cost_on_refresh_asks_again_what_the_cache_resolved(store_db: Conn) 
     cost = estimate(store_db, seed, refs, refresh=True)
 
     assert (cost.crossref_batches, cost.openalex_batches, cost.title_searches) == (1, 1, 1)
+
+
+def test_checks_sharing_their_limits_ask_crossref_one_at_a_time(
+    registry: Registry, clock: Clock
+) -> None:
+    """Live, six Checks clicked at once each had a limiter of its own, and Crossref sent 429s."""
+    registries = shared_registries(
+        Settings(_env_file=None),  # pyright: ignore[reportCallIssue]
+        transport=httpx.MockTransport(registry.handle),
+        clock=clock,
+        sleep=clock.sleep,
+    )
+
+    async def one_check(doi: str) -> None:
+        async with registries() as each:
+            await each.crossref_dois([doi])
+
+    async def three_at_once() -> None:
+        await asyncio.gather(*(one_check(f"10.5555/{i}") for i in range(3)))
+
+    asyncio.run(three_at_once())
+
+    assert len(registry.sent("api.crossref.org")) == 3
+    assert clock.now >= 2.0
+
+
+def test_a_429_without_a_retry_after_waits_longer_each_try(
+    registry: Registry, registries: Registries, clock: Clock
+) -> None:
+    """Crossref's 429s carry no `Retry-After`; retries a second apart drew 429 after 429 live."""
+    throttled: list[httpx.Request] = []
+
+    def twice(request: httpx.Request) -> httpx.Response | None:
+        if len(throttled) < 2:
+            throttled.append(request)
+            return httpx.Response(429)
+        return None
+
+    registry.responses.append(twice)
+
+    async def ask() -> None:
+        async with registries:
+            await registries.crossref_dois(["10.5555/x"])
+
+    asyncio.run(ask())
+
+    assert clock.sleeps == [1.0, 2.0]
+
+
+def _burst_429(request: httpx.Request) -> httpx.Response:
+    """OpenAlex's answer to a burst, as recorded: its budget header says 0 while the day is not."""
+    assert request.url.host == "api.openalex.org"
+    return httpx.Response(
+        429,
+        headers={"retry-after": "1", "x-ratelimit-remaining-usd": "0"},
+        json={
+            "error": "Rate limit exceeded",
+            "message": "Rate limit exceeded: 10 requests per second. Please slow down.",
+            "retryAfter": 0.032,
+            "dailyRemainingUsd": 0,
+        },
+    )
+
+
+def test_openalex_slowing_a_burst_is_not_a_spent_budget(
+    store_db: Conn, registry: Registry, registries: Registries
+) -> None:
+    """Live, this told the reader to come back after 00:00 UTC with $0.07 of the day left."""
+    registry.crossref["10.1109/cvpr.2016.90"] = RESNET
+    throttled: list[httpx.Request] = []
+
+    def once(request: httpx.Request) -> httpx.Response | None:
+        is_list = request.url.path == "/works" and request.url.host == "api.openalex.org"
+        if is_list and not throttled:
+            throttled.append(request)
+            return _burst_429(request)
+        return None
+
+    registry.responses.append(once)
+    refs = [_ref("b0", doi="10.1109/cvpr.2016.90", title=RESNET["title"][0])]
+    seed = _seed(store_db, refs)
+
+    events = _check(store_db, seed, refs, registries)
+
+    assert not any(isinstance(e, BudgetSpent) for e in events)
+    assert _checked(events)["b0"].level is Level.CERTAIN
+    assert registries.budget_usd == pytest.approx(0.09)  # pyright: ignore[reportUnknownMemberType]
+
+
+def test_a_429_with_the_day_truly_spent_still_stops_the_check(
+    store_db: Conn, registry: Registry, registries: Registries
+) -> None:
+    registry.responses.append(lambda r: _burst_429(r) if r.url.host == "api.openalex.org" else None)
+    refs = [_ref("b0", doi="10.5555/x")]
+    seed = _seed(store_db, refs)
+
+    events = _check(store_db, seed, refs, registries)
+
+    assert isinstance(events[-1], BudgetSpent)
+
+
+def test_a_doi_with_a_comma_stops_nothing_and_finds_its_record(
+    store_db: Conn, registry: Registry, registries: Registries
+) -> None:
+    """Live, one such DOI got a 400 from both registries, and its batch and Check went with it."""
+    comma = "10.5555/a,b"
+    registry.crossref[comma] = crossref_item(comma, "A title with a comma DOI", "Odd", 1999)
+    registry.openalex[comma] = openalex_work(comma, "A title with a comma DOI", "A Odd", 1999, "W2")
+    registry.crossref["10.1109/cvpr.2016.90"] = RESNET
+    refs = [
+        _ref("b0", doi=comma, title="A title with a comma DOI"),
+        _ref("b1", doi="10.1109/cvpr.2016.90", title=RESNET["title"][0]),
+    ]
+    seed = _seed(store_db, refs)
+
+    checked = _checked(_check(store_db, seed, refs, registries))
+
+    assert checked["b0"].level is Level.CERTAIN
+    assert checked["b1"].level is Level.CERTAIN
+    [single] = [r for r in registry.sent("api.crossref.org") if r.url.path != "/works"]
+    assert unquote(single.url.path) == f"/works/{comma}"
+
+
+def test_a_doi_with_a_comma_crossref_does_not_know_is_a_miss(
+    store_db: Conn, registry: Registry, registries: Registries
+) -> None:
+    refs = [_ref("b0", doi="10.1234/foo,bar", title="Nothing anyone printed")]
+    seed = _seed(store_db, refs)
+
+    checked = _checked(_check(store_db, seed, refs, registries))
+
+    assert checked["b0"].state is ResolutionState.UNRESOLVED
+    row = RegistryResponses(store_db).get(RegistrySource.CROSSREF_DOI, ["10.1234/foo,bar"])
+    assert row["10.1234/foo,bar"].hit is False
+
+
+def test_a_long_printed_string_stays_within_what_crossref_accepts(
+    store_db: Conn, registry: Registry, registries: Registries
+) -> None:
+    """Live, Crossref answered 431 at 8,000 characters and 414 at 12,000, and the Check stopped."""
+    registry.responses.append(
+        lambda r: (
+            httpx.Response(414) if len(r.url.params.get("query.bibliographic", "")) > 6000 else None
+        )
+    )
+    refs = [_ref("b0", text="Smith J. " * 1500)]
+    seed = _seed(store_db, refs)
+
+    checked = _checked(_check(store_db, seed, refs, registries))
+
+    assert checked["b0"].state is ResolutionState.UNRESOLVED

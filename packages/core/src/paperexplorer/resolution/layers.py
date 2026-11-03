@@ -27,6 +27,11 @@ from paperexplorer.resolution.matching import (
 from paperexplorer.resolution.records import candidate, from_crossref, from_openalex
 from paperexplorer.store import RegistryResponses, Works
 
+# Crossref refuses a query past ~6,000 characters (431, then 414), and Postgres cannot index a
+# key past ~2,700 bytes. A bibliography entry is far shorter: longer is GROBID running entries
+# together. The cut is in the key too, so the query sent is the query cached.
+QUERY_CHARS = 1000
+
 
 def doi_key(ref: Reference) -> str | None:
     """The key a Reference's printed DOI is cached under."""
@@ -35,12 +40,12 @@ def doi_key(ref: Reference) -> str | None:
 
 def title_key(ref: Reference) -> str | None:
     """The key, and the query sent, for a Reference's title search."""
-    return normalize_title(ref.title) if ref.title and normalize_title(ref.title) else None
+    return normalize_title(ref.title)[:QUERY_CHARS] or None if ref.title else None
 
 
 def bibliographic_query(ref: Reference) -> str:
     """The printed string as Crossref's bibliographic query is sent it."""
-    return " ".join(ref.text.split())
+    return " ".join(ref.text.split())[:QUERY_CHARS]
 
 
 def bibliographic_key(ref: Reference) -> str:

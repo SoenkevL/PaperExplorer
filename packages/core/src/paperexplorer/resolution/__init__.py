@@ -29,7 +29,6 @@ from paperexplorer.resolution.registries import (
     BudgetSpentError,
     Registries,
     RegistryError,
-    RegistryLimits,
     shared_registries,
 )
 from paperexplorer.resolution.verification import registration, unregistered, verify
@@ -52,7 +51,6 @@ __all__ = [
     "RegistryCheckEvent",
     "RegistryCheckFinished",
     "RegistryError",
-    "RegistryLimits",
     "agrees",
     "candidates",
     "counts",

@@ -2,6 +2,7 @@
 
 import asyncio
 import csv
+import hashlib
 import json
 import re
 from collections.abc import Callable
@@ -93,7 +94,8 @@ class Registry:
             if "query.bibliographic" in params:
                 return httpx.Response(200, json={"message": {"items": self.bibliographic}})
             if request.url.path != "/works":  # a single record, by its DOI
-                record = self.crossref.get(unquote(request.url.path.split("/")[-1]))
+                encoded = request.url.raw_path.decode().partition("?")[0].rpartition("/")[2]
+                record = self.crossref.get(unquote(encoded))
                 if record is None:
                     return httpx.Response(404, text="Resource not found.")
                 return httpx.Response(200, json={"message": record})
@@ -615,9 +617,20 @@ def test_checks_sharing_their_limits_ask_crossref_one_at_a_time(
     registry: Registry, clock: Clock
 ) -> None:
     """Live, six Checks clicked at once each had a limiter of its own, and Crossref sent 429s."""
+    running = 0
+    most_at_once = [0]
+
+    async def counted(request: httpx.Request) -> httpx.Response:
+        nonlocal running
+        running += 1
+        most_at_once[0] = max(most_at_once[0], running)
+        await asyncio.sleep(0)
+        running -= 1
+        return registry.handle(request)
+
     registries = shared_registries(
         Settings(_env_file=None),  # pyright: ignore[reportCallIssue]
-        transport=httpx.MockTransport(registry.handle),
+        transport=httpx.MockTransport(counted),
         clock=clock,
         sleep=clock.sleep,
     )
@@ -633,6 +646,7 @@ def test_checks_sharing_their_limits_ask_crossref_one_at_a_time(
 
     assert len(registry.sent("api.crossref.org")) == 3
     assert clock.now >= 2.0
+    assert most_at_once == [1]
 
 
 def test_a_429_without_a_retry_after_waits_longer_each_try(
@@ -727,9 +741,10 @@ def test_a_doi_with_a_comma_stops_nothing_and_finds_its_record(
     checked = _checked(_check(store_db, seed, refs, registries))
 
     assert checked["b0"].level is Level.CERTAIN
+    assert checked["b0"].layer is Layer.CROSSREF
     assert checked["b1"].level is Level.CERTAIN
     [single] = [r for r in registry.sent("api.crossref.org") if r.url.path != "/works"]
-    assert unquote(single.url.path) == f"/works/{comma}"
+    assert single.url.raw_path == b"/works/10.5555%2Fa%2Cb"
 
 
 def test_a_doi_with_a_comma_crossref_does_not_know_is_a_miss(
@@ -745,7 +760,12 @@ def test_a_doi_with_a_comma_crossref_does_not_know_is_a_miss(
     assert row["10.1234/foo,bar"].hit is False
 
 
-def test_a_long_printed_string_stays_within_what_crossref_accepts(
+def _long_text() -> str:
+    """Words that do not compress: Postgres cannot index a key this long, as it could repetition."""
+    return " ".join(hashlib.sha256(str(i).encode()).hexdigest() for i in range(180))
+
+
+def test_a_long_printed_string_stays_within_what_crossref_and_the_cache_accept(
     store_db: Conn, registry: Registry, registries: Registries
 ) -> None:
     """Live, Crossref answered 431 at 8,000 characters and 414 at 12,000, and the Check stopped."""
@@ -754,9 +774,119 @@ def test_a_long_printed_string_stays_within_what_crossref_accepts(
             httpx.Response(414) if len(r.url.params.get("query.bibliographic", "")) > 6000 else None
         )
     )
-    refs = [_ref("b0", text="Smith J. " * 1500)]
+    refs = [_ref("b0", text=_long_text())]
     seed = _seed(store_db, refs)
 
     checked = _checked(_check(store_db, seed, refs, registries))
 
     assert checked["b0"].state is ResolutionState.UNRESOLVED
+
+
+def test_a_long_title_stays_within_what_the_cache_accepts_and_is_asked_once(
+    store_db: Conn, registry: Registry, registries: Registries
+) -> None:
+    refs = [_ref("b0", title=_long_text())]
+    seed = _seed(store_db, refs)
+
+    _check(store_db, seed, refs, registries)
+    _check(store_db, seed, refs, registries)
+
+    assert len([r for r in registry.sent("api.openalex.org") if r.url.path == "/works"]) == 1
+
+
+def test_a_singleton_saying_the_day_is_spent_stops_the_check(
+    store_db: Conn, registry: Registry, registries: Registries
+) -> None:
+    registry.remaining_usd = "0"
+    registry.responses.append(
+        lambda r: _burst_429(r) if r.url.path == "/works" and "openalex" in str(r.url) else None
+    )
+    refs = [_ref("b0", doi="10.5555/x")]
+    seed = _seed(store_db, refs)
+
+    assert isinstance(_check(store_db, seed, refs, registries)[-1], BudgetSpent)
+    assert len([r for r in registry.requests if r.url.path.startswith("/works/W")]) == 1
+
+
+def test_a_failing_answers_budget_header_is_not_believed(
+    registry: Registry, registries: Registries
+) -> None:
+    registry.responses.append(
+        lambda r: httpx.Response(503, headers={"x-ratelimit-remaining-usd": "0"})
+    )
+
+    async def ask() -> None:
+        async with registries:
+            await registries.openalex_dois(["10.5555/x"])
+
+    with pytest.raises(RegistryError, match="3 times"):
+        asyncio.run(ask())
+
+    assert registries.budget_usd is None
+
+
+def test_a_doi_with_a_pipe_goes_quoted_to_openalex(
+    registry: Registry, registries: Registries
+) -> None:
+    async def ask() -> None:
+        async with registries:
+            await registries.openalex_dois(["10.5555/a|b", "10.5555/c"])
+
+    asyncio.run(ask())
+
+    assert registry.requests[0].url.params["filter"] == 'doi:"10.5555/a|b"|10.5555/c'
+
+
+def test_crossref_single_records_follow_their_own_rate_limit(
+    registry: Registry, registries: Registries, clock: Clock
+) -> None:
+    registry.crossref["10.5555/a,b"] = crossref_item("10.5555/a,b", "A title", "Odd", 1999)
+    registry.responses.append(
+        lambda r: httpx.Response(
+            200,
+            json={"message": registry.crossref["10.5555/a,b"]},
+            headers={"x-rate-limit-limit": "2", "x-rate-limit-interval": "1s"},
+        )
+    )
+
+    async def ask() -> None:
+        async with registries:
+            await registries.crossref_dois(["10.5555/a,b", "10.5555/c,d", "10.5555/e,f"])
+
+    asyncio.run(ask())
+
+    # Five a second, until the first answer says two.
+    assert clock.sleeps == pytest.approx([0.2, 0.5])  # pyright: ignore[reportUnknownMemberType]
+
+
+def test_a_cancelled_check_gives_back_its_turn(registry: Registry, clock: Clock) -> None:
+    """Limits now outlive a Check: a slot lost to a dropped reader would hang the API's Checks."""
+    let_go = asyncio.Event()
+
+    async def stuck(request: httpx.Request) -> httpx.Response:
+        if "first" in str(request.url):
+            await let_go.wait()
+        return registry.handle(request)
+
+    registries = shared_registries(
+        Settings(_env_file=None),  # pyright: ignore[reportCallIssue]
+        transport=httpx.MockTransport(stuck),
+        clock=clock,
+        sleep=clock.sleep,
+    )
+
+    async def one_check(doi: str) -> None:
+        async with registries() as each:
+            await each.crossref_dois([doi])
+
+    async def cancel_both_then_check() -> None:
+        tasks = [asyncio.create_task(one_check(f"10.5555/{d}")) for d in ("first", "second")]
+        await asyncio.sleep(0.01)
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        await asyncio.wait_for(one_check("10.5555/third"), timeout=1)
+
+    asyncio.run(cancel_both_then_check())
+
+    assert "third" in str(registry.requests[-1].url)

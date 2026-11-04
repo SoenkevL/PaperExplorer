@@ -390,11 +390,7 @@ tower_env POSTGRES_USER paperexplorer
 tower_env POSTGRES_DB paperexplorer
 tower_env POSTGRES_PASSWORD "$pg_password"
 tower_env PE_DATABASE_URL "postgresql://paperexplorer:$pg_password@localhost:5432/paperexplorer"
-tower_env PE_EMBEDDING_BASE_URL "http://localhost:11434/v1"
-tower_env PE_EMBEDDING_MODEL "$EMBED_MODEL"
-tower_env PE_CHAT_BASE_URL "http://localhost:11434/v1"
-tower_env PE_CHAT_MODEL "$CHAT_MODEL"
-tower_env PE_CHAT_NUM_CTX "$CHAT_NUM_CTX"
+tower_env PE_OLLAMA_BASE_URL "http://localhost:11434/v1"
 tower_env PE_ZOTERO_LIBRARY_ID "$zid"
 tower_env PE_ZOTERO_LIBRARY_TYPE user
 tower_env PE_ZOTERO_API_KEY "$zkey"
@@ -403,7 +399,7 @@ tower_env ZOTERO_STORAGE_HOST_DIR "$STORAGE_DIR"
 say ""
 say "On the Mac: the database is reached through an SSH tunnel, embeddings over the LAN."
 write_env PE_DATABASE_URL "postgresql://paperexplorer:$pg_password@localhost:5432/paperexplorer"
-write_env PE_EMBEDDING_BASE_URL "http://$TOWER_HOST:11434/v1"
+write_env PE_OLLAMA_BASE_URL "http://$TOWER_HOST:11434/v1"
 note "tunnel when needed: ssh -N -L 5432:localhost:5432 $TOWER"
 pause
 

@@ -789,6 +789,7 @@ version = "0.1.0"
 source = { editable = "packages/core" }
 dependencies = [
     { name = "httpx" },
+    { name = "httpx2" },
     { name = "langfuse" },
     { name = "liteparse" },
     { name = "psycopg", extra = ["binary"] },
@@ -805,6 +806,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "httpx", specifier = ">=0.28" },
+    { name = "httpx2", specifier = ">=2.16.0" },
     { name = "langfuse", specifier = ">=5.0.4" },
     { name = "liteparse", specifier = "==2.16.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.10" },

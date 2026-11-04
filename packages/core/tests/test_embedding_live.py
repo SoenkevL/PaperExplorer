@@ -6,7 +6,8 @@ import pytest
 
 from paperexplorer.config import Settings
 from paperexplorer.domain import Vector
-from paperexplorer.embedding import DIMENSIONS, OpenAICompatibleEmbedder
+from paperexplorer.embedding import DIMENSIONS
+from paperexplorer.inference import embedder as provider_embedder
 from paperexplorer.tracing import Tracing
 
 
@@ -18,7 +19,7 @@ def cosine(a: Vector, b: Vector) -> float:
 @pytest.mark.tower
 def test_bge_m3_gives_1024_dimensions_and_puts_like_meanings_closer() -> None:
     settings = Settings(embedding_batch_size=2)
-    embedder = OpenAICompatibleEmbedder.from_settings(settings, Tracing.off())
+    embedder = provider_embedder(settings, Tracing.off())
 
     question, answer, paraphrase, unrelated = embedder.embed(
         [
@@ -29,7 +30,7 @@ def test_bge_m3_gives_1024_dimensions_and_puts_like_meanings_closer() -> None:
         ]
     )
 
-    assert settings.embedding_model == "bge-m3"
+    assert embedder.model.endswith("bge-m3")
     assert {len(v) for v in (question, answer, paraphrase, unrelated)} == {DIMENSIONS}
     assert cosine(answer, paraphrase) > cosine(answer, question) > cosine(answer, unrelated)
     assert cosine(question, answer) > cosine(question, unrelated)

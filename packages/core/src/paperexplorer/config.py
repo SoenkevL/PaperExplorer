@@ -20,9 +20,14 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://paperexplorer:paperexplorer@localhost:5432/paperexplorer"
     data_dir: Path = Path("data")
 
-    embedding_base_url: str = "http://localhost:11434/v1"
-    embedding_model: str = "bge-m3"
-    embedding_api_key: SecretStr = SecretStr("ollama")
+    # Who runs the chat and embedding models: an entry of the table in `inference`.
+    provider: str = "ollama"
+    provider_api_key: SecretStr | None = None
+    ollama_base_url: str = "http://localhost:11434/v1"
+
+    embedding_model: str | None = Field(
+        default=None, description="Over the Provider's own embedding model."
+    )
     embedding_batch_size: int = Field(default=32, ge=1, description="Texts per embedding request.")
     # Set from the eval of 2026-10-29 (docs/eval-2026-10-29.md): of 168 Pointers at or above 0.7,
     # 2 sat at a place that does not bear their sentence out (both of one invented sentence); of
@@ -34,16 +39,12 @@ class Settings(BaseSettings):
         description="Cosine an Answer sentence needs with a Chunk sentence for close Support.",
     )
 
-    # The answering agent's chat model, behind any OpenAI-compatible endpoint (Ollama by default).
-    chat_base_url: str = "http://localhost:11434/v1"
-    chat_model: str = Field(
-        default="paperexplorer-chat", description="Ollama alias from scripts/setup-tower.sh."
-    )
-    chat_api_key: SecretStr = SecretStr("ollama")
-    chat_num_ctx: int = Field(
-        default=73728,
+    # The answering agent's chat model, the Provider's own unless set.
+    chat_model: str | None = Field(default=None, description="Over the Provider's own chat model.")
+    chat_num_ctx: int | None = Field(
+        default=None,
         ge=1,
-        description="The chat model's context in tokens, as its Modelfile sets it; on every trace.",
+        description="Over the Provider's chat context in tokens; set it with `chat_model`.",
     )
     # A Seed this small is read whole, in context, rather than searched (ADR 0010). Counted in
     # bge-m3 tokens, the sum of its Chunks'; the rest of the chat context is left for gemma
@@ -136,6 +137,10 @@ class Settings(BaseSettings):
         "langfuse_release",
         "crossref_mailto",
         "openalex_api_key",
+        "provider_api_key",
+        "embedding_model",
+        "chat_model",
+        "chat_num_ctx",
         mode="before",
     )
     @classmethod
@@ -145,7 +150,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _whole_seed_fits_the_context(self) -> Self:
-        if self.whole_seed_max_tokens >= self.chat_num_ctx:
+        if self.chat_num_ctx is not None and self.whole_seed_max_tokens >= self.chat_num_ctx:
             raise ValueError(
                 f"PE_WHOLE_SEED_MAX_TOKENS ({self.whole_seed_max_tokens}) must stay below"
                 f" PE_CHAT_NUM_CTX ({self.chat_num_ctx}): the whole Seed would leave no room for"

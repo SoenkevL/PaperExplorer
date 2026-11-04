@@ -2,12 +2,10 @@
 
 import logging
 from collections.abc import Sequence
-from typing import Self
 
 import httpx
 from pydantic import BaseModel, ValidationError
 
-from paperexplorer.config import Settings
 from paperexplorer.domain import Vector
 from paperexplorer.tracing import Tracing
 
@@ -36,34 +34,28 @@ class OpenAICompatibleEmbedder:
     """Texts go to `<base_url>/embeddings` in batches of `batch_size`, one request each."""
 
     def __init__(
-        self, http: httpx.Client, model: str, *, batch_size: int, tracing: Tracing
+        self,
+        http: httpx.Client,
+        model: str,
+        *,
+        batch_size: int,
+        tracing: Tracing,
+        stored_as: str | None = None,
     ) -> None:
-        """`http` is based at the server's API root (`…/v1`) and sends the key."""
+        """`http` is based at the server's API root (`…/v1`) and sends the key.
+
+        `model` is what the server is asked for; `stored_as`, if given, names its Vectors instead.
+        """
         self._http = http
         self._model = model
+        self._stored_as = stored_as or model
         self._batch_size = batch_size
         self._tracing = tracing
 
-    @classmethod
-    def from_settings(cls, settings: Settings, tracing: Tracing) -> Self:
-        """The server and model named by the `PE_EMBEDDING_*` settings."""
-        http = httpx.Client(
-            base_url=settings.embedding_base_url,
-            headers={"Authorization": f"Bearer {settings.embedding_api_key.get_secret_value()}"},
-            # The first request after a while waits for the server to load the model.
-            timeout=120.0,
-        )
-        return cls(
-            http,
-            settings.embedding_model,
-            batch_size=settings.embedding_batch_size,
-            tracing=tracing,
-        )
-
     @property
     def model(self) -> str:
-        """The model the server is asked for."""
-        return self._model
+        """The name stored with each Vector."""
+        return self._stored_as
 
     def embed(self, texts: Sequence[str]) -> list[Vector]:
         """One Vector per text, in order; raises `EmbeddingError` if the server fails."""

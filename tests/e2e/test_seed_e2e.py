@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from psycopg.rows import TupleRow
 
 from paperexplorer.config import Settings
-from paperexplorer.embedding import OpenAICompatibleEmbedder
+from paperexplorer.inference import embedder
 from paperexplorer.library import ZoteroLibrary
 from paperexplorer.pipeline import STAGES, StageContext, run_stage
 from paperexplorer.resolution import DoiOrgRegistry
@@ -31,7 +31,7 @@ def test_the_seed_reaches_the_api_with_its_citations(
         conn=store_db,
         settings=settings,
         library=ZoteroLibrary.from_settings(settings),
-        embedder=OpenAICompatibleEmbedder.from_settings(settings, Tracing.off()),
+        embedder=embedder(settings, Tracing.off()),
         tracing=Tracing.off(),
         doi_registry=DoiOrgRegistry.from_settings(settings),
     )

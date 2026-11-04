@@ -521,6 +521,7 @@ def test_a_run_records_the_chat_settings_and_how_often_live_repeats(
         settings,
         small_seed,
         questions_file,
+        chat_model="paperexplorer-chat",
         embedding_model="fake-bag-of-words",
         git_sha="abc1234",
         tracing_host=None,

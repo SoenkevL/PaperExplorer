@@ -41,8 +41,7 @@ from pydantic_ai.messages import (
 )
 from pydantic_ai.models import Model, ModelRequestContext
 from pydantic_ai.models.instrumented import InstrumentationSettings
-from pydantic_ai.models.openai import OpenAIChatModel, OpenAIChatModelSettings
-from pydantic_ai.providers.ollama import OllamaProvider
+from pydantic_ai.models.openai import OpenAIChatModelSettings
 from pydantic_ai.settings import ModelSettings, merge_model_settings
 from pydantic_ai.tools import ToolDefinition
 from pydantic_ai.usage import UsageLimits
@@ -63,6 +62,7 @@ from paperexplorer.asking.tools import SeedTools
 from paperexplorer.config import Settings
 from paperexplorer.domain import Answer
 from paperexplorer.embedding import Embedder
+from paperexplorer.inference import chat_context
 from paperexplorer.store import ScoredChunk
 from paperexplorer.tracing import Tracing
 
@@ -140,23 +140,6 @@ class _Tally:
     forced_search: list[ScoredChunk] | None = None
 
 
-def chat_model(settings: Settings) -> Model:
-    """The chat model behind `PE_CHAT_BASE_URL`, Ollama's OpenAI-compatible endpoint by default.
-
-    Ollama's profile reads the model's thinking from the `reasoning` field and sends tool
-    schemas without `strict`; any OpenAI-compatible server that does the same fits.
-    """
-    provider = OllamaProvider(
-        base_url=settings.chat_base_url, api_key=settings.chat_api_key.get_secret_value()
-    )
-    # A stream silent for `chat_timeout_s` fails the turn, rather than at the client's 600 s.
-    return OpenAIChatModel(
-        settings.chat_model,
-        provider=provider,
-        settings=ModelSettings(timeout=settings.chat_timeout_s),
-    )
-
-
 async def ask(
     ctx: AskingContext, conversation: Conversation, question: str
 ) -> AsyncIterator[AnswerEvent]:
@@ -214,7 +197,7 @@ async def _answer_turn(
         "position": str(position),
         "prompt_version": PROMPT_VERSION,
         "model": ctx.model.model_name,
-        "num_ctx": str(ctx.settings.chat_num_ctx),
+        "num_ctx": str(chat_context(ctx.settings)),
         "temperature": str(ctx.settings.chat_temperature),
         "answer_thinking": str(ctx.settings.chat_answer_thinking).lower(),
         "reading": reading.value,

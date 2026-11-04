@@ -31,6 +31,7 @@ from paperexplorer.evals.questions import Questions
 from paperexplorer.evals.rendering import render_answers, render_summary
 from paperexplorer.evals.summaries import EvalSummary
 from paperexplorer.evals.turns import METRICS, AskingMetrics, ask_turn
+from paperexplorer.inference import chat_context
 from paperexplorer.store import WorkTexts
 
 logger = logging.getLogger(__name__)
@@ -65,6 +66,7 @@ def run_info(
     work: Work,
     questions_file: Path,
     *,
+    chat_model: str,
     embedding_model: str,
     git_sha: str | None,
     tracing_host: str | None,
@@ -79,9 +81,9 @@ def run_info(
         git_sha=git_sha,
         seed=work.zotero_key or str(work.id),
         work_id=work.id,
-        model=settings.chat_model,
+        model=chat_model,
         prompt_version=PROMPT_VERSION,
-        num_ctx=settings.chat_num_ctx,
+        num_ctx=chat_context(settings),
         temperature=settings.chat_temperature,
         answer_thinking=settings.chat_answer_thinking,
         repeat=repeat,

@@ -127,8 +127,8 @@ def _wired(*responses: str) -> Callable[[Settings], Wiring]:
 
     return lambda settings: Wiring.from_settings(
         settings,
-        embedder=FakeEmbedder(settings.embedding_model),
-        model=FunctionModel(stream_function=stream, model_name=settings.chat_model),
+        embedder=FakeEmbedder("bge-m3"),
+        model=FunctionModel(stream_function=stream, model_name="paperexplorer-chat"),
     )
 
 

@@ -54,6 +54,15 @@ def test_melious_needs_a_key() -> None:
         embedder(_settings(provider="melious"), Tracing.off())
 
 
+def test_ollama_is_never_sent_the_key_meant_for_another_provider() -> None:
+    settings = _settings(provider="ollama", provider_api_key="sk-mel-test")
+
+    model = chat_model(settings)
+
+    assert isinstance(model, OpenAIChatModel)
+    assert model.client.api_key == "ollama"
+
+
 def test_an_unknown_provider_names_the_known_ones() -> None:
     with pytest.raises(ProviderError, match=r"melious, ollama"):
         chat_model(_settings(provider="nonesuch"))

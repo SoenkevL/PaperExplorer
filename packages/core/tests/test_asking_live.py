@@ -1,4 +1,4 @@
-"""Pointer Support with Ollama's bge-m3 at the provisional Support threshold, on the tower.
+"""Pointer Support with the Provider's bge-m3 at the provisional Support threshold, on the tower.
 
 No chat model: the Answers are written here. The paraphrase is of a sentence of the CC BY
 Villiger fixture, since the Seed's text may not be committed (its licence is unknown).

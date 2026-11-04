@@ -32,10 +32,10 @@ class Provider(BaseModel):
     embedding_model: str
     # The message field the Provider's thinking arrives in, and must be sent back in.
     thinking_field: str
-    # None: the Provider needs `PE_PROVIDER_API_KEY`.
-    keyless: str | None = None
+    # What goes in place of a key for a Provider that needs none; else `PE_PROVIDER_API_KEY`.
+    no_key_placeholder: str | None = None
     # Before the model's name on each stored Vector, so that one Provider's Vectors are never
-    # searched with another's: both servers say `bge-m3`, and whether they agree is not yet known.
+    # searched with another's: both call theirs `bge-m3`, and whether they agree is not yet known.
     vector_prefix: str = ""
 
 
@@ -47,7 +47,7 @@ def _providers(settings: Settings) -> dict[str, Provider]:
             chat_context=73728,  # its Modelfile's num_ctx
             embedding_model="bge-m3",
             thinking_field="reasoning",
-            keyless="ollama",
+            no_key_placeholder="ollama",
         ),
         # Probed 2026-11-03 (docs/research/2026-11-melious-api.md).
         "melious": Provider(
@@ -71,11 +71,12 @@ def _provider(settings: Settings) -> Provider:
 
 
 def _key(settings: Settings, provider: Provider) -> str:
-    if settings.provider_api_key is not None:
-        return settings.provider_api_key.get_secret_value()
-    if provider.keyless is None:
+    # The key belongs to the hosted Provider: Ollama, often over plain HTTP, never gets it.
+    if provider.no_key_placeholder is not None:
+        return provider.no_key_placeholder
+    if settings.provider_api_key is None:
         raise ProviderError(f"PE_PROVIDER {settings.provider!r} needs PE_PROVIDER_API_KEY")
-    return provider.keyless
+    return settings.provider_api_key.get_secret_value()
 
 
 def chat_context(settings: Settings) -> int:
@@ -91,13 +92,11 @@ def chat_context(settings: Settings) -> int:
 
 
 def chat_model(settings: Settings, *, http: httpx2.AsyncClient | None = None) -> Model:
-    """The chat model of `PE_PROVIDER`; `http` is for tests.
-
-    Ollama's pydantic-ai profile also fits Melious: tool schemas without `strict`, and a profile
-    by the model's name. Only where thinking travels differs.
-    """
+    """The chat model of `PE_PROVIDER`; `http` is for tests."""
     provider = _provider(settings)
     chat_context(settings)
+    # Ollama's pydantic-ai profile also fits Melious: tool schemas without `strict`, and a profile
+    # by the model's name. Only where thinking travels differs.
     # A stream silent for `chat_timeout_s` fails the turn, rather than at the client's 600 s.
     return OpenAIChatModel(
         settings.chat_model or provider.chat_model,

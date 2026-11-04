@@ -1,10 +1,10 @@
 # Answers and Vectors may come from a hosted Provider
 
-Until now a local model answered every Question, so paper text stayed on the tower. The tower's GPU limits which models fit and how much context they get. So a Provider, local or hosted, now runs both the chat model and the Embedder: `PE_PROVIDER` picks one from the table in `inference` and `PE_PROVIDER_API_KEY` is its key. Ollama stays the default; Melious is the first hosted Provider. This amends ADR 0008's "local model" (its rule on the authors' words stands) and ADR 0009's "a settings change": a new server is one entry in that table.
+Until now a local model answered every Question, so paper text stayed on the tower. The tower's GPU limits which models fit and how much context they get. So a Provider, local or hosted, now runs both the chat model and the Embedder: `PE_PROVIDER` picks one from the table in `inference` and `PE_PROVIDER_API_KEY` is its key. Ollama stays the default; Melious is the first hosted Provider. This amends ADR 0008's "local model" (its rule on the authors' words stands) and ADR 0009's "a settings change": a new Provider is one entry in that table.
 
 ## Considered Options
 
-- **Separate settings for each server (`PE_CHAT_BASE_URL` and the rest):** already there, but a switch took several lines, compose's URLs overrode `.env`, and a server's thinking field had no setting.
+- **Separate settings for chat and embeddings (`PE_CHAT_BASE_URL` and the rest):** already there, but a switch took several lines, compose's URLs overrode `.env`, and where thinking travels had no setting.
 - **Chat hosted, embeddings local:** keeps every Vector and the Support threshold as they are, but every Question would still need Ollama.
 - **A class per Provider:** more code per Provider, when the two so far differ only in values.
 

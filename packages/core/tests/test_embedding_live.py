@@ -1,4 +1,4 @@
-"""The real Embedder: Ollama's bge-m3 on the tower, through its OpenAI-compatible endpoint."""
+"""The real Embedder: the Provider's bge-m3, through its OpenAI-compatible endpoint."""
 
 import math
 

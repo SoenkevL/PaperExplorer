@@ -1,4 +1,4 @@
-"""Hybrid search over the Seed with Ollama's bge-m3, on the tower."""
+"""Hybrid search over the Seed with the Provider's bge-m3, on the tower."""
 
 import re
 from pathlib import Path

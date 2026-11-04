@@ -42,10 +42,7 @@ class OpenAICompatibleEmbedder:
         tracing: Tracing,
         stored_as: str | None = None,
     ) -> None:
-        """`http` is based at the server's API root (`…/v1`) and sends the key.
-
-        `model` is what the server is asked for; `stored_as`, if given, names its Vectors instead.
-        """
+        """`http` is based at the API root (`…/v1`) with the key; `stored_as` names the Vectors."""
         self._http = http
         self._model = model
         self._stored_as = stored_as or model

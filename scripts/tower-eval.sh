@@ -53,10 +53,13 @@ mkdir -p "$RUN_DIR"
   uv sync --quiet
   docker compose up -d --quiet-pull --wait db
   uv run paperexplorer migrate
-  for model in "${MODELS[@]}"; do
-    ollama show "$model" >/dev/null 2>&1 \
-      || { echo "Ollama has no $model: create it from the Mac with scripts/setup-tower.sh" >&2; exit 1; }
-  done
+  # Only Ollama's models live on the tower; a hosted Provider answers for its own.
+  if [[ "$(uv run python -c 'from paperexplorer.config import Settings; print(Settings().provider)')" == ollama ]]; then
+    for model in "${MODELS[@]}"; do
+      ollama show "$model" >/dev/null 2>&1 \
+        || { echo "Ollama has no $model: create it from the Mac with scripts/setup-tower.sh" >&2; exit 1; }
+    done
+  fi
   uv run paperexplorer eval "$SEED" --run-id "$RUN_ID" "$@"
 } 2>&1 | tee "$RUN_DIR/console.log"
 

@@ -59,7 +59,10 @@ A Registry Check (ADR 0011) looks References up in Crossref and OpenAlex. It run
   | OpenAlex | 8/s | 25/s (`PE_OPENALEX_API_KEY`) |
 
   Both settings exist and stay empty for now; filling them changes no code. OpenAlex runs below its published 10 and 30 because 8 parallel keyless calls already drew 429s.
-- A 429 waits for its `Retry-After`; a 5xx backs off exponentially; three tries each.
+- Limits are shared: the API's Checks all run within one `RegistryLimits`, as the hosts count a client's calls, however many Checks are running.
+- A 429 waits for its `Retry-After`, or exponentially when it names none (Crossref's never do); a 5xx backs off exponentially; three tries each.
+- A 429 is not proof of a spent budget: OpenAlex reports `x-ratelimit-remaining-usd: 0` when slowing a burst too. A free singleton decides; only 429s from it as well mean the day is spent. Only a successful answer's budget header is believed.
+- A DOI with a comma cannot go in a Crossref filter, so it is asked singly (`/works/{doi}`, the single-record limit, 404 a miss); to OpenAlex it goes quoted in its batch. Title and bibliographic queries, and their cache keys, are cut to 1,000 characters: Crossref answers 431 from about 8,000, and Postgres cannot index a key past about 2,700 bytes.
 - References move through the layers in order; within a layer calls run in parallel, and layer 1's two batches go to their hosts at once.
 - When OpenAlex's daily budget is spent, the Check stops with "OpenAlex budget spent, N References left, try after 00:00 UTC" and keeps every Resolution and response so far.
 - A Seed's first full Check: ~5–10 s. Anything after it from the cache: no registry calls.

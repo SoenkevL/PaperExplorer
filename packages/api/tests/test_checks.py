@@ -16,7 +16,7 @@ from paperexplorer.parsing import ParsedWork, Reference, TextOrigin
 from paperexplorer.resolution import Registries
 from paperexplorer.store import Works, WorkTexts
 from paperexplorer_api.app import Checking
-from paperexplorer_api.client import ApiClient, NotFoundError
+from paperexplorer_api.client import STREAM_TIMEOUT_S, ApiClient, NotFoundError
 from paperexplorer_api.schemas import (
     CheckFinishedEvent,
     Merge,
@@ -286,3 +286,19 @@ def test_the_client_checks_chooses_and_merges_through_typed_calls(
     assert merged.moved == 1
     with pytest.raises(NotFoundError):
         client.check_cost(999999)
+
+
+def test_checking_one_reference_waits_as_long_as_a_stream_does() -> None:
+    """Checks queue for Crossref's one slot a second, past the client's usual ten seconds."""
+    timeouts: list[dict[str, float]] = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        timeouts.append(request.extensions["timeout"])
+        return httpx.Response(200, json={"resolution": None, "stopped": "Check stopped: why"})
+
+    http = httpx.Client(base_url="http://api", transport=httpx.MockTransport(answer), timeout=10)
+
+    checked = ApiClient(http).check_reference(1, "b0")
+
+    assert checked.stopped == "Check stopped: why"
+    assert timeouts[0]["read"] == STREAM_TIMEOUT_S

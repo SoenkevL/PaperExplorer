@@ -19,6 +19,13 @@ Measured 2026-10-28 to 2026-11-01 from the Mac on a home connection, with no Ope
 
 Crossref's response headers carry the limits that apply (`x-rate-limit-limit`, `x-rate-limit-interval`, `x-concurrency-limit`); list queries showed `1`, `1s`, `1` on the public pool. OpenAlex's carry the cost and the day's budget (`x-ratelimit-cost-usd`, `x-ratelimit-remaining-usd`); a singleton get costs nothing and still reports the budget. OpenAlex's daily budget is $0.10 without a key and $1 with a free one, reset at 00:00 UTC: 100 or 1,000 title searches a day.
 
+Measured 2026-11-03, keyless:
+
+- Crossref's 429s carry no `Retry-After` and none of its rate headers; retries a second apart drew more of them. Even one call a second, one at a time, draws an occasional 429.
+- OpenAlex's 429 on a burst (30 at once: 19 refused) has `retry-after: 1`, `x-ratelimit-remaining-usd: 0` and `x-ratelimit-remaining: 0`, with the message "10 requests per second" and $0.0686 of the day in fact left. A singleton right after reported the true budget.
+- A comma in a filter value gets 400 from both. OpenAlex accepts `doi:"10.1000/a,b"|10.1/x`; Crossref has no quoting. Crossref's `/works/{doi}` answers with the DOI percent-encoded (`10.1002%2Fana.24779`, also APA's `//` form), 404 for an unknown DOI, with limits of its own (`5`, `1s`, `1`). No real DOI with a comma turned up to test a hit.
+- `query.bibliographic` is fine at 6,000 characters, 431 at 8,000, 414 at 12,000.
+
 ## Coverage
 
 - **Fixture References:** 207 of 280 (74%) carry a DOI from GROBID, 68 a title only, 4 nothing usable. GROBID missed one printed DOI. A regex over the printed text does worse: the text breaks DOIs at line ends (`10.1016/j.` …) and GROBID rejoins them. No fixture Reference prints an arXiv ID.

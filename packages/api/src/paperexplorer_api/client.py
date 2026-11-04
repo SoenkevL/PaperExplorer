@@ -154,7 +154,13 @@ class ApiClient:
     def check_reference(self, work_id: int, key: str, *, refresh: bool = False) -> CheckedReference:
         """Check one Reference; `refresh` asks the registries again, past the cache."""
         path = f"/works/{work_id}/references/{key}/checks"
-        return CheckedReference.model_validate(self._send("POST", path, {"refresh": refresh}))
+        # Not a stream, but it can wait as long as one: Checks queue for the registries' limits.
+        with self._http.stream(
+            "POST", path, json={"refresh": refresh}, timeout=STREAM_TIMEOUT_S
+        ) as response:
+            response.read()
+            _check(response, path)
+            return CheckedReference.model_validate(response.json())
 
     def candidates(self, work_id: int, key: str) -> list[WorkBrief]:
         """The Works a reader might choose for a Reference, likeliest first."""

@@ -13,7 +13,9 @@ def test_index_shows_connected_api_version() -> None:
     def respond(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/works":
             return httpx.Response(200, json=[])
-        return httpx.Response(200, json={"status": "ok", "version": "9.9"})
+        if request.url.path == "/health":
+            return httpx.Response(200, json={"status": "ok", "version": "9.9"})
+        return httpx.Response(404, json={"detail": "No such route"})
 
     api = _api(httpx.MockTransport(respond))
 

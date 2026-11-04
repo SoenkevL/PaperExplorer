@@ -1,6 +1,7 @@
 {#- Each DOI two Library Items hold, its Standing Item first: let another stand, or merge it into
-    the Standing Item in Zotero once the reader confirms. Swapped whole by its buttons. -#}
-<section id="duplicates" class="duplicates" aria-live="polite">
+    the Standing Item in Zotero once the reader confirms. Swapped whole by its buttons, and read
+    after a sync rather than with the page, as the API syncs before it answers. -#}
+<section id="duplicates" class="duplicates" aria-live="polite" hx-get="/duplicates" hx-trigger="library-synced from:body" hx-swap="outerHTML">
 {% if groups or message %}
   <h2>Duplicate Items</h2>
   {% if message %}<p class="{{ 'failed' if failed else 'done' }}">{{ message }}</p>{% endif %}

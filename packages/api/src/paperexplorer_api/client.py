@@ -219,9 +219,9 @@ class ApiClient:
         body = Ingest(from_stage=from_stage).model_dump()
         return LibraryWork.model_validate(self._send("POST", f"/works/{work_id}/ingesting", body))
 
-    def cancel_ingesting(self, work_id: int) -> None:
-        """Take a waiting Work off the queue; `ConflictError` once it runs."""
-        path = f"/works/{work_id}/ingesting"
+    def cancel_stage_run(self, work_id: int) -> None:
+        """Cancel a Work's waiting Stage Run; `ConflictError` once it is under way."""
+        path = f"/works/{work_id}/stage-run"
         _check(self._http.request("DELETE", path), path)
 
     def resolve_references(self, work_id: int) -> LibraryWork:

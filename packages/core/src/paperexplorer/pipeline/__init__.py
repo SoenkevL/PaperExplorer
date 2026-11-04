@@ -1,7 +1,7 @@
 """The pipeline: Stages run one at a time per Work, re-runnable, with their status in the store."""
 
 import logging
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 
 from paperexplorer.domain import WorkId
 from paperexplorer.pipeline.stage import Stage, StageContext, StageError, StageResult
@@ -75,10 +75,18 @@ def run_stage(ctx: StageContext, name: str, work: WorkId) -> StageResult:
     return result
 
 
-def run_chain(ctx: StageContext, names: Iterable[str], work: WorkId) -> None:
-    """Run the Stages in order for one Work; the first failure is recorded, raised and ends it."""
+def run_chain(
+    ctx: StageContext,
+    names: Iterable[str],
+    work: WorkId,
+    *,
+    after: Callable[[str], None] | None = None,
+) -> None:
+    """Run the Stages in order, calling `after` as each commits; the first failure ends it."""
     for name in names:
         run_stage(ctx, name, work)
+        if after is not None:
+            after(name)
 
 
 def remaining(ran: Mapping[str, StageStatus]) -> list[str]:

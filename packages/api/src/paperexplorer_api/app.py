@@ -18,13 +18,13 @@ from paperexplorer.store import StageStatuses
 from paperexplorer.wiring import Wiring
 from paperexplorer_api.asking_thread import AskingContexts, AskingThread
 from paperexplorer_api.conversations import Conversations
-from paperexplorer_api.ingesting_thread import IngestingThread
 from paperexplorer_api.routes import Connections, checks, citations, works
 from paperexplorer_api.routes import conversations as conversation_routes
 from paperexplorer_api.routes.checks import Checking
 from paperexplorer_api.routes.ingesting import Ingesting
 from paperexplorer_api.routes.ingesting import router as ingesting_routes
 from paperexplorer_api.schemas import Health
+from paperexplorer_api.stage_run_thread import StageRunThread
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +66,8 @@ def create_app(
     With `ingesting`, it lists the Library and runs Stages on a thread of their own.
     """
     thread = AskingThread(connections, asking.contexts) if asking else None
-    ingesting_thread = (
-        IngestingThread(
+    stage_run_thread = (
+        StageRunThread(
             connections,
             ingesting.context,
             forget_work=asking.conversations.forget_work if asking else None,
@@ -78,13 +78,13 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
-        if ingesting_thread is not None:
+        if stage_run_thread is not None:
             await asyncio.to_thread(_interrupt_running, connections)
         yield
         if thread is not None:
             await asyncio.to_thread(thread.stop)
-        if ingesting_thread is not None:
-            await asyncio.to_thread(ingesting_thread.stop)
+        if stage_run_thread is not None:
+            await asyncio.to_thread(stage_run_thread.stop)
 
     app = FastAPI(title="PaperExplorer API", version=__version__, lifespan=lifespan)
 
@@ -96,8 +96,8 @@ def create_app(
     app.include_router(citations.router(connections))
     if checking is not None:
         app.include_router(checks.router(connections, checking))
-    if ingesting is not None and ingesting_thread is not None:
-        app.include_router(ingesting_routes(connections, ingesting, ingesting_thread))
+    if ingesting is not None and stage_run_thread is not None:
+        app.include_router(ingesting_routes(connections, ingesting, stage_run_thread))
     if asking is not None and thread is not None:
         app.include_router(
             conversation_routes.router(connections, asking.contexts, asking.conversations, thread)

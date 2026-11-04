@@ -85,6 +85,41 @@ def test_a_chain_stops_at_the_first_failure_and_resumes_there(ctx: StageContext)
     assert remaining(statuses) == FIVE
 
 
+def test_a_chain_says_when_each_stage_has_committed_and_never_for_a_failed_one(
+    ctx: StageContext,
+) -> None:
+    work = Works(ctx.conn).ensure("VILL2024")
+    told: list[tuple[str, StageState]] = []
+
+    run_chain(
+        ctx,
+        ["fetch", "parse"],
+        work,
+        after=lambda name: told.append((name, StageStatuses(ctx.conn).for_work(work)[name].state)),
+    )
+
+    assert told == [("fetch", StageState.DONE), ("parse", StageState.DONE)]
+
+    told.clear()
+    no_pdf = Works(ctx.conn).ensure("NOPDF234")
+    with pytest.raises(StageError):
+        run_chain(ctx, ["fetch"], no_pdf, after=lambda name: told.append((name, StageState.DONE)))
+    assert told == []
+
+
+def test_a_stage_left_running_for_one_work_can_be_recorded_failed(store_db: Conn) -> None:
+    statuses = StageStatuses(store_db)
+    work, other = Works(store_db).ensure("VILL2024"), Works(store_db).ensure("OTHER234")
+    statuses.start(work, "embed")
+    statuses.start(other, "embed")
+
+    statuses.fail_running(work, "the connection was lost")
+
+    assert statuses.for_work(work)["embed"].error == "the connection was lost"
+    assert statuses.for_work(work)["embed"].state is StageState.FAILED
+    assert statuses.for_work(other)["embed"].state is StageState.RUNNING
+
+
 def test_a_stage_that_failed_on_a_rerun_resumes_from_there_though_later_ones_are_done(
     ctx: StageContext,
 ) -> None:

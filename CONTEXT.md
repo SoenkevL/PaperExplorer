@@ -48,11 +48,15 @@ _Avoid_: Access level, OA status
 A Work's text recovered by OCR from a scan. It may misread the authors' words, so it is never shown as their exact text.
 _Avoid_: Scanned text
 
-## Getting a Work ready
+## Stages
 
 **Stage**:
-One restartable step of getting a Work ready, with its state recorded per Work.
+One restartable step of a Work's pipeline, with its state recorded per Work.
 _Avoid_: Step, job, task
+
+**Stage Run**:
+The Stages started together for one Work, waiting their turn or under way. A Stage Run is cancelled only while it waits.
+_Avoid_: Job, task, queue entry, Retrieval Run
 
 **Ingesting**:
 Running a Work's Stages from fetching its PDF through linking its Citations, so it can be read and asked about.
@@ -61,6 +65,10 @@ _Avoid_: Indexing, processing, importing
 **Ingested**:
 Said of a Work whose Ingesting Stages are all done.
 _Avoid_: Indexed, processed, ready
+
+**Resolving References**:
+Running the Stages that verify an Ingested Work's printed DOIs and match its References against the Library. It spends no Registry Check.
+_Avoid_: Matching, lookup, Registry Check
 
 ## Inside a Work
 

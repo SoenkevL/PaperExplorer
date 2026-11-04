@@ -71,9 +71,11 @@ class WorkSummary(BaseModel):
 # The Stages of Ingesting, which make a Work Ingested, and of resolving its References, in order.
 INGESTING_STAGES = ("fetch", "parse", "chunk", "embed", "extract_citations")
 RESOLVING_STAGES = ("verify_dois", "resolve")
+# Running these replaces the Chunks a Conversation holds.
+TEXT_STAGES = ("parse", "chunk")
 
 
-class StageRun(BaseModel):
+class StageStatus(BaseModel):
     """How a Stage's last run for a Work went; a pending Stage has none."""
 
     state: StageState
@@ -84,15 +86,12 @@ class StageRun(BaseModel):
 
 
 class LibraryWork(WorkSummary):
-    """A Library Item as the reader finds and ingests it.
-
-    `run` is `queued` while it waits its turn and `running` until the last Stage of its run ended,
-    between Stages too; `stage_runs` holds each Stage's last run.
-    """
+    """A Library Item as the reader finds and ingests it, with each Stage's last status."""
 
     has_pdf: bool
+    # Its Stage Run, `running` between Stages too, until the last has ended.
     run: Literal["queued", "running"] | None
-    stage_runs: dict[str, StageRun]
+    stage_statuses: dict[str, StageStatus]
 
 
 class LibraryPage(BaseModel):

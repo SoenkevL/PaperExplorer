@@ -14,7 +14,7 @@ from paperexplorer_api.schemas import (
     LibraryPage,
     LibrarySynced,
     LibraryWork,
-    StageRun,
+    StageStatus,
     WorkSummary,
 )
 from paperexplorer_web.app import create_app
@@ -26,8 +26,8 @@ FIVE = SEVEN[:5]
 WHEN = datetime(2026, 11, 4, tzinfo=UTC)
 
 
-def _run(state: Any = "done", error: str | None = None) -> StageRun:
-    return StageRun(state=state, counts={}, error=error, started_at=WHEN, finished_at=WHEN)
+def _run(state: Any = "done", error: str | None = None) -> StageStatus:
+    return StageStatus(state=state, counts={}, error=error, started_at=WHEN, finished_at=WHEN)
 
 
 def _work(
@@ -52,7 +52,7 @@ def _work(
         stages={s: runs[s].state if s in runs else "pending" for s in SEVEN},
         has_pdf=has_pdf,
         run=run,
-        stage_runs=runs,
+        stage_statuses=runs,
     )
 
 
@@ -165,33 +165,92 @@ def test_a_failed_search_says_why() -> None:
     assert "could not be read" in Api({"GET /library": refuse}).web().get("/library").text
 
 
-def test_syncing_answers_with_the_list_for_the_current_search() -> None:
-    api = Api(
-        {
-            "POST /library/sync": _json(LibrarySynced(items=2, removed=0, stale=False)),
-            "GET /library": _page(_work()),
-        }
-    )
+def test_syncing_says_how_it_went_and_tells_the_page_to_read_the_list_again() -> None:
+    api = Api({"POST /library/sync": _json(LibrarySynced(items=2, removed=0, stale=False))})
 
-    response = api.web().post("/library/sync", data={"q": "smith"})
+    response = api.web().post("/library/sync")
 
-    assert api.seen[-1].url.params["q"] == "smith"
-    assert _row(response.text)
+    assert response.headers["HX-Trigger"] == "library-synced"
+    assert 'id="library-sync-status"' in response.text
     assert "could not be reached" not in response.text
+    assert [r.url.path for r in api.seen] == ["/library/sync"]
 
 
 def test_a_sync_that_could_not_reach_zotero_keeps_the_last_copy_and_says_so() -> None:
+    api = Api({"POST /library/sync": _json(LibrarySynced(items=0, removed=0, stale=True))})
+
+    response = api.web().post("/library/sync")
+
+    assert "Zotero could not be reached" in response.text
+    assert response.headers["HX-Trigger"] == "library-synced"
+
+
+def test_a_failed_sync_says_why_and_does_not_reread_the_list() -> None:
+    api = Api({"POST /library/sync": httpx.Response(500, text="boom")})
+
+    response = api.web().post("/library/sync")
+
+    assert "not synced" in response.text
+    assert "HX-Trigger" not in response.headers
+
+
+def test_the_list_reads_the_current_search_again_after_a_sync() -> None:
+    text = Api({"GET /library": _page(_work())}).web().get("/library").text
+
+    root = re.search(r'<div id="library-list"[^>]*>', text)
+    assert root
+    assert 'hx-trigger="library-synced from:body"' in root.group(0)
+    assert 'hx-include="#library-search"' in root.group(0)
+    assert 'hx-disinherit="*"' in root.group(0)
+
+
+def test_opening_the_page_waits_for_no_sync() -> None:
+    api = Api({"GET /library": _page(_work())})
+
+    text = api.web().get("/").text
+
+    assert "/duplicates" not in [r.url.path for r in api.seen]
+    assert "/library/sync" not in [r.url.path for r in api.seen]
+    section = re.search(r'<section id="duplicates"[^>]*>', text)
+    assert section
+    assert 'hx-get="/duplicates"' in section.group(0)
+    assert 'hx-trigger="library-synced from:body"' in section.group(0)
+
+
+def test_a_failed_load_more_stays_a_list_item_and_says_why() -> None:
+    api = Api({"GET /library": httpx.Response(500, text="boom")})
+
+    text = api.web().get("/library", params={"offset": 50}).text
+
+    assert text.strip().startswith("<li")
+    assert 'id="library-list"' not in text
+    assert "could not be read" in text
+
+
+def test_an_action_on_a_work_that_has_gone_says_so_instead_of_vanishing() -> None:
     api = Api(
         {
-            "POST /library/sync": _json(LibrarySynced(items=0, removed=0, stale=True)),
-            "GET /library": _page(_work()),
+            "POST /works/7/ingesting": httpx.Response(404, json={"detail": "No Work 7"}),
+            "GET /works/7/stages": httpx.Response(404, json={"detail": "No Work 7"}),
         }
     )
 
-    response = api.web().post("/library/sync", data={"q": ""})
+    row = _row(api.web().post("/works/7/ingesting", data={}).text)
 
-    assert "Zotero could not be reached" in response.text
-    assert _row(response.text)
+    assert "No Work 7" in row
+    assert "every 2s" not in row
+
+
+def test_an_action_the_api_cannot_answer_says_why_and_does_not_poll() -> None:
+    def refuse(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("refused", request=request)
+
+    api = Api({"POST /works/7/ingesting": refuse, "GET /works/7/stages": refuse})
+
+    row = _row(api.web().post("/works/7/ingesting", data={}).text)
+
+    assert "refused" in row
+    assert "every 2s" not in row
 
 
 def test_starting_answers_with_a_row_that_polls_while_it_waits_and_can_be_cancelled() -> None:
@@ -203,7 +262,7 @@ def test_starting_answers_with_a_row_that_polls_while_it_waits_and_can_be_cancel
     assert 'hx-get="/works/7/row"' in row
     assert 'hx-trigger="every 2s"' in row
     assert "queued" in row
-    assert 'hx-delete="/works/7/ingesting"' in row
+    assert 'hx-delete="/works/7/stage-run"' in row
     assert ">Ingest<" not in row
 
 
@@ -281,12 +340,12 @@ def test_a_refusal_shows_in_the_row_with_the_work_as_it_stands() -> None:
 def test_cancelling_answers_with_the_row_as_it_now_stands() -> None:
     api = Api(
         {
-            "DELETE /works/7/ingesting": httpx.Response(204),
+            "DELETE /works/7/stage-run": httpx.Response(204),
             "GET /works/7/stages": _json(_work()),
         }
     )
 
-    row = _row(api.web().delete("/works/7/ingesting").text)
+    row = _row(api.web().delete("/works/7/stage-run").text)
 
     assert ">Ingest<" in row
 

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
 # Redeploys the stack from this checkout's commit: db up, pending migrations applied, then the
-# api and web images rebuilt and restarted, waiting until both are healthy. Appends everything
+# api and web images rebuilt and restarted, waiting until both and grobid, which api depends on,
+# are healthy. Appends everything
 # to data/redeploy.log.
 #
 # On the tower the post-merge hook runs it after a pull moves `dev` in the deploy checkout (see

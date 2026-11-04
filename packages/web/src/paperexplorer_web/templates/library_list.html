@@ -1,8 +1,7 @@
-{#- What a search or a sync swaps in. -#}
-<div id="library-list" aria-live="polite">
+{#- The list for a search; it reads itself again after a sync, with the search as it is by then. -#}
+<div id="library-list" hx-get="/library" hx-trigger="library-synced from:body" hx-include="#library-search" hx-target="this" hx-swap="outerHTML" hx-disinherit="*">
   {% if message %}<p class="failed">{{ message }}</p>{% endif %}
   {% if library %}
-  {% if library.message %}<p class="failed">{{ library.message }}</p>{% endif %}
   {% if library.rows %}
   <ul class="works">{% include "library_rows.html" %}</ul>
   {% else %}

@@ -4,17 +4,13 @@ from urllib.parse import urlencode
 
 from pydantic import BaseModel
 
-from paperexplorer_api.schemas import INGESTING_STAGES, RESOLVING_STAGES, LibraryPage, LibraryWork
-
-# Re-running these replaces the Chunks a Conversation holds.
-_TEXT_STAGES = {"parse", "chunk"}
-
-
-class Rerun(BaseModel):
-    """A done Stage the reader may run again, and what to ask first."""
-
-    stage: str
-    confirm: str
+from paperexplorer_api.schemas import (
+    INGESTING_STAGES,
+    RESOLVING_STAGES,
+    TEXT_STAGES,
+    LibraryPage,
+    LibraryWork,
+)
 
 
 class Row(BaseModel):
@@ -23,9 +19,9 @@ class Row(BaseModel):
     work: LibraryWork
     message: str | None = None
     polling: bool
-    start: str | None  # "Ingest" or "Resume" when there is something to run
-    reruns: dict[str, Rerun]
-    resolve: str | None  # the button resolving its References, once Ingested
+    start_label: str | None  # "Ingest" or "Resume" when there is something to run
+    rerun_confirms: dict[str, str]  # what to ask first, by each done Stage that may run again
+    resolve_label: str | None  # Resolving References, once Ingested
     shown_stages: tuple[str, ...]
     errors: list[str]
 
@@ -34,7 +30,7 @@ def _confirm(stage: str) -> str:
     stages = INGESTING_STAGES[INGESTING_STAGES.index(stage) :]
     named = stages[0] if len(stages) == 1 else f"{', '.join(stages[:-1])} and {stages[-1]}"
     question = f"Re-run {named}?"
-    if _TEXT_STAGES.intersection(stages):
+    if set(TEXT_STAGES).intersection(stages):
         return f"{question} A Conversation about this Work starts afresh."
     return question
 
@@ -51,21 +47,21 @@ def row(work: LibraryWork, message: str | None = None) -> Row:
         work=work,
         message=message,
         polling=not idle,
-        start=None
+        start_label=None
         if not idle or not work.has_pdf or ingested
         else ("Resume" if started else "Ingest"),
-        reruns={
-            stage: Rerun(stage=stage, confirm=_confirm(stage))
+        rerun_confirms={
+            stage: _confirm(stage)
             for stage, is_done in zip(INGESTING_STAGES, done, strict=True)
             if is_done and idle and work.has_pdf
         },
-        resolve=None
+        resolve_label=None
         if not ingested or not idle
         else ("Resolve again" if resolved else "Resolve References"),
         shown_stages=INGESTING_STAGES + RESOLVING_STAGES if ingested else INGESTING_STAGES,
         errors=[
             f"{name}: {run.error}"
-            for name, run in work.stage_runs.items()
+            for name, run in work.stage_statuses.items()
             if run.state == "failed" and run.error
         ],
     )
@@ -75,18 +71,14 @@ class LibraryList(BaseModel):
     """The rows found, and where more of them load from."""
 
     rows: list[Row]
-    message: str | None = None
     more_url: str | None
 
 
-def library_list(
-    page: LibraryPage, query: str, offset: int, *, message: str | None = None
-) -> LibraryList:
+def library_list(page: LibraryPage, query: str, offset: int) -> LibraryList:
     """The rows of a page of the Library, for the search that found them."""
     following = offset + len(page.items)
     more = following < page.total and bool(page.items)
     return LibraryList(
         rows=[row(w) for w in page.items],
-        message=message,
         more_url=f"/library?{urlencode({'q': query, 'offset': following})}" if more else None,
     )

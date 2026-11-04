@@ -1,4 +1,4 @@
-"""The Ingesting thread: Stages the reader started run one at a time, whoever is still listening."""
+"""The Stage Run thread: what the reader started runs one at a time, whoever is still listening."""
 
 import logging
 import threading
@@ -13,16 +13,17 @@ from psycopg.rows import TupleRow
 from paperexplorer import pipeline
 from paperexplorer.domain import WorkId
 from paperexplorer.pipeline import StageContext
+from paperexplorer.store import StageStatuses
 from paperexplorer_api.routes import Connections
+from paperexplorer_api.schemas import TEXT_STAGES
 
 logger = logging.getLogger(__name__)
 
 type StageContexts = Callable[[psycopg.Connection[TupleRow]], StageContext]
-"""A run's `StageContext` around the store connection it opened for itself."""
+"""A Stage Run's `StageContext` around the store connection it opened for itself."""
 
 type Run = Literal["queued", "running"]
 
-_TEXT_STAGES = {"parse", "chunk"}
 # A shutdown does not wait for a long Stage: it rolls back, and the next start says so.
 _STOP_WAIT_S = 2.0
 
@@ -33,13 +34,8 @@ class _Queued:
     stages: Sequence[str]
 
 
-class IngestingThread:
-    """Runs each Work's Stages in the order started, one Work at a time, on a thread of its own.
-
-    A run outlives the request that started it. What is queued lives in memory, so a restart loses
-    it; a failure is in the Stage's status, and ends only its own run. The thread starts with the
-    first run.
-    """
+class StageRunThread:
+    """Runs Stage Runs in the order started, one at a time and past their requests' ends."""
 
     def __init__(
         self,
@@ -116,12 +112,27 @@ class IngestingThread:
             with self._connections() as conn:
                 ctx = self._contexts(conn)
                 try:
-                    pipeline.run_chain(ctx, queued.stages, queued.work)
+                    pipeline.run_chain(
+                        ctx,
+                        queued.stages,
+                        queued.work,
+                        after=lambda name: self._after(queued, name),
+                    )
                 finally:
                     ctx.tracing.flush()
         except Exception as e:
-            # `run_stage` recorded the reason, unless the store itself went away.
-            logger.warning("The run of Work %d ended early: %s", queued.work, e)
-        finally:
-            if self._forget_work is not None and _TEXT_STAGES.intersection(queued.stages):
-                self._forget_work(queued.work)
+            logger.warning("The Stage Run of Work %d ended early: %s", queued.work, e)
+            self._record_failure(queued.work, e)
+
+    def _after(self, queued: _Queued, stage: str) -> None:
+        """Forget Conversations as the Chunks they hold go, not when a long `embed` has ended."""
+        if self._forget_work is not None and stage in TEXT_STAGES:
+            self._forget_work(queued.work)
+
+    def _record_failure(self, work: WorkId, error: Exception) -> None:
+        """Say why on a connection of its own: `run_stage` cannot once the store has gone away."""
+        try:
+            with self._connections() as conn:
+                StageStatuses(conn).fail_running(work, str(error) or type(error).__name__)
+        except psycopg.Error as e:
+            logger.warning("Could not record why Work %d stopped: %s", work, e)

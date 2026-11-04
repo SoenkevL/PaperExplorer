@@ -14,13 +14,14 @@ from psycopg.rows import TupleRow
 from paperexplorer.config import Settings
 from paperexplorer.domain import Attachment, LibraryChanges, LibraryItem, Vector
 from paperexplorer.embedding import FakeEmbedder
-from paperexplorer.library import InMemoryLibrary, LibraryUnavailableError
+from paperexplorer.library import InMemoryLibrary, LibraryUnavailableError, sync
+from paperexplorer.parsing import ParsedWork
 from paperexplorer.pipeline import INGESTING, RESOLVING
-from paperexplorer.resolution import InMemoryDoiRegistry
-from paperexplorer.store import StageStatuses, Works, migrate
+from paperexplorer.resolution import InMemoryDoiRegistry, Registries
+from paperexplorer.store import StageStatuses, Works, WorkTexts, migrate
 from paperexplorer.tracing import Tracing
 from paperexplorer.wiring import Wiring
-from paperexplorer_api.app import Asking, Ingesting, create_app
+from paperexplorer_api.app import Asking, Checking, Ingesting, create_app
 from paperexplorer_api.client import ApiClient, ConflictError, NotFoundError
 from paperexplorer_api.conversations import Conversations
 from paperexplorer_api.schemas import INGESTING_STAGES, RESOLVING_STAGES, LibraryWork
@@ -54,10 +55,13 @@ class GatedEmbedder(FakeEmbedder):
         self.door = threading.Event()
         self.door.set()
         self.fail_next = False
+        self.on_embed: Callable[[], None] | None = None
 
     def embed(self, texts: Sequence[str]) -> list[Vector]:
         self.reached.set()
         assert self.door.wait(10), "the test never opened the door"
+        if self.on_embed is not None:
+            self.on_embed()
         if self.fail_next:
             self.fail_next = False
             raise RuntimeError("the Provider went away")
@@ -202,7 +206,7 @@ def test_ingesting_runs_the_five_stages_and_the_work_can_be_read(harness: Harnes
     done = harness.settled(work.id)
     assert [done.stages[s] for s in FIVE] == ["done"] * 5
     assert done.stages["verify_dois"] == "pending"
-    assert done.stage_runs["embed"].counts == {"chunks": 32, "embedded": 32}
+    assert done.stage_statuses["embed"].counts == {"chunks": 32, "embedded": 32}
     assert len(harness.client.work(work.id).blocks) == 33
 
 
@@ -210,8 +214,9 @@ def test_ingesting_goes_on_after_the_client_that_started_it_has_gone(harness: Ha
     work = harness.synced()["VILL2024"]
     harness.embedder.door.clear()
 
-    with TestClient(harness.app) as gone:
-        assert ApiClient(gone).ingest(work.id).run in {"queued", "running"}
+    gone = TestClient(harness.app)
+    assert ApiClient(gone).ingest(work.id).run in {"queued", "running"}
+    gone.close()
 
     harness.embedder.door.set()
     assert harness.settled(work.id).stages["extract_citations"] == "done"
@@ -254,14 +259,14 @@ def test_a_second_work_waits_and_may_be_cancelled_while_it_waits(harness: Harnes
     with pytest.raises(ConflictError, match="already"):
         harness.client.ingest(second)
     with pytest.raises(ConflictError, match="running"):
-        harness.client.cancel_ingesting(first)
+        harness.client.cancel_stage_run(first)
     assert harness.client.work_stages(first).run == "running"
 
-    harness.client.cancel_ingesting(second)
+    harness.client.cancel_stage_run(second)
 
     assert harness.client.work_stages(second).run is None
     with pytest.raises(NotFoundError):
-        harness.client.cancel_ingesting(second)
+        harness.client.cancel_stage_run(second)
     harness.embedder.door.set()
     assert harness.settled(first).stages["extract_citations"] == "done"
     assert harness.client.work_stages(second).stages["fetch"] == "pending"
@@ -292,28 +297,28 @@ def test_a_failure_stops_the_chain_with_its_reason_and_ingesting_resumes_there(
 
     assert failed.stages["chunk"] == "done"
     assert failed.stages["embed"] == "failed"
-    assert failed.stage_runs["embed"].error == "the Provider went away"
+    assert failed.stage_statuses["embed"].error == "the Provider went away"
     assert failed.stages["extract_citations"] == "pending"
-    chunked_at = failed.stage_runs["chunk"].finished_at
+    chunked_at = failed.stage_statuses["chunk"].finished_at
 
     harness.client.ingest(work.id)
     resumed = harness.settled(work.id)
 
-    assert resumed.stage_runs["chunk"].finished_at == chunked_at
+    assert resumed.stage_statuses["chunk"].finished_at == chunked_at
     assert resumed.stages["extract_citations"] == "done"
 
 
 def test_rerunning_a_done_stage_continues_through_the_chain(harness: Harness) -> None:
     work = harness.synced()["VILL2024"]
     harness.client.ingest(work.id)
-    fetched_at = harness.settled(work.id).stage_runs["fetch"].finished_at
+    fetched_at = harness.settled(work.id).stage_statuses["fetch"].finished_at
 
     harness.client.ingest(work.id, from_stage="chunk")
     again = harness.settled(work.id)
 
-    assert again.stage_runs["fetch"].finished_at == fetched_at
+    assert again.stage_statuses["fetch"].finished_at == fetched_at
     assert [again.stages[s] for s in FIVE] == ["done"] * 5
-    assert again.stage_runs["embed"].counts["embedded"] == 32
+    assert again.stage_statuses["embed"].counts["embedded"] == 32
 
 
 def test_resolving_needs_an_ingested_work_then_runs_the_last_two_stages(harness: Harness) -> None:
@@ -344,10 +349,9 @@ def test_changing_a_works_text_forgets_its_conversations_but_embedding_does_not(
         model=Script().model(),
     )
     conversations = Conversations.from_settings(recorded_settings)
-    app = create_app(
-        connect, Asking(wiring.asking, conversations), ingesting=ingesting(GatedEmbedder())
-    )
-    harness = Harness(app, library, GatedEmbedder())
+    embedder = GatedEmbedder()
+    app = create_app(connect, Asking(wiring.asking, conversations), ingesting=ingesting(embedder))
+    harness = Harness(app, library, embedder)
     work = harness.synced()["VILL2024"]
     harness.client.ingest(work.id)
     harness.settled(work.id)
@@ -357,9 +361,71 @@ def test_changing_a_works_text_forgets_its_conversations_but_embedding_does_not(
     harness.settled(work.id)
     assert conversations.get(conversation.id) is not None
 
+    # Forgotten once `chunk` commits, not at the end of the Stage Run: embedding takes minutes.
+    embedder.reached.clear()
+    embedder.door.clear()
     harness.client.ingest(work.id, from_stage="chunk")
-    harness.settled(work.id)
+    assert embedder.reached.wait(30)
     assert conversations.get(conversation.id) is None
+    embedder.door.set()
+    harness.settled(work.id)
+
+
+def test_a_stage_whose_connection_was_lost_is_recorded_failed_and_the_work_can_resume(
+    harness: Harness, connect: Callable[[], psycopg.Connection[TupleRow]]
+) -> None:
+    work = harness.synced()["VILL2024"]
+
+    def lose_every_other_connection() -> None:
+        harness.embedder.on_embed = None
+        with connect() as conn:
+            conn.execute(
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity"
+                " WHERE datname = current_database() AND pid <> pg_backend_pid()"
+            )
+
+    harness.embedder.on_embed = lose_every_other_connection
+    harness.client.ingest(work.id)
+
+    lost = harness.settled(work.id)
+
+    assert lost.stages["embed"] == "failed"
+    assert lost.stage_statuses["embed"].error
+    harness.client.ingest(work.id)
+    assert harness.settled(work.id).stages["extract_citations"] == "done"
+
+
+def test_a_check_waiting_for_another_sync_leaves_the_api_answering(
+    connect: Callable[[], psycopg.Connection[TupleRow]],
+    library: InMemoryLibrary,
+    parse_fixture: Callable[[str], ParsedWork],
+) -> None:
+    parsed = parse_fixture("villiger2024-tandf")
+    with connect() as conn:
+        work = Works(conn).ensure("VILL2024")
+        WorkTexts(conn).replace(work, parsed)
+
+    def no_registries() -> Registries:
+        raise RuntimeError("the test ends before any registry is asked")
+
+    app = create_app(connect, checking=Checking(library=library, registries=no_registries))
+    with TestClient(app, raise_server_exceptions=False) as client, connect() as holder:
+        with holder.transaction():
+            sync(holder, InMemoryLibrary([], {}))
+            check = threading.Thread(
+                target=client.post,
+                args=[f"/works/{work}/references/{parsed.references[0].id}/checks"],
+            )
+            check.start()
+            time.sleep(0.3)
+            answered = threading.Event()
+            threading.Thread(
+                target=lambda: (client.get("/health"), answered.set()), daemon=True
+            ).start()
+            responsive = answered.wait(5)
+        check.join(30)
+
+    assert responsive
 
 
 def test_starting_up_marks_a_stage_left_running_as_interrupted(
@@ -374,7 +440,7 @@ def test_starting_up_marks_a_stage_left_running_as_interrupted(
         stages = ApiClient(client).work_stages(work)
 
     assert stages.stages["parse"] == "failed"
-    assert stages.stage_runs["parse"].error == "Interrupted by a restart"
+    assert stages.stage_statuses["parse"].error == "Interrupted by a restart"
 
 
 def test_the_api_starts_before_the_database_is_migrated(

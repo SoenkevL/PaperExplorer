@@ -82,7 +82,8 @@ def _settled_row(web: TestClient, work_id: str) -> str:
 def test_a_reader_finds_ingests_resolves_reads_and_asks_in_the_interface(web: TestClient) -> None:
     assert "VILL2024" not in web.get("/").text.replace("work-", "")
 
-    listed = web.post("/library/sync", data={"q": ""}).text
+    web.post("/library/sync")
+    listed = web.get("/library").text
     found = re.search(r'<li id="work-(\d+)"', listed)
     assert found
     work_id = found.group(1)

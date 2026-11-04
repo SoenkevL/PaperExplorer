@@ -126,10 +126,7 @@ class Works:
     def library_items(
         self, query: str, limit: int, offset: int, *, done_first: Sequence[str]
     ) -> list[Work]:
-        """A page of the Library Items matching `query`.
-
-        Those with every Stage of `done_first` done come first, then the newest added.
-        """
+        """A page of the Library Items matching `query`: `done_first` all done, then the newest."""
         where, words = _search(query)
         done = (
             "(SELECT count(*) FROM stage_status s WHERE s.work_id = works.id"

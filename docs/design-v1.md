@@ -36,7 +36,7 @@ The seed paper is "A critical review of brain entropy as a biomarker of the psyc
 - A chunk is a paragraph. Paragraphs over 400 tokens are split at sentence borders (GROBID's sentences; for a scan, end punctuation) into the fewest windows that fit, balanced in size, with one sentence of overlap. Tokens are counted with the bge-m3 tokenizer.
 - Edge cases: a single sentence over 400 tokens is hard-split at a token boundary and flagged `oversized_sentence`. Paragraphs under about 30 tokens become their own chunks, flagged `short`, and are never merged across paragraph borders.
 - Each chunk stores its heading path, page number and position on the page.
-- Embeddings: bge-m3, behind an `Embedder` interface that talks to an **OpenAI-compatible** `/v1/embeddings` endpoint (`base_url`, `model` and key are settings). Ollama serves it for now, and any compatible server can replace it later. The model name is stored with each vector.
+- Embeddings: bge-m3, behind an `Embedder` interface that talks to an **OpenAI-compatible** `/v1/embeddings` endpoint (the Provider, ADR 0013). Ollama serves it by default. The model name is stored with each vector.
 - Search: the query is the citing sentence with citation markers removed. It runs through pgvector with an HNSW index and through Postgres full-text search (`english`), and the two rankings are merged by Reciprocal Rank Fusion (k=60) in one SQL query that uses CTEs.
 - The scores from both searches are kept.
 - By default the search is limited to the cited work, with a toggle to widen the Scope to the whole Exploration.

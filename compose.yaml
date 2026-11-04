@@ -30,6 +30,8 @@ services:
       PE_LOG_FORMAT: json
       PE_DATA_DIR: /data
       PE_ZOTERO_STORAGE_DIR: /zotero/storage
+      # Over `.env`'s empty value, which would otherwise hide the image's model and make OCR download it.
+      PE_TESSDATA_DIR: /opt/tessdata
     extra_hosts: ["host.docker.internal:host-gateway"]
     ports: ["8000:8000"]
     # The API runs the Stages the reader starts, so it holds what `pipeline` holds.
@@ -92,6 +94,8 @@ services:
       PE_LANGFUSE_RELEASE: ${PE_LANGFUSE_RELEASE:-}
       PE_DATA_DIR: /data
       PE_ZOTERO_STORAGE_DIR: /zotero/storage
+      # Over `.env`'s empty value, which would otherwise hide the image's model and make OCR download it.
+      PE_TESSDATA_DIR: /opt/tessdata
     extra_hosts: ["host.docker.internal:host-gateway"]
     volumes:
       - ./data:/data

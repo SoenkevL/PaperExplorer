@@ -185,7 +185,8 @@ button { font: inherit; color: inherit; }
 .library-tools { display: flex; gap: 0.5rem; }
 .library-tools input { flex: 1 1 auto; min-width: 0; padding: 0.4rem 0.6rem; font: inherit; color: var(--ink); background: transparent; border: 1px solid var(--rule); border-radius: 6px; }
 .library-row .title { font: 600 1.05rem/1.35 var(--serif); }
-.library-row .failed { margin: 0.3rem 0 0; font-size: 13px; color: var(--danger); overflow-wrap: anywhere; }
+.library p.failed { color: var(--danger); overflow-wrap: anywhere; }
+.library-row p.failed { margin: 0.3rem 0 0; font-size: 13px; }
 .library-row .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.4rem; }
 .library-row .actions:empty { display: none; }
 .library-row .note { display: block; font-size: 12px; }

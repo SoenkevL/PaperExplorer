@@ -23,6 +23,17 @@ docker run -d --rm -p 127.0.0.1:8070:8070 grobid/grobid:0.9.1-crf
 uv run paperexplorer parse path/to/paper.pdf
 ```
 
+## Switch Provider
+
+Ollama on the tower runs the models by default. To use Melious instead, set two lines in `.env`, leaving `PE_CHAT_MODEL`, `PE_CHAT_NUM_CTX` and `PE_EMBEDDING_MODEL` empty:
+
+```sh
+PE_PROVIDER=melious
+PE_PROVIDER_API_KEY=sk-mel-...
+```
+
+A switch needs no `embed`: both Providers' `bge-m3` agree, so they share their Vectors. Seed text and Questions go to the Provider, so read ADR 0013 first. A new Provider is one entry in the table in `packages/core/src/paperexplorer/inference.py`.
+
 ## Run (tower)
 
 First time: run `scripts/setup-tower.sh` from the Mac. It checks and sets up the tower over SSH.

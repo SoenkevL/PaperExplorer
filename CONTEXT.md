@@ -151,3 +151,7 @@ _Avoid_: Confidence (a Citation Link has one), score
 **Quote**:
 Words an Answer puts in quotation marks. Exact when they match the authors' text in a Chunk the model read; only an exact Quote is shown as the authors' words.
 _Avoid_: Citation, excerpt
+
+**Provider**:
+The service, local or hosted, that runs the models behind Answers and Vectors. Switching Provider moves both.
+_Avoid_: Backend, server, vendor

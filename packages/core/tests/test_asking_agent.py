@@ -46,7 +46,6 @@ from paperexplorer.asking import (
     StepEvent,
     TextPiece,
     ask,
-    chat_model,
 )
 from paperexplorer.asking.agent import (
     LAST_REQUEST,
@@ -58,6 +57,7 @@ from paperexplorer.asking.agent import (
 from paperexplorer.config import Settings
 from paperexplorer.domain import Work
 from paperexplorer.embedding import Embedder, FakeEmbedder, OpenAICompatibleEmbedder
+from paperexplorer.inference import chat_model
 from paperexplorer.store import Chunks, StoredChunk
 from paperexplorer.tracing import Tracing
 
@@ -451,7 +451,7 @@ def test_regression_eval_a_stalled_stream_ends_the_turn_at_the_chat_timeout(
         port = server.sockets[0].getsockname()[1]
         settings = Settings(
             _env_file=None,  # pyright: ignore[reportCallIssue]
-            chat_base_url=f"http://127.0.0.1:{port}/v1",
+            ollama_base_url=f"http://127.0.0.1:{port}/v1",
             chat_timeout_s=0.5,
         )
         ctx = AskingContext(
@@ -1213,7 +1213,7 @@ def test_ollama_is_asked_for_no_reasoning_on_a_request_that_must_answer(
             0,
         )
         port = server.sockets[0].getsockname()[1]
-        settings = Settings(_env_file=None, chat_base_url=f"http://127.0.0.1:{port}/v1")  # pyright: ignore[reportCallIssue]
+        settings = Settings(_env_file=None, ollama_base_url=f"http://127.0.0.1:{port}/v1")  # pyright: ignore[reportCallIssue]
         ctx = AskingContext(
             conn=store_db,
             embedder=FakeEmbedder(),

@@ -1,4 +1,4 @@
-"""Pointer Support with Ollama's bge-m3 at the provisional Support threshold, on the tower.
+"""Pointer Support with the Provider's bge-m3 at the provisional Support threshold, on the tower.
 
 No chat model: the Answers are written here. The paraphrase is of a sentence of the CC BY
 Villiger fixture, since the Seed's text may not be committed (its licence is unknown).
@@ -13,7 +13,7 @@ from paperexplorer import chunking
 from paperexplorer.asking import resolve_answer
 from paperexplorer.config import Settings
 from paperexplorer.domain import Chunk, ChunkId, Support, WorkId
-from paperexplorer.embedding import OpenAICompatibleEmbedder
+from paperexplorer.inference import embedder as provider_embedder
 from paperexplorer.parsing import ParsedWork, parse
 from paperexplorer.store import StoredChunk
 from paperexplorer.tracing import Tracing
@@ -31,7 +31,7 @@ def test_a_paraphrase_of_a_sentence_is_close_to_it_and_an_unrelated_sentence_is_
     parse_fixture: Callable[[str], ParsedWork],
 ) -> None:
     settings = Settings()
-    embedder = OpenAICompatibleEmbedder.from_settings(settings, Tracing.off())
+    embedder = provider_embedder(settings, Tracing.off())
     read = _stored(chunking.chunk(parse_fixture("villiger2024-tandf")))
     cited = next(c for c in read if "84 ongoing clinical studies" in c.chunk.text)
     [said] = [
@@ -66,7 +66,7 @@ def test_an_unrelated_sentence_is_weak_against_every_chunk_of_the_seed() -> None
     if settings.zotero_storage_dir is None:
         pytest.skip("PE_ZOTERO_STORAGE_DIR is not set")
     pdf: Path = next((settings.zotero_storage_dir / SEED_ATTACHMENT).glob("*.pdf"))
-    embedder = OpenAICompatibleEmbedder.from_settings(settings, Tracing.off())
+    embedder = provider_embedder(settings, Tracing.off())
     read = _stored(chunking.chunk(parse(pdf, settings)))
 
     answer = resolve_answer(

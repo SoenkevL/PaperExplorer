@@ -26,10 +26,10 @@ from paperexplorer.asking import (
     StepEvent,
     TextPiece,
     ask,
-    chat_model,
 )
 from paperexplorer.config import Settings
-from paperexplorer.embedding import OpenAICompatibleEmbedder
+from paperexplorer.inference import chat_model
+from paperexplorer.inference import embedder as provider_embedder
 from paperexplorer.parsing import ParsedWork
 from paperexplorer.store import Chunks, CitationGraphs, Works, WorkTexts
 from paperexplorer.tracing import configure_tracing
@@ -56,7 +56,7 @@ def test_the_chat_model_answers_from_what_it_read_and_its_thinking_stays_in_the_
         http=httpx.Client(transport=httpx.MockTransport(lambda _: httpx.Response(200, json={}))),
         span_exporter=exporter,
     )
-    embedder = OpenAICompatibleEmbedder.from_settings(settings, tracing)
+    embedder = provider_embedder(settings, tracing)
     parsed = parse_fixture("villiger2024-tandf")
     works, chunks = Works(store_db), Chunks(store_db)
     work = works.ensure("VILLIGER")
@@ -107,11 +107,12 @@ def test_the_chat_model_answers_from_what_it_read_and_its_thinking_stays_in_the_
     thinking = [
         part["content"]
         for span in exporter.get_finished_spans()
-        if span.name == f"chat {settings.chat_model}"
+        if span.name == f"chat {chat_model(settings).model_name}"
         for message in json.loads(str((span.attributes or {}).get("gen_ai.output.messages", "[]")))
         for part in message.get("parts", [])
         if part.get("type") == "thinking" and part.get("content")
     ]
-    assert thinking, "Ollama returned no reasoning for the chat model"
+    # Reading the whole Seed offers no tools, so that request runs without thinking.
+    assert bool(thinking) is searched, thinking
     for thought in thinking:
         assert thought not in draft and thought not in answer.text

@@ -6,7 +6,6 @@ from paperexplorer.asking.agent import (
     SYSTEM_PROMPT,
     AskingContext,
     ask,
-    chat_model,
 )
 from paperexplorer.asking.answers import resolve_answer
 from paperexplorer.asking.conversation import Conversation
@@ -40,6 +39,5 @@ __all__ = [
     "StepEvent",
     "TextPiece",
     "ask",
-    "chat_model",
     "resolve_answer",
 ]

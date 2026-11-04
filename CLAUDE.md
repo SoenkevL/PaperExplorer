@@ -1,6 +1,6 @@
 # PaperExplorer
 
-A reader for following a paper's citations into the cited Works' own words. Text shown as the authors' is their text exactly as extracted; a local model may write Answers to the reader's Questions, and its words count as the authors' only where they match exactly (ADR 0008).
+A reader for following a paper's citations into the cited Works' own words. Text shown as the authors' is their text exactly as extracted; a model, local or hosted, may write Answers to the reader's Questions, and its words count as the authors' only where they match exactly (ADR 0008).
 
 ## Read first
 
@@ -24,12 +24,12 @@ Before the first edit, match the request to one line below and call the Skill to
 
 - **New feature or behaviour change**: grill in plan mode: call the Skill tool for `mattpocock-skills:grilling` and `mattpocock-skills:domain-modeling` (together, `/grill-with-docs`). Done when the frontier is empty and the user confirms. Spans sessions → offer `/to-spec`, then `/to-tickets`.
 - **Building it**: `mattpocock-skills:tdd`; seams confirmed with the user before the first test.
-- **Something broken, failing or slow**: `mattpocock-skills:diagnosing-bugs`; a red loop before any hypothesis.
-- **A module's shape, a seam, a new package**: `mattpocock-skills:codebase-design`.
+- **Something broken, failing or slow, the user asking to debug**: `mattpocock-skills:diagnosing-bugs`; a red loop before any hypothesis.
+- **A module's shape, a seam, a new package, requests to optimize the codebase**: `mattpocock-skills:codebase-design`.
 - **A term missing from or clashing with `CONTEXT.md`, or an ADR**: `mattpocock-skills:domain-modeling`.
-- **A design question hard to settle on paper**: `mattpocock-skills:prototype`.
+- **A design question hard to settle on paper, an experimental new feature**: `mattpocock-skills:prototype`.
 - **Facts from outside docs or APIs**: `mattpocock-skills:research`, findings in `docs/research/`.
-- **Before opening a PR**: `mattpocock-skills:code-review` against `dev`.
+- **Before opening a PR**: `mattpocock-skills:code-review` against `dev` in a new subsession. Never executed in the same context.
 - **Mid-merge or rebase conflict**: `mattpocock-skills:resolving-merge-conflicts`.
 - **A step only the user can take** (tower, Zotero, Langfuse keys): `mattpocock-skills:wizard`.
 - **Editing CLAUDE.md, a skill, or a doc agents read**: `mattpocock-skills:writing-for-agents`.

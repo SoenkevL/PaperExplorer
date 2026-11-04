@@ -1,4 +1,4 @@
-"""Hybrid search over the Seed with Ollama's bge-m3, on the tower."""
+"""Hybrid search over the Seed with the Provider's bge-m3, on the tower."""
 
 import re
 from pathlib import Path
@@ -10,7 +10,7 @@ from psycopg.rows import TupleRow
 from paperexplorer import chunking, retrieval
 from paperexplorer.config import Settings
 from paperexplorer.domain import Scope
-from paperexplorer.embedding import OpenAICompatibleEmbedder
+from paperexplorer.inference import embedder as provider_embedder
 from paperexplorer.parsing import parse
 from paperexplorer.store import Chunks, Works, WorkTexts
 from paperexplorer.tracing import Tracing
@@ -35,7 +35,7 @@ def test_searching_the_seed_for_a_headings_words_finds_chunks_under_that_heading
     chunks = Chunks(store_db)
     chunks.replace(work, chunking.chunk(parsed))
     stored = chunks.for_work(work)
-    embedder = OpenAICompatibleEmbedder.from_settings(settings, Tracing.off())
+    embedder = provider_embedder(settings, Tracing.off())
     vectors = embedder.embed([s.chunk.text for s in stored])
     chunks.record_embeddings(
         work, embedder.model, {s.id: v for s, v in zip(stored, vectors, strict=True)}

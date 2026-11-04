@@ -483,7 +483,8 @@ def eval_command(
     with _work_or_exit(settings, work) as (conn, found):
         chunks = store.Chunks(conn)
         stored = chunks.for_work(found.id)
-        if not stored or chunks.without_embedding(found.id, settings.embedding_model):
+        wiring = _wiring(ctx, settings)
+        if not stored or chunks.without_embedding(found.id, wiring.embedder.model):
             typer.echo(f"{work} is not chunked and embedded; run chunk and embed first", err=True)
             raise typer.Exit(1)
         unknown = evals.unknown_places(dataset, stored)
@@ -492,11 +493,11 @@ def eval_command(
             for name, place in unknown:
                 typer.echo(f"  {name}: {place}", err=True)
             raise typer.Exit(1)
-        wiring = _wiring(ctx, settings)
         info = evals.run_info(
             settings,
             found,
             questions,
+            chat_model=wiring.model.model_name,
             embedding_model=wiring.embedder.model,
             git_sha=trace_release(settings),
             tracing_host=wiring.tracing.base_url,

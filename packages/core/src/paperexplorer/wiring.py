@@ -7,9 +7,10 @@ import psycopg
 from psycopg.rows import TupleRow
 from pydantic_ai.models import Model
 
-from paperexplorer.asking import AskingContext, Reading, chat_model
+from paperexplorer import inference
+from paperexplorer.asking import AskingContext, Reading
 from paperexplorer.config import Settings
-from paperexplorer.embedding import Embedder, OpenAICompatibleEmbedder
+from paperexplorer.embedding import Embedder
 from paperexplorer.tracing import Tracing, configure_tracing
 
 
@@ -35,12 +36,12 @@ class Wiring:
         if tracing is None:
             tracing = configure_tracing(settings)
         if embedder is None:
-            embedder = OpenAICompatibleEmbedder.from_settings(settings, tracing)
+            embedder = inference.embedder(settings, tracing)
         return cls(
             settings=settings,
             tracing=tracing,
             embedder=embedder,
-            model=chat_model(settings) if model is None else model,
+            model=inference.chat_model(settings) if model is None else model,
         )
 
     def asking(

@@ -1,6 +1,7 @@
 """Works: one row per Work, holding its Library Item's metadata snapshot (ADR 0001)."""
 
-from collections.abc import Collection
+from collections.abc import Collection, Sequence
+from typing import LiteralString
 
 import psycopg
 from psycopg.rows import TupleRow, class_row
@@ -22,6 +23,16 @@ _STANDING = (
     "stands_by_reader DESC, zotero_key IS NULL, pdf_attachment_key IS NULL, added_at NULLS LAST, id"
 )
 _CANDIDATES = 10
+_SEARCHED = "concat_ws(' ', title, array_to_string(creators, ' '), year, zotero_key, doi)"
+
+
+def _search(query: str) -> tuple[LiteralString, list[str]]:
+    """The WHERE clause for a search of the Library, and its parameters: every word must match."""
+    words = [w.replace("\\", r"\\").replace("%", r"\%").replace("_", r"\_") for w in query.split()]
+    where: LiteralString = " WHERE zotero_key IS NOT NULL"
+    for _ in words:
+        where += f" AND {_SEARCHED} ILIKE %s"
+    return where, [f"%{w}%" for w in words]
 
 
 class Works:
@@ -111,6 +122,32 @@ class Works:
                 _WORK + " WHERE EXISTS (SELECT 1 FROM stage_status s WHERE s.work_id = works.id)"
                 " ORDER BY id"
             ).fetchall()
+
+    def library_items(
+        self, query: str, limit: int, offset: int, *, done_first: Sequence[str]
+    ) -> list[Work]:
+        """A page of the Library Items matching `query`.
+
+        Those with every Stage of `done_first` done come first, then the newest added.
+        """
+        where, words = _search(query)
+        done = (
+            "(SELECT count(*) FROM stage_status s WHERE s.work_id = works.id"
+            " AND s.state = 'done' AND s.stage = ANY(%s)) = %s"
+        )
+        with self._conn.cursor(row_factory=class_row(Work)) as cur:
+            return cur.execute(
+                _WORK + where + f" ORDER BY {done} DESC, added_at DESC NULLS LAST, id"
+                " LIMIT %s OFFSET %s",
+                [*words, list(done_first), len(done_first), limit, offset],
+            ).fetchall()
+
+    def library_count(self, query: str) -> int:
+        """How many Library Items match `query`."""
+        where, words = _search(query)
+        row = self._conn.execute("SELECT count(*) FROM works" + where, words).fetchone()
+        assert row is not None
+        return row[0]
 
     def standing_item(self, doi: str) -> WorkId | None:
         """The Work of the Standing Item for a DOI, in any printed form, if anything holds it."""

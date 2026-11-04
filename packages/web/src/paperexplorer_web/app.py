@@ -27,6 +27,7 @@ from paperexplorer_api.schemas import (
     WorkSummary,
 )
 from paperexplorer_web.checks import PendingCheck, relay_check
+from paperexplorer_web.library import LibraryList, library_list, row
 from paperexplorer_web.relay import Pending, PendingQuestion, Views, not_embedded, relay
 from paperexplorer_web.segments import Segment, segments
 
@@ -111,14 +112,123 @@ def create_app(api: ApiClient) -> FastAPI:
     @app.get("/", response_class=HTMLResponse)
     def index(request: Request) -> HTMLResponse:  # pyright: ignore[reportUnusedFunction]
         works: list[WorkSummary] = []
+        library: LibraryList | None = None
+        has_library = False
+        message: str | None = None
         try:
             api_version: str | None = api.health().version
-            works = api.works()
         except httpx.HTTPError:
             logger.warning("API unreachable", exc_info=True)
             api_version = None
-        context = {"api_version": api_version, "works": works, "duplicates": duplicate_items()}
+        if api_version is not None:
+            try:
+                library = library_list(api.library(), "", 0)
+                has_library = True
+            except NotFoundError:
+                works = _works_or_none()
+            except httpx.HTTPError as e:
+                logger.warning("The Library could not be read", exc_info=True)
+                has_library = True
+                message = f"The Library could not be read: {_why(e)}"
+        context = {
+            "api_version": api_version,
+            "works": works,
+            "library": library,
+            "has_library": has_library,
+            "message": message,
+            "duplicates": duplicate_items(),
+        }
         return pages.TemplateResponse(request, "index.html", context)
+
+    def _works_or_none() -> list[WorkSummary]:
+        try:
+            return api.works()
+        except httpx.HTTPError:
+            logger.warning("Works could not be read", exc_info=True)
+            return []
+
+    def library_view(
+        request: Request, query: str, *, offset: int = 0, message: str | None = None
+    ) -> HTMLResponse:
+        """The list for a search; a later page's rows alone, to go after those shown."""
+        try:
+            library = library_list(api.library(query, offset=offset), query, offset)
+        except (httpx.HTTPError, NotFoundError) as e:
+            logger.warning("The Library could not be read", exc_info=True)
+            context = {"library": None, "message": f"The Library could not be read: {_why(e)}"}
+            return pages.TemplateResponse(request, "library_list.html", context)
+        template = "library_rows.html" if offset else "library_list.html"
+        context = {"library": library, "message": message}
+        return pages.TemplateResponse(request, template, context)
+
+    @app.get("/library", response_class=HTMLResponse)
+    def library_search(  # pyright: ignore[reportUnusedFunction]
+        request: Request, q: str = "", offset: Annotated[int, Query(ge=0)] = 0
+    ) -> HTMLResponse:
+        """The Library Items a search finds."""
+        return library_view(request, q, offset=offset)
+
+    @app.post("/library/sync", response_class=HTMLResponse)
+    def library_sync(  # pyright: ignore[reportUnusedFunction]
+        request: Request, q: Annotated[str, Form()] = ""
+    ) -> HTMLResponse:
+        """Bring the Library up to date with Zotero, then show the current search."""
+        message = None
+        try:
+            if api.sync_library().stale:
+                message = "Zotero could not be reached; this is the last copy of the Library."
+        except (httpx.HTTPError, NotFoundError) as e:
+            logger.warning("The Library was not synced", exc_info=True)
+            message = f"The Library was not synced: {_why(e)}"
+        return library_view(request, q, message=message)
+
+    def row_view(request: Request, work_id: int, message: str | None = None) -> HTMLResponse:
+        """A Work's row as it now stands; a row that keeps asking when the API does not answer."""
+        try:
+            work = api.work_stages(work_id)
+        except NotFoundError:
+            return HTMLResponse("")
+        except httpx.HTTPError:
+            logger.warning("Work %d's Stages could not be read", work_id, exc_info=True)
+            return pages.TemplateResponse(request, "library_row_lost.html", {"work_id": work_id})
+        return pages.TemplateResponse(request, "library_row.html", {"row": row(work, message)})
+
+    @app.get("/works/{work_id}/row", response_class=HTMLResponse)
+    def work_row(request: Request, work_id: int) -> HTMLResponse:  # pyright: ignore[reportUnusedFunction]
+        """A Work's row, as polled while a run holds it."""
+        return row_view(request, work_id)
+
+    @app.post("/works/{work_id}/ingesting", response_class=HTMLResponse)
+    def ingest(  # pyright: ignore[reportUnusedFunction]
+        request: Request, work_id: int, from_stage: Annotated[str | None, Form()] = None
+    ) -> HTMLResponse:
+        """Start Ingesting a Work, from a Stage the reader confirmed or where it stopped."""
+        try:
+            work = api.ingest(work_id, from_stage=from_stage)
+        except (httpx.HTTPError, ConflictError, NotFoundError) as e:
+            logger.warning("Work %d not started", work_id, exc_info=True)
+            return row_view(request, work_id, f"Not started: {_why(e)}")
+        return pages.TemplateResponse(request, "library_row.html", {"row": row(work)})
+
+    @app.delete("/works/{work_id}/ingesting", response_class=HTMLResponse)
+    def cancel_ingesting(request: Request, work_id: int) -> HTMLResponse:  # pyright: ignore[reportUnusedFunction]
+        """Take a waiting Work off the queue."""
+        try:
+            api.cancel_ingesting(work_id)
+        except (httpx.HTTPError, ConflictError, NotFoundError) as e:
+            logger.warning("Work %d not cancelled", work_id, exc_info=True)
+            return row_view(request, work_id, f"Not cancelled: {_why(e)}")
+        return row_view(request, work_id)
+
+    @app.post("/works/{work_id}/resolving", response_class=HTMLResponse)
+    def resolve_references(request: Request, work_id: int) -> HTMLResponse:  # pyright: ignore[reportUnusedFunction]
+        """Start the Stages that resolve an Ingested Work's References."""
+        try:
+            work = api.resolve_references(work_id)
+        except (httpx.HTTPError, ConflictError, NotFoundError) as e:
+            logger.warning("Work %d's References not started", work_id, exc_info=True)
+            return row_view(request, work_id, f"Not started: {_why(e)}")
+        return pages.TemplateResponse(request, "library_row.html", {"row": row(work)})
 
     def duplicate_items() -> list[DuplicateItems]:
         """Each DOI's Duplicate Items; none when the API serves none (no Zotero keys) or is down."""
@@ -394,7 +504,7 @@ def _unserved(outcome: str, error: NotFoundError) -> str:
     )
 
 
-def _why(error: httpx.HTTPError | NotFoundError) -> str:
+def _why(error: httpx.HTTPError | NotFoundError | ConflictError) -> str:
     """The API's own reason for refusing, when it gave one."""
     if isinstance(error, httpx.HTTPStatusError):
         try:

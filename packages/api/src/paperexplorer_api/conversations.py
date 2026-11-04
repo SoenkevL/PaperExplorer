@@ -10,6 +10,7 @@ from typing import Self
 
 from paperexplorer.asking import Conversation
 from paperexplorer.config import Settings
+from paperexplorer.domain import WorkId
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,13 @@ class Conversations:
             self._held[conversation_id] = (held[0], self._clock())
             self._held.move_to_end(conversation_id)
             return held[0]
+
+    def forget_work(self, work: WorkId) -> None:
+        """Forget every Conversation about a Work, whose Chunks they hold have changed."""
+        with self._lock:
+            for conversation_id, (conversation, _) in list(self._held.items()):
+                if conversation.work.id == work:
+                    del self._held[conversation_id]
 
     def _evict(self) -> None:
         now = self._clock()

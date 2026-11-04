@@ -1,0 +1,12 @@
+{#- What a search or a sync swaps in. -#}
+<div id="library-list" aria-live="polite">
+  {% if message %}<p class="failed">{{ message }}</p>{% endif %}
+  {% if library %}
+  {% if library.message %}<p class="failed">{{ library.message }}</p>{% endif %}
+  {% if library.rows %}
+  <ul class="works">{% include "library_rows.html" %}</ul>
+  {% else %}
+  <p class="note">No Library Items found.</p>
+  {% endif %}
+  {% endif %}
+</div>

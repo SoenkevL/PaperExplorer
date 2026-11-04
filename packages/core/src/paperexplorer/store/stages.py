@@ -69,6 +69,14 @@ class StageStatuses:
             "DELETE FROM stage_status WHERE work_id = %s AND stage = ANY(%s)", (work, list(stages))
         )
 
+    def interrupt_running(self) -> int:
+        """Record every running Stage as failed, as nothing can be running them; how many."""
+        return self._conn.execute(
+            "UPDATE stage_status SET state = 'failed', finished_at = clock_timestamp(), error = %s"
+            " WHERE state = 'running'",
+            ("Interrupted by a restart",),
+        ).rowcount
+
     def for_work(self, work: WorkId) -> dict[str, StageStatus]:
         """Status of every Stage that has run for the Work, by Stage name, oldest run first."""
         with self._conn.cursor(row_factory=class_row(StageStatus)) as cur:

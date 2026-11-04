@@ -7,6 +7,18 @@
 <p class="status down">API unreachable</p>
 {% endif %}
 {% with groups = duplicates, message = none %}{% include "duplicates.html" %}{% endwith %}
+{% if has_library %}
+<section class="library">
+  <div class="library-tools">
+    <input id="library-search" type="search" name="q" placeholder="Search title, author, year, key or DOI" aria-label="Search the Library"
+      hx-get="/library" hx-trigger="input changed delay:300ms, search" hx-target="#library-list" hx-swap="outerHTML">
+    <button type="button" hx-post="/library/sync" hx-include="#library-search" hx-target="#library-list" hx-swap="outerHTML">Sync</button>
+    <span hx-post="/library/sync" hx-trigger="load" hx-include="#library-search" hx-target="#library-list" hx-swap="outerHTML"></span>
+  </div>
+  {% include "library_list.html" %}
+</section>
+{% else %}
+{% if api_version %}<p class="note">Finding and Ingesting Library Items needs Zotero's keys in <code>.env</code> (<code>PE_ZOTERO_LIBRARY_ID</code>, <code>PE_ZOTERO_API_KEY</code>): the Library needs Zotero.</p>{% endif %}
 {% if works %}
 <ul class="works">
   {% for w in works %}
@@ -20,5 +32,6 @@
   </li>
   {% endfor %}
 </ul>
+{% endif %}
 {% endif %}
 {% endblock %}

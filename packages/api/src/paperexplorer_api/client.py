@@ -3,6 +3,7 @@
 from collections.abc import Generator, Iterable, Iterator, Mapping
 from contextlib import AbstractContextManager
 from typing import Any, Protocol
+from urllib.parse import urlencode
 
 import httpx
 from pydantic import TypeAdapter
@@ -16,6 +17,10 @@ from paperexplorer_api.schemas import (
     Conversation,
     DuplicateItems,
     Health,
+    Ingest,
+    LibraryPage,
+    LibrarySynced,
+    LibraryWork,
     Merge,
     Merged,
     ReadersChoice,
@@ -33,6 +38,8 @@ _DUPLICATES = TypeAdapter(list[DuplicateItems])
 # A turn's stream may sit idle while the model thinks; the API sends a keep-alive comment every
 # 15 s, so only a minute without a byte means it is gone.
 STREAM_TIMEOUT_S = 60.0
+# A first sync reads the whole Library in pages, and another sync may hold it up.
+SYNC_TIMEOUT_S = 300.0
 
 
 class _Response(Protocol):
@@ -189,6 +196,37 @@ class ApiClient:
     def merge(self, merge: Merge) -> Merged:
         """Merge one Duplicate Item into another in Zotero; the other goes to the trash."""
         return Merged.model_validate(self._send("POST", "/duplicates/merge", merge.model_dump()))
+
+    def library(self, query: str = "", *, limit: int = 50, offset: int = 0) -> LibraryPage:
+        """A page of the Library Items matching `query`, Ingested ones first."""
+        params = urlencode({"q": query, "limit": limit, "offset": offset})
+        return LibraryPage.model_validate(self._get(f"/library?{params}"))
+
+    def sync_library(self) -> LibrarySynced:
+        """Bring the Library up to date with Zotero."""
+        path = "/library/sync"
+        with self._http.stream("POST", path, json=None, timeout=SYNC_TIMEOUT_S) as response:
+            response.read()
+            _check(response, path)
+            return LibrarySynced.model_validate(response.json())
+
+    def work_stages(self, work_id: int) -> LibraryWork:
+        """One Library Item with where each of its Stages stands."""
+        return LibraryWork.model_validate(self._get(f"/works/{work_id}/stages"))
+
+    def ingest(self, work_id: int, *, from_stage: str | None = None) -> LibraryWork:
+        """Start Ingesting; `ConflictError` with no PDF, nothing left to run, or a run under way."""
+        body = Ingest(from_stage=from_stage).model_dump()
+        return LibraryWork.model_validate(self._send("POST", f"/works/{work_id}/ingesting", body))
+
+    def cancel_ingesting(self, work_id: int) -> None:
+        """Take a waiting Work off the queue; `ConflictError` once it runs."""
+        path = f"/works/{work_id}/ingesting"
+        _check(self._http.request("DELETE", path), path)
+
+    def resolve_references(self, work_id: int) -> LibraryWork:
+        """Start the Stages that resolve an Ingested Work's References."""
+        return LibraryWork.model_validate(self._send("POST", f"/works/{work_id}/resolving"))
 
     def _get(self, path: str) -> Any:
         response = self._http.get(path)

@@ -12,6 +12,9 @@ from paperexplorer.store import LibraryVersions, ReadersChoices, Resolutions, Wo
 
 logger = logging.getLogger(__name__)
 
+# Any fixed number: Postgres advisory locks have no names, and this is the only one here.
+_SYNC_LOCK = 7_210_001
+
 
 class SyncResult(BaseModel):
     """What a sync did: items recorded, Works removed, and whether it read the whole Library."""
@@ -50,8 +53,10 @@ def merge(conn: psycopg.Connection[TupleRow], library: Library, keep: Work, othe
 def sync(conn: psycopg.Connection[TupleRow], library: Library, *, full: bool = False) -> SyncResult:
     """Bring the Works up to date with the Library, reading only its changes after the first.
 
-    Runs in the caller's transaction. A Library that cannot be reached leaves the last copy.
+    Runs in the caller's transaction, which holds a lock until it ends: another sync waits for it,
+    then reads only what changed after it. A Library that cannot be reached leaves the last copy.
     """
+    conn.execute("SELECT pg_advisory_xact_lock(%s)", (_SYNC_LOCK,))
     versions, works = LibraryVersions(conn), Works(conn)
     since = None if full else versions.last()
     try:

@@ -1,6 +1,7 @@
 """The pipeline: Stages run one at a time per Work, re-runnable, with their status in the store."""
 
 import logging
+from collections.abc import Iterable, Mapping
 
 from paperexplorer.domain import WorkId
 from paperexplorer.pipeline.stage import Stage, StageContext, StageError, StageResult
@@ -13,9 +14,20 @@ from paperexplorer.pipeline.stages import (
     resolve,
     verify_dois,
 )
-from paperexplorer.store import StageStatuses
+from paperexplorer.store import StageState, StageStatus, StageStatuses
 
-__all__ = ["STAGES", "Stage", "StageContext", "StageError", "StageResult", "run_stage"]
+__all__ = [
+    "INGESTING",
+    "RESOLVING",
+    "STAGES",
+    "Stage",
+    "StageContext",
+    "StageError",
+    "StageResult",
+    "remaining",
+    "run_chain",
+    "run_stage",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +41,10 @@ STAGES: dict[str, Stage] = {
     "verify_dois": verify_dois,
     "resolve": resolve,
 }
+
+# The Stages that make a Work Ingested, and the two that resolve its References afterwards.
+INGESTING: tuple[str, ...] = ("fetch", "parse", "chunk", "embed", "extract_citations")
+RESOLVING: tuple[str, ...] = ("verify_dois", "resolve")
 
 
 def run_stage(ctx: StageContext, name: str, work: WorkId) -> StageResult:
@@ -57,3 +73,17 @@ def run_stage(ctx: StageContext, name: str, work: WorkId) -> StageResult:
         raise
     logger.info("Stage %s finished for Work %d: %s", name, work, result.counts)
     return result
+
+
+def run_chain(ctx: StageContext, names: Iterable[str], work: WorkId) -> None:
+    """Run the Stages in order for one Work; the first failure is recorded, raised and ends it."""
+    for name in names:
+        run_stage(ctx, name, work)
+
+
+def remaining(ran: Mapping[str, StageStatus]) -> list[str]:
+    """The Ingesting Stages from the first not done on: all of them need to run from there."""
+    for i, name in enumerate(INGESTING):
+        if name not in ran or ran[name].state is not StageState.DONE:
+            return list(INGESTING[i:])
+    return []

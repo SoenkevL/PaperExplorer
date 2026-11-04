@@ -48,6 +48,20 @@ _Avoid_: Access level, OA status
 A Work's text recovered by OCR from a scan. It may misread the authors' words, so it is never shown as their exact text.
 _Avoid_: Scanned text
 
+## Getting a Work ready
+
+**Stage**:
+One restartable step of getting a Work ready, with its state recorded per Work.
+_Avoid_: Step, job, task
+
+**Ingesting**:
+Running a Work's Stages from fetching its PDF through linking its Citations, so it can be read and asked about.
+_Avoid_: Indexing, processing, importing
+
+**Ingested**:
+Said of a Work whose Ingesting Stages are all done.
+_Avoid_: Indexed, processed, ready
+
 ## Inside a Work
 
 **Chunk**:

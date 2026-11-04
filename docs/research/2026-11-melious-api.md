@@ -19,7 +19,16 @@ On `deepseek-v4-flash-0731` and `bge-m3`, streamed. The first seven rows used te
 | Keep-alive lines | None on these short requests, so the stall behaviour is still unknown |
 | Real paper | Whole Seed (1 request) and retrieval (1 request, 0 tools) each answered "84" correctly, each with one close Pointer and no unknown handle |
 
-Not answered: how close Melious's `bge-m3` is to Ollama's, because the tower was offline. `gemma-4-31b` was not probed. One Question per reading says little about Answer quality or the Support threshold; that takes an eval.
+**Against Ollama's `bge-m3`** (Ollama 0.40.3, also 2026-11-03), 1024 dimensions on both:
+
+| Cosine per pair, Ollama against Melious | n | min | median | max |
+|---|---|---|---|---|
+| Short sentences (8 languages, a technical sentence, "Why?") | 10 | 0.999902 | 0.999987 | 0.999994 |
+| `villiger2024-tandf` Chunks | 32 | 0.999968 | 0.999983 | 0.999992 |
+
+Comparing a Chunk's Ollama Vector with another Chunk's Melious Vector moves the cosine by at most 0.00124. Melious's Vectors are not always identical between calls (cosine to the first call never below 0.9999987), even under one reported upstream; Ollama's were identical over 3 calls. Other papers, and the effect of mixed Vectors on Answers and Pointers, were not measured.
+
+`gemma-4-31b` was not probed. One Question per reading says little about Answer quality or the Support threshold; that takes an eval.
 
 ## Answer
 
@@ -103,7 +112,7 @@ Other embedding models on the hub, none needed:
 Two cautions for this repo:
 
 - **Not normalised.** Embeddings are "generally not normalized to unit length" ([reference](https://melious.ai/docs/reference/embeddings)). That is safe here: search uses pgvector's cosine distance (`store/chunks.py`) and Support scales Vectors to length 1 (`asking/answers.py`).
-- **Same name, maybe different vectors.** Vectors are stored per model name, and both servers call it `bge-m3`. Whether Melious's providers and Ollama's build give the same vector for the same text is unknown. If they differ, a Seed embedded on one and queried on the other mixes them silently, and `support_threshold` (0.7, set by an eval on Ollama) may not carry over.
+- **Same name, shared Vectors.** Vectors are stored per model name, and both call it `bge-m3`, so a Seed embedded on one is queried on the other. They were measured to agree closely ([Probed with a key](#probed-with-a-key-2026-11-03)); `support_threshold` (0.7, set by an eval on Ollama) has not been re-evaluated on Melious's.
 
 ## Models
 

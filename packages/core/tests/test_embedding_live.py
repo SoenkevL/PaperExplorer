@@ -30,7 +30,7 @@ def test_bge_m3_gives_1024_dimensions_and_puts_like_meanings_closer() -> None:
         ]
     )
 
-    assert embedder.model.endswith("bge-m3")
+    assert embedder.model == "bge-m3"
     assert {len(v) for v in (question, answer, paraphrase, unrelated)} == {DIMENSIONS}
     assert cosine(answer, paraphrase) > cosine(answer, question) > cosine(answer, unrelated)
     assert cosine(question, answer) > cosine(question, unrelated)

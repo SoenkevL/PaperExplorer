@@ -73,7 +73,7 @@ def test_models_and_context_can_be_set_over_the_providers_own() -> None:
 
     assert chat_model(settings).model_name == "gemma-4-31b"
     assert chat_context(settings) == 256000
-    assert embedder(settings, Tracing.off()).model == "melious/other"
+    assert embedder(settings, Tracing.off()).model == "other"
 
 
 def test_a_whole_seed_budget_beyond_the_providers_context_is_refused() -> None:
@@ -84,7 +84,7 @@ def test_a_whole_seed_budget_beyond_the_providers_context_is_refused() -> None:
     assert chat_context(_melious(whole_seed_max_tokens=80000)) == 1_000_000
 
 
-def test_melious_is_asked_for_bge_m3_and_its_vectors_are_stored_apart_from_ollamas() -> None:
+def test_melious_and_ollama_store_bge_m3_under_one_name_so_a_switch_embeds_nothing() -> None:
     seen: list[httpx.Request] = []
 
     def answer(request: httpx.Request) -> httpx.Response:
@@ -94,7 +94,7 @@ def test_melious_is_asked_for_bge_m3_and_its_vectors_are_stored_apart_from_ollam
     melious = embedder(_melious(), Tracing.off(), transport=httpx.MockTransport(answer))
 
     assert melious.embed(["a sentence"]) == [[1.0, 0.0]]
-    assert melious.model == "melious/bge-m3"
+    assert melious.model == embedder(_settings(), Tracing.off()).model == "bge-m3"
     assert str(seen[0].url) == "https://api.melious.ai/v1/embeddings"
     assert seen[0].headers["authorization"] == "Bearer sk-mel-test"
     assert json.loads(seen[0].content)["model"] == "bge-m3"

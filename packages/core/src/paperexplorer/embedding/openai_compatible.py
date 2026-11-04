@@ -34,25 +34,18 @@ class OpenAICompatibleEmbedder:
     """Texts go to `<base_url>/embeddings` in batches of `batch_size`, one request each."""
 
     def __init__(
-        self,
-        http: httpx.Client,
-        model: str,
-        *,
-        batch_size: int,
-        tracing: Tracing,
-        stored_as: str | None = None,
+        self, http: httpx.Client, model: str, *, batch_size: int, tracing: Tracing
     ) -> None:
-        """`http` is based at the API root (`…/v1`) with the key; `stored_as` names the Vectors."""
+        """`http` is based at the server's API root (`…/v1`) and sends the key."""
         self._http = http
         self._model = model
-        self._stored_as = stored_as or model
         self._batch_size = batch_size
         self._tracing = tracing
 
     @property
     def model(self) -> str:
-        """The name stored with each Vector."""
-        return self._stored_as
+        """The model the server is asked for."""
+        return self._model
 
     def embed(self, texts: Sequence[str]) -> list[Vector]:
         """One Vector per text, in order; raises `EmbeddingError` if the server fails."""

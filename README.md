@@ -32,7 +32,7 @@ PE_PROVIDER=melious
 PE_PROVIDER_API_KEY=sk-mel-...
 ```
 
-Then run `embed` for each Work, since each Provider keeps its own Vectors. Seed text and Questions go to the Provider, so read ADR 0013 first. A new Provider is one entry in the table in `packages/core/src/paperexplorer/inference.py`.
+A switch needs no `embed`: both Providers' `bge-m3` agree, so they share their Vectors. Seed text and Questions go to the Provider, so read ADR 0013 first. A new Provider is one entry in the table in `packages/core/src/paperexplorer/inference.py`.
 
 ## Run (tower)
 

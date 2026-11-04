@@ -34,9 +34,6 @@ class Provider(BaseModel):
     thinking_field: str
     # What goes in place of a key for a Provider that needs none; else `PE_PROVIDER_API_KEY`.
     no_key_placeholder: str | None = None
-    # Before the model's name on each stored Vector, so that one Provider's Vectors are never
-    # searched with another's: both call theirs `bge-m3`, and whether they agree is not yet known.
-    vector_prefix: str = ""
 
 
 def _providers(settings: Settings) -> dict[str, Provider]:
@@ -49,14 +46,15 @@ def _providers(settings: Settings) -> dict[str, Provider]:
             thinking_field="reasoning",
             no_key_placeholder="ollama",
         ),
-        # Probed 2026-11-03 (docs/research/2026-11-melious-api.md).
+        # Probed 2026-11-03 (docs/research/2026-11-melious-api.md). Its bge-m3 shares Ollama's name,
+        # and so its stored Vectors, because the two were measured to agree (ADR 0013). A Provider
+        # whose model of that name has not been measured against them must name it differently.
         "melious": Provider(
             base_url="https://api.melious.ai/v1",
             chat_model="deepseek-v4-flash-0731",
             chat_context=1_000_000,
             embedding_model="bge-m3",
             thinking_field="reasoning_content",
-            vector_prefix="melious/",
         ),
     }
 
@@ -123,7 +121,6 @@ def embedder(
     return OpenAICompatibleEmbedder(
         http,
         model,
-        stored_as=provider.vector_prefix + model,
         batch_size=settings.embedding_batch_size,
         tracing=tracing,
     )

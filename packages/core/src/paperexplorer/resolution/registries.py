@@ -6,6 +6,7 @@ import time
 from collections.abc import Awaitable, Callable, Collection
 from contextlib import asynccontextmanager
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 from pydantic import JsonValue
@@ -35,6 +36,10 @@ class RegistryError(Exception):
     """A registry kept failing: three tries, each a 429 or a 5xx or no answer."""
 
 
+class _ThrottledError(RegistryError):
+    """Every try was a 429."""
+
+
 class BudgetSpentError(Exception):
     """OpenAlex's daily budget is spent; it resets at 00:00 UTC."""
 
@@ -47,18 +52,19 @@ class _Limiter:
         self._clock, self._sleep = clock, sleep
         self._next = 0.0
         self._running = 0
-        self._free = asyncio.Condition()
-
-    def open(self) -> None:
-        """Start afresh on the running event loop, as each Check runs on its own."""
-        self._running = 0
-        self._free = asyncio.Condition()
+        self._waiting: list[asyncio.Future[None]] = []
+        self._loop: asyncio.AbstractEventLoop | None = None
 
     @asynccontextmanager
     async def slot(self):
-        async with self._free:
-            await self._free.wait_for(lambda: self._running < self.concurrency)
-            self._running += 1
+        loop = asyncio.get_running_loop()
+        if loop is not self._loop:  # calls end with their event loop, and their futures with it
+            self._loop, self._running, self._waiting = loop, 0, []
+        while self._running >= self.concurrency:
+            waiter = loop.create_future()
+            self._waiting.append(waiter)
+            await waiter
+        self._running += 1
         try:
             now = self._clock()
             start, self._next = max(now, self._next), max(now, self._next) + 1 / self.rate
@@ -66,9 +72,13 @@ class _Limiter:
                 await self._sleep(start - now)
             yield
         finally:
-            async with self._free:
-                self._running -= 1
-                self._free.notify_all()
+            # Nothing here may await: limits outlive a Check, so a cancelled release would
+            # keep this slot from every later Check until the API restarts.
+            self._running -= 1
+            for waiter in self._waiting:
+                if not waiter.done():
+                    waiter.set_result(None)
+            self._waiting = []
 
     def hold(self, seconds: float) -> None:
         """Make the next call wait at least this long, as a 429's `Retry-After` asks."""
@@ -82,6 +92,19 @@ class _Limiter:
             self.concurrency = concurrency
 
 
+class RegistryLimits:
+    """One limiter per host and request type: the hosts count a client's calls, not its Checks."""
+
+    def __init__(
+        self, settings: Settings, *, clock: Clock = time.monotonic, sleep: Sleep = asyncio.sleep
+    ) -> None:
+        polite = settings.crossref_mailto is not None
+        keyed = settings.openalex_api_key is not None
+        self.crossref = _Limiter(3 if polite else 1, 3 if polite else 1, clock, sleep)
+        self.crossref_single = _Limiter(10 if polite else 5, 3 if polite else 1, clock, sleep)
+        self.openalex = _Limiter(25 if keyed else 8, 25 if keyed else 8, clock, sleep)
+
+
 class Registries:
     """Crossref and OpenAlex as a Registry Check asks them; tests pass `transport` and a clock."""
 
@@ -89,6 +112,7 @@ class Registries:
         self,
         settings: Settings,
         *,
+        limits: RegistryLimits | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
         clock: Clock = time.monotonic,
         sleep: Sleep = asyncio.sleep,
@@ -98,16 +122,15 @@ class Registries:
         self._api_key = key.get_secret_value() if key else None
         self._transport = transport
         self._sleep = sleep
-        polite, keyed = self._mailto is not None, self._api_key is not None
-        self._crossref = _Limiter(3 if polite else 1, 3 if polite else 1, clock, sleep)
-        self._openalex = _Limiter(25 if keyed else 8, 25 if keyed else 8, clock, sleep)
+        limits = limits or RegistryLimits(settings, clock=clock, sleep=sleep)
+        self._crossref = limits.crossref
+        self._crossref_single = limits.crossref_single
+        self._openalex = limits.openalex
         self._client: httpx.AsyncClient | None = None
         self.budget_usd: float | None = None  # what is left of OpenAlex's day, once a call says
 
     async def __aenter__(self) -> Registries:
         self._client = httpx.AsyncClient(transport=self._transport, timeout=30)
-        self._crossref.open()
-        self._openalex.open()
         return self
 
     async def __aexit__(self, *_: object) -> None:
@@ -117,19 +140,28 @@ class Registries:
 
     async def budget(self) -> float | None:
         """What is left of OpenAlex's day in US dollars, asked of a free singleton record."""
-        params = {"api_key": self._api_key} if self._api_key else {}
-        await self._get(self._openalex, OPENALEX_SINGLETON, params, budgeted=True)
+        await self._get(self._openalex, OPENALEX_SINGLETON, self._openalex_auth(), cost=0.0)
         return self.budget_usd
 
     async def crossref_dois(self, dois: Collection[str]) -> dict[str, JsonValue]:
         """Crossref's item for each of up to 100 normalized DOIs, `None` where it has none."""
-        found = await self._crossref_list({"filter": ",".join(f"doi:{d}" for d in dois)}, BATCH)
+        # A comma ends a filter's value, and Crossref has no way to quote one.
+        listed = [d for d in dois if "," not in d]
+        found = (
+            await self._crossref_list({"filter": ",".join(f"doi:{d}" for d in listed)}, BATCH)
+            if listed
+            else []
+        )
+        for doi in dois:
+            if "," in doi and (record := await self._crossref_record(doi)) is not None:
+                found.append(record)
         return _by_doi(dois, found, "DOI")
 
     async def openalex_dois(self, dois: Collection[str]) -> dict[str, JsonValue]:
         """OpenAlex's Work for each of up to 100 normalized DOIs, `None` where it has none."""
         found = await self._openalex_list(
-            {"filter": "doi:" + "|".join(dois), "per-page": str(BATCH)}, OPENALEX_LIST_COST
+            {"filter": "doi:" + "|".join(_filter_value(d) for d in dois), "per-page": str(BATCH)},
+            OPENALEX_LIST_COST,
         )
         return _by_doi(dois, found, "doi")
 
@@ -147,32 +179,53 @@ class Registries:
         return [*await self._crossref_list({"query.bibliographic": text}, CANDIDATES)]
 
     async def _crossref_list(self, params: dict[str, str], rows: int) -> list[Json]:
-        params = params | {"rows": str(rows)} | ({"mailto": self._mailto} if self._mailto else {})
+        params = params | {"rows": str(rows)} | self._crossref_polite()
         response = await self._get(self._crossref, CROSSREF, params)
-        limit, interval = (
-            response.headers.get(h) for h in ("x-rate-limit-limit", "x-rate-limit-interval")
-        )
-        concurrency = response.headers.get("x-concurrency-limit")
-        if limit and interval and interval.endswith("s") and interval[:-1].isdigit():
-            self._crossref.tighten(float(limit) / max(int(interval[:-1]), 1), None)
-        if concurrency and concurrency.isdigit():
-            self._crossref.tighten(None, int(concurrency))
+        _follow_crossref_headers(self._crossref, response)
         items: list[Json] = response.json()["message"]["items"]
         return items
+
+    async def _crossref_record(self, doi: str) -> Json | None:
+        """Crossref's record of exactly this DOI, `None` when it answers that it has none."""
+        url = f"{CROSSREF}/{quote(doi, safe='')}"
+        response = await self._get(
+            self._crossref_single, url, self._crossref_polite(), absent_ok=True
+        )
+        _follow_crossref_headers(self._crossref_single, response)
+        if response.status_code == 404:
+            return None
+        record: Json = response.json()["message"]
+        return record
 
     async def _openalex_list(self, params: dict[str, str], cost: float) -> list[Json]:
         if self.budget_usd is not None and self.budget_usd < cost:
             raise BudgetSpentError
-        params = params | ({"api_key": self._api_key} if self._api_key else {})
-        response = await self._get(self._openalex, OPENALEX, params, budgeted=True)
+        response = await self._get(
+            self._openalex, OPENALEX, params | self._openalex_auth(), cost=cost
+        )
         results: list[Json] = response.json()["results"]
         return results
 
+    def _crossref_polite(self) -> dict[str, str]:
+        return {"mailto": self._mailto} if self._mailto else {}
+
+    def _openalex_auth(self) -> dict[str, str]:
+        return {"api_key": self._api_key} if self._api_key else {}
+
     async def _get(
-        self, limiter: _Limiter, url: str, params: dict[str, str], *, budgeted: bool = False
+        self,
+        limiter: _Limiter,
+        url: str,
+        params: dict[str, str],
+        *,
+        cost: float | None = None,
+        absent_ok: bool = False,
     ) -> httpx.Response:
+        """GET within `limiter`; `cost` is its share of OpenAlex's day; `absent_ok` allows 404."""
         assert self._client is not None, "use Registries as an async context manager"
+        throttled = False
         for attempt in range(TRIES):
+            throttled = False
             async with limiter.slot():
                 try:
                     response = await self._client.get(url, params=params)
@@ -180,24 +233,84 @@ class Registries:
                     logger.warning("No answer from %s (try %d): %s", url, attempt + 1, e)
                     await self._sleep(2**attempt)
                     continue
-            if budgeted and (left := response.headers.get("x-ratelimit-remaining-usd")):
-                self.budget_usd = float(left)
             if response.status_code == 429:
-                if budgeted and self.budget_usd is not None and self.budget_usd <= 0:
-                    raise BudgetSpentError
-                wait = response.headers.get("retry-after", "1")
-                logger.warning("%s asked to wait %ss (try %d)", url, wait, attempt + 1)
+                throttled = True
+                # Crossref's 429 names no wait, and a second is not enough to be let back in.
+                wait = response.headers.get("retry-after", "")
+                seconds = float(wait) if wait.replace(".", "", 1).isdigit() else 2**attempt
+                logger.warning("%s asked to wait %ss (try %d)", url, seconds, attempt + 1)
                 # Every call to this host waits, not only this one.
-                limiter.hold(float(wait) if wait.replace(".", "", 1).isdigit() else 1)
+                limiter.hold(seconds)
+                left = response.headers.get("x-ratelimit-remaining-usd")
+                if (
+                    cost is not None
+                    and left
+                    and float(left) <= cost
+                    and await self._budget_spent(cost)
+                ):
+                    raise BudgetSpentError
                 continue
             if response.status_code >= 500:
                 logger.warning("%s answered %d (try %d)", url, response.status_code, attempt + 1)
                 await self._sleep(2**attempt)
                 continue
+            if absent_ok and response.status_code == 404:
+                return response
             if response.is_error:
                 raise RegistryError(f"{url} answered {response.status_code}")
+            if cost is not None:
+                self._note_budget(response)
             return response
-        raise RegistryError(f"{url} failed {TRIES} times")
+        raise (_ThrottledError if throttled else RegistryError)(f"{url} failed {TRIES} times")
+
+    async def _budget_spent(self, cost: float) -> bool:
+        """Whether OpenAlex's day cannot pay `cost`, asked of a free singleton record.
+
+        A 429 says `remaining-usd: 0` for a burst as well as for a spent day; only an answer
+        that is not a 429 tells them apart. Nothing but 429s means the day is spent.
+        """
+        try:
+            response = await self._get(self._openalex, OPENALEX_SINGLETON, self._openalex_auth())
+        except _ThrottledError:
+            return True
+        except RegistryError:
+            return False
+        self._note_budget(response)
+        return self.budget_usd is not None and self.budget_usd < cost
+
+    def _note_budget(self, response: httpx.Response) -> None:
+        """Keep what a successful answer says is left of the day; only those are believed."""
+        if left := response.headers.get("x-ratelimit-remaining-usd"):
+            self.budget_usd = float(left)
+
+
+def shared_registries(
+    settings: Settings,
+    *,
+    transport: httpx.AsyncBaseTransport | None = None,
+    clock: Clock = time.monotonic,
+    sleep: Sleep = asyncio.sleep,
+) -> Callable[[], Registries]:
+    """Fresh `Registries` for each Check, all within one set of limits."""
+    limits = RegistryLimits(settings, clock=clock, sleep=sleep)
+    return lambda: Registries(settings, limits=limits, transport=transport, sleep=sleep)
+
+
+def _follow_crossref_headers(limiter: _Limiter, response: httpx.Response) -> None:
+    """Tighten a Crossref limiter to the limits its answer names."""
+    limit, interval = (
+        response.headers.get(h) for h in ("x-rate-limit-limit", "x-rate-limit-interval")
+    )
+    concurrency = response.headers.get("x-concurrency-limit")
+    if limit and interval and interval.endswith("s") and interval[:-1].isdigit():
+        limiter.tighten(float(limit) / max(int(interval[:-1]), 1), None)
+    if concurrency and concurrency.isdigit():
+        limiter.tighten(None, int(concurrency))
+
+
+def _filter_value(doi: str) -> str:
+    """A DOI as an OpenAlex filter value: quoted when it holds what separates filters or values."""
+    return f'"{doi}"' if "," in doi or "|" in doi else doi
 
 
 def _by_doi(dois: Collection[str], records: list[Json], field: str) -> dict[str, JsonValue]:

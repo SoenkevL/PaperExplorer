@@ -7,7 +7,13 @@ from typing import Any, Self
 import httpx
 
 from paperexplorer.config import Settings
-from paperexplorer.domain import Attachment, Collection, LibraryChanges, LibraryItem
+from paperexplorer.domain import (
+    COLLECTION_DEPTH,
+    Attachment,
+    Collection,
+    LibraryChanges,
+    LibraryItem,
+)
 from paperexplorer.library.port import ItemNotFoundError, LibraryUnavailableError
 
 logger = logging.getLogger(__name__)
@@ -18,7 +24,6 @@ _STORED = frozenset({"imported_file", "imported_url"})
 # Children of a Library Item, not Library Items themselves.
 _CHILD_TYPES = frozenset({"attachment", "note", "annotation"})
 _PAGE = 100  # the Web API's largest page
-_MAX_DEPTH = 32  # Zotero allows no cycle; a walk up the tree still stops here
 
 
 class ZoteroLibrary:
@@ -244,11 +249,11 @@ def _outside_trash(collections: list[dict[str, Any]]) -> set[str]:
 
     Zotero marks only the Collection the reader trashed, not its subcollections.
     """
-    parent = {c["key"]: c["data"]["parentCollection"] or None for c in collections}
+    parent = {c["key"]: _collection(c).parent_key for c in collections}
     trashed = {c["key"] for c in collections if c["data"].get("deleted")}
 
     def in_trash(key: str | None, depth: int = 0) -> bool:
-        if key is None or depth > _MAX_DEPTH:
+        if key is None or depth > COLLECTION_DEPTH:
             return False
         return key in trashed or in_trash(parent.get(key), depth + 1)
 

@@ -23,6 +23,7 @@ from paperexplorer.store import (
     StageStatuses,
     Works,
     WorkTexts,
+    migrate,
 )
 
 from .test_library import (  # pyright: ignore[reportPrivateUsage]
@@ -358,3 +359,55 @@ def test_a_collection_deleted_with_only_its_own_key_reported_takes_its_subcollec
     sync(store_db, library)
 
     assert [c.key for c in Collections(store_db).list()] == ["PSYCHED1"]
+
+
+def test_a_collection_restored_from_zoteros_trash_comes_back_with_its_branch_and_filing(
+    store_db: Conn,
+) -> None:
+    zotero = SyncingZotero(10, [_zitem("DEEP2222", 5, collections=["TRAINING", "THERAPY2"])])
+    zotero.put_collections(_json("collections.json")[:3])  # Psychedelics > Therapy > Training
+    library = zotero.library()
+    sync(store_db, library)
+    zotero.trash_collection("PSYCHED1")
+    sync(store_db, library)
+
+    zotero.restore_collection("PSYCHED1")  # nothing under it changes version
+    result = sync(store_db, library)
+
+    assert [c.key for c in Collections(store_db).list()] == ["PSYCHED1", "THERAPY2", "TRAINING"]
+    assert _filing(store_db) == {"DEEP2222": ["THERAPY2", "TRAINING"]}
+    assert result.full  # a Collection the store did not hold: read it all once
+
+
+def test_a_subcollection_edited_while_its_parent_is_in_the_trash_stays_gone(
+    store_db: Conn,
+) -> None:
+    zotero = SyncingZotero(10, [])
+    zotero.put_collections(_json("collections.json")[:3])
+    library = zotero.library()
+    sync(store_db, library)
+    zotero.trash_collection("THERAPY2")
+    sync(store_db, library)
+
+    zotero.version += 1
+    zotero.collections["TRAINING"]["version"] = zotero.version
+    zotero.collections["TRAINING"]["data"]["name"] = "Training, renamed"
+    sync(store_db, library)
+
+    assert [c.key for c in Collections(store_db).list()] == ["PSYCHED1"]
+
+
+def test_the_first_sync_after_the_collections_migration_reads_the_whole_library(
+    store_db: Conn,
+) -> None:
+    library = CountingLibrary([_filed("AAAA1111", "METHODS4")])
+    library.put_collection(Collection(key="METHODS4", name="Methods"))
+    sync(store_db, library)
+    store_db.execute("DROP TABLE work_collections, collections")  # as a store before 0009
+    store_db.execute("DELETE FROM schema_migrations WHERE name = '0009_collections.sql'")
+
+    migrate(store_db)
+    result = sync(store_db, library)
+
+    assert result.full and library.asked[-1] is None
+    assert _filing(store_db) == {"AAAA1111": ["METHODS4"]}

@@ -33,6 +33,10 @@ class Attachment(BaseModel):
     filename: str
 
 
+COLLECTION_DEPTH = 32
+"""How deep a walk through the Collection tree goes; Zotero allows no cycle, but a walk stops."""
+
+
 class Collection(BaseModel):
     """A Collection as Zotero records it: its key, its name and the key of its parent, if any."""
 

@@ -372,6 +372,13 @@ class SyncingZotero:
         c["version"] = c["data"]["version"] = self.version
         c["data"]["deleted"] = True
 
+    def restore_collection(self, key: str) -> None:
+        """Zotero desktop's restore from the trash: only that Collection's version moves."""
+        self.version += 1
+        c = self.collections[key]
+        c["version"] = c["data"]["version"] = self.version
+        del c["data"]["deleted"]
+
     def touch(self, key: str) -> None:
         self.version += 1
         self.items[key]["version"] = self.items[key]["data"]["version"] = self.version

@@ -5,9 +5,7 @@ from collections.abc import Iterable
 import psycopg
 from psycopg.rows import TupleRow, class_row
 
-from paperexplorer.domain import Collection, WorkId
-
-MAX_DEPTH = 32  # Zotero allows no cycle; a walk down the tree still stops here
+from paperexplorer.domain import COLLECTION_DEPTH, Collection, WorkId
 
 
 class Collections:
@@ -36,7 +34,7 @@ class Collections:
             " UNION SELECT c.key, b.depth + 1 FROM collections c"
             " JOIN branch b ON c.parent_key = b.key WHERE b.depth < %s)"
             " DELETE FROM collections WHERE key IN (SELECT key FROM branch)",
-            (list(keys), MAX_DEPTH),
+            (list(keys), COLLECTION_DEPTH),
         ).rowcount
 
     def keys(self) -> set[str]:

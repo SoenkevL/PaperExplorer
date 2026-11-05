@@ -15,3 +15,7 @@ CREATE TABLE work_collections (
     PRIMARY KEY (work_id, collection_key)
 );
 CREATE INDEX work_collections_collection_key ON work_collections (collection_key);
+
+-- The next sync reads the whole Library: one reading only what changed would leave the
+-- Collections and Works that did not change unknown.
+DELETE FROM library_sync;

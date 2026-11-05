@@ -61,12 +61,21 @@ def sync(conn: psycopg.Connection[TupleRow], library: Library, *, full: bool = F
     except LibraryUnavailableError as e:
         logger.warning("The Library could not be read (%s); the last copy stands", e)
         return SyncResult(full=False, items=0, removed=0, stale=True)
+    held = collections.keys()
+    if not changes.full and any(c.key not in held for c in changes.collections):
+        # A Collection new to the store may be one restored from the trash, whose subcollections
+        # and filing did not change version: only the whole Library says what it holds.
+        try:
+            changes = library.changes(None)
+        except LibraryUnavailableError as e:
+            logger.warning("The Library could not be read (%s); the last copy stands", e)
+            return SyncResult(full=False, items=0, removed=0, stale=True)
     for collection in changes.collections:
         collections.record(collection)
     gone_collections = set(changes.deleted_collections)
     if changes.full:
         gone_collections |= collections.keys() - {c.key for c in changes.collections}
-    collections.remove(gone_collections)  # their filing goes with them
+    collections_removed = collections.remove(gone_collections)  # their filing goes with them
     known = collections.keys()
     for orphan in (c for c in changes.collections if c.parent_key not in known | {None}):
         logger.warning(
@@ -101,7 +110,9 @@ def sync(conn: psycopg.Connection[TupleRow], library: Library, *, full: bool = F
     removed = sum(works.remove_library_item(key) for key in sorted(gone))
     versions.record(changes.version)
     logger.info(
-        "Library synced to version %d: %d items recorded, %d gone, %d Works removed",
+        "Library synced to version %d: %d items recorded, %d gone, %d Works removed;"
+        " %d Collections recorded, %d removed",
         changes.version, len(items), len(gone), removed,
+        len(changes.collections), collections_removed,
     )  # fmt: skip
     return SyncResult(full=changes.full, items=len(items), removed=removed, moved=moved)

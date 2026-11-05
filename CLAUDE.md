@@ -10,6 +10,7 @@ A reader for following a paper's citations into the cited Works' own words. Text
 - `docs/design-v1.md`: v1 scope and its definition of done.
 - `docs/design-asking.md`: asking the Seed Questions (Pointers, Quotes, the agent, tracing, eval). Read it before touching `asking`, `tracing` or the Conversation routes.
 - `docs/design-resolution.md`: resolving References (Library sync, Registry Checks, limits, cache). Read it before touching `resolution`, `library` sync or the Check routes.
+- `docs/design-collections.md`: Collections in the Library and on the landing page (sync, API, navigator pane, rows). Read it before touching Collections, the landing page or `library_row.html`.
 
 ## Workflow
 

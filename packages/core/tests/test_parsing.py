@@ -6,8 +6,8 @@ from typer.testing import CliRunner
 
 from paperexplorer.cli import app
 from paperexplorer.config import Settings
-from paperexplorer.parsing import Block, CitationMarker, ParsedWork, TextOrigin
-from paperexplorer.parsing.assemble import assemble
+from paperexplorer.parsing import Block, CitationMarker, LinkTarget, ParsedWork, Span, TextOrigin
+from paperexplorer.parsing.assemble import _join_fragments, assemble  # pyright: ignore[reportPrivateUsage]
 from paperexplorer.parsing.grobid import read_tei
 from paperexplorer.parsing.text_layer import TextLayer
 
@@ -279,3 +279,33 @@ def test_a_one_line_entry_merged_with_the_next_is_split_at_the_hanging_indent(
     assert huberman.surnames == ["Huberman", "Hogg"]
     assert any(r.text.startswith("Irisawa S, Isotani T, Yagyu T") for r in work.references)
     assert len(work.references) == len(refs)
+
+
+def test_author_and_year_links_split_by_a_comma_make_one_marker() -> None:
+    # Regression: a PDF (recorded from data/cache VHI7PT4K) links `Brown` and `2020` of
+    # `(Brown, 2020; Kadavath et al., 2022)` separately with `, ` between them; the year stayed a
+    # second marker, so the reader showed the year and the `;` as links of their own.
+    text = "(OpenAI) (Brown, 2020; Kadavath et al., 2022), and Persky (1995) argued"
+    brown = LinkTarget(page=16, reference_id="b4")
+    kadavath = LinkTarget(page=16, reference_id="b22")
+    persky = LinkTarget(page=17, reference_id="b38")
+
+    def linked(part: str, target: LinkTarget) -> CitationMarker:
+        start = text.index(part)
+        return CitationMarker(
+            span=Span(start=start, end=start + len(part)), text=part, link_target=target
+        )
+
+    joined = _join_fragments(
+        [
+            linked("Brown", brown),
+            linked("2020", brown),
+            linked("Kadavath et al.", kadavath),
+            linked("2022", kadavath),
+            linked("Persky", persky),
+            linked("1995", persky),
+        ],
+        text,
+    )
+
+    assert [m.text for m in joined] == ["Brown, 2020", "Kadavath et al., 2022", "Persky (1995"]

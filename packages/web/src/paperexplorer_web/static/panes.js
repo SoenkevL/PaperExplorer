@@ -116,6 +116,20 @@
     return sheet ? sheet.getBoundingClientRect().height / window.innerHeight : 0.5;
   }
 
+  // A Library Match steps through its Citations: each click opens the next, then wraps around.
+  function stepThrough(step) {
+    const ids = step.dataset.citations.split(" ");
+    const next = Number(step.dataset.at ?? -1) + 1;
+    const at = next < ids.length ? next : 0;
+    step.dataset.at = String(at);
+    const pill = Array.from(document.querySelectorAll("a.citation")).find((a) =>
+      new URL(a.href, location.href).searchParams.getAll("c").includes(ids[at]),
+    );
+    if (!pill) return;
+    pill.scrollIntoView({ block: "center", behavior: "smooth" });
+    pill.click();
+  }
+
   document.addEventListener("click", (event) => {
     if (!(event.target instanceof Element)) return;
     const target = event.target;
@@ -126,6 +140,8 @@
     if (close) setPane(close.dataset.pane, false);
     if (target.closest(".drawer-toggle")) setPane("conversation", !isShown("conversation"));
     if (target.closest(".sheet-toggle")) setPane("citation", true);
+    const step = target.closest(".library-match-step");
+    if (step) stepThrough(step);
     // The Citation being opened is marked in the Work until another takes its place.
     const citation = target.closest("a.citation");
     if (citation) {

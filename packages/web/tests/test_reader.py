@@ -13,11 +13,19 @@ from paperexplorer_api.schemas import (
     CitationDetail,
     CitationLink,
     CitationSpan,
+    ConfidenceLevel,
+    LibraryMatch,
     Reference,
+    WorkBrief,
     WorkSummary,
     WorkText,
 )
 from paperexplorer_web.app import create_app
+
+
+def _span(id_: int, start: int, end: int, level: ConfidenceLevel) -> CitationSpan:
+    return CitationSpan(id=id_, start=start, end=end, confidence_level=level, library_match=False)
+
 
 STAGES = {"fetch": "done", "parse": "done", "extract_citations": "done"}
 TEXT = "Therapists <may> need it (Smith, 2020; Jones & Lee, 2021) [1\u20133]."
@@ -35,16 +43,17 @@ WORK = WorkText(
               text="1 Introduction", ocr_confidence=None, citations=[]),
         Block(position=1, kind="paragraph", heading_path=["1 Introduction"], page=1, boxes=[],
               text=TEXT, ocr_confidence=None, citations=[
-                  CitationSpan(id=11, start=25, end=38, confidence_level="certain"),
-                  CitationSpan(id=12, start=39, end=57, confidence_level="low"),
-                  CitationSpan(id=13, start=58, end=60, confidence_level="high"),
-                  CitationSpan(id=14, start=60, end=61, confidence_level="high"),
-                  CitationSpan(id=15, start=60, end=61, confidence_level="unlinked"),
-                  CitationSpan(id=16, start=61, end=63, confidence_level="high"),
+                  _span(11, 25, 38, "certain"),
+                  _span(12, 39, 57, "low"),
+                  _span(13, 58, 60, "high"),
+                  _span(14, 60, 61, "high"),
+                  _span(15, 60, 61, "unlinked"),
+                  _span(16, 61, 63, "high"),
               ]),
         Block(position=2, kind="footnote", heading_path=["1 Introduction"], page=2, boxes=[],
               text="A footnote.", ocr_confidence=None, citations=[]),
     ],
+    library_matches=[],
 )  # fmt: skip
 SMITH = CitationDetail(
     id=11,
@@ -274,3 +283,67 @@ def test_every_script_and_stylesheet_url_carries_its_contents_version() -> None:
     script = next(u for u in urls if "/panes.js" in u)
     served = client.get(script).content
     assert script.endswith(hashlib.sha256(served).hexdigest()[:12])
+
+
+def _with_library_matches(matched: set[int], matches: list[LibraryMatch]) -> WorkText:
+    blocks = [
+        b.model_copy(update={"citations": [
+            c.model_copy(update={"library_match": c.id in matched}) for c in b.citations
+        ]})
+        for b in WORK.blocks
+    ]  # fmt: skip
+    return WORK.model_copy(update={"blocks": blocks, "library_matches": matches})
+
+
+def _held(id_: int, title: str, year: int | None, citations: list[int]) -> LibraryMatch:
+    work = WorkBrief(
+        id=id_, zotero_key=f"HELD{id_:04d}", title=title, creators=[], year=year, doi=None
+    )
+    return LibraryMatch(work=work, citations=citations)
+
+
+def test_a_firmly_linked_citation_to_a_library_match_is_drawn_apart() -> None:
+    # 11 certain, 12 low, 14 high sharing the dash with the Unlinked 15, 16 high
+    work = _with_library_matches({11, 12, 14, 16}, [])
+    page = _reader(work).get("/works/7").text
+
+    links = re.findall(r'<a class="citation ([a-z -]+)"[^>]*>(.*?)</a>', page)
+    assert [(c, html.unescape(t)) for c, t in links] == [
+        ("certain library-match", "(Smith, 2020;"),
+        ("low", "Jones & Lee, 2021)"),  # doubt stays visible
+        ("high", "[1"),
+        ("unlinked", "\u2013"),
+        ("high library-match", "3]"),
+    ]
+    assert "library-match" in _block_html(page, 1)
+    key = re.search(r'<details class="key">(.*?)</details>', page, re.S)
+    assert key and 'class="citation certain library-match"' in key[1]
+
+
+def test_the_citation_pane_lists_the_library_matches_to_step_through() -> None:
+    work = _with_library_matches(
+        {11, 13, 16},
+        [
+            _held(1, "On the training of therapists", 2020, [11, 16]),
+            _held(2, "Untitled", None, [13]),
+        ],
+    )
+    page = _reader(work).get("/works/7").text
+
+    pane = re.search(r'<aside id="citation"[^>]*>(.*?)</aside>', page, re.S)
+    assert pane
+    found = re.search(r'<details class="library-matches"[^>]*>(.*?)</details>', pane[1], re.S)
+    assert found, "no Library Matches list"
+    assert "Library Matches" in found[1]
+    entries = re.findall(
+        r'<button[^>]*data-citations="([^"]+)"[^>]*>(.*?)</button>', found[1], re.S
+    )
+    assert [(c, " ".join(_text(t).split())) for c, t in entries] == [
+        ("11 16", "On the training of therapists (2020) 2 Citations"),
+        ("13", "Untitled 1 Citation"),
+    ]
+    assert found.start() < pane[1].index('id="panel"')
+
+
+def test_a_work_without_library_matches_shows_no_list() -> None:
+    assert "library-matches" not in _reader().get("/works/7").text

@@ -94,6 +94,10 @@ _Avoid_: Bibliography entry, source (see above), citation
 The match of a Reference to a Work, with a confidence.
 _Avoid_: Lookup, linking
 
+**Library Match**:
+A Resolution that matching against the Library made at certain or high confidence: the Reference's Work has a Library Item the reader already holds. A Reader's Choice is not one, even of a Library Item.
+_Avoid_: Known work, in Zotero, library hit
+
 **Registry Check**:
 The reader's request to look one or more References up in Crossref and OpenAlex. It spends their rate limits, so it runs only when the reader asks; matching against the Library never needs one.
 _Avoid_: Lookup, check (alone), query

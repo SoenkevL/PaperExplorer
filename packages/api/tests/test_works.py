@@ -6,9 +6,9 @@ import psycopg
 from fastapi.testclient import TestClient
 from psycopg.rows import TupleRow
 
-from paperexplorer.domain import LibraryItem
+from paperexplorer.domain import Layer, Level, LibraryItem, Resolution, ResolutionState, WorkId
 from paperexplorer.parsing import ParsedWork
-from paperexplorer.store import StageStatuses, Works
+from paperexplorer.store import Resolutions, StageStatuses, Works
 
 from .conftest import Stored
 
@@ -105,3 +105,76 @@ def test_ocr_text_is_marked_as_such(
 
     assert work["text_origin"] == "ocr"
     assert all(b["ocr_confidence"] is not None for b in work["blocks"])
+
+
+def _cited_references(villiger: Stored) -> list[str]:
+    """Reference keys in the order the Work first cites them."""
+    keys = [c.link.reference_id for c in villiger.graph.citations if c.link]
+    return list(dict.fromkeys(keys))
+
+
+def _library_work(conn: Conn, key: str, title: str) -> WorkId:
+    work = Works(conn).ensure(key)
+    Works(conn).record_library_item(work, LibraryItem(key=key, title=title, year=2020))
+    return work
+
+
+def test_a_citation_whose_reference_has_a_library_match_says_so(
+    api: TestClient, villiger: Stored, store_db: Conn
+) -> None:
+    first, second, third, fourth = _cited_references(villiger)[:4]
+    matched = _library_work(store_db, "LIBM0001", "A Work the reader holds")
+    later = _library_work(store_db, "LIBM0002", "Another Work the reader holds")
+    chosen = _library_work(store_db, "LIBM0003", "A Work the reader picked")
+    near = _library_work(store_db, "LIBM0004", "A near title")
+
+    def resolved(ref: str, work: WorkId, level: Level, layer: Layer) -> Resolution:
+        return Resolution(
+            reference=ref, state=ResolutionState.RESOLVED, work=work, level=level, layer=layer
+        )
+
+    for r in (
+        resolved(second, later, Level.CERTAIN, Layer.LIBRARY),
+        resolved(first, matched, Level.HIGH, Layer.LIBRARY),
+        resolved(third, chosen, Level.CERTAIN, Layer.READER),  # a Reader's Choice is not one
+        resolved(fourth, near, Level.LOW, Layer.LIBRARY),  # nor is a low Library match
+    ):
+        Resolutions(store_db).save(villiger.work, r)
+
+    text = api.get(f"/works/{villiger.work}").json()
+
+    spans = {c["id"]: c for b in text["blocks"] for c in b["citations"]}
+    by_reference = {
+        r: [i for i, c in zip(spans, villiger.graph.citations, strict=True)
+            if c.link and c.link.reference_id == r]
+        for r in (first, second)
+    }  # fmt: skip
+    assert {i for i, c in spans.items() if c["library_match"]} == {
+        *by_reference[first],
+        *by_reference[second],
+    }
+    assert [(m["work"]["zotero_key"], m["work"]["title"], m["citations"])
+            for m in text["library_matches"]] == [
+        ("LIBM0001", "A Work the reader holds", by_reference[first]),
+        ("LIBM0002", "Another Work the reader holds", by_reference[second]),
+    ]  # fmt: skip
+
+
+def test_a_library_match_whose_library_item_is_gone_is_not_shown(
+    api: TestClient, villiger: Stored, store_db: Conn
+) -> None:
+    [first] = _cited_references(villiger)[:1]
+    work = _library_work(store_db, "LIBM0001", "Deleted in Zotero since")
+    Resolutions(store_db).save(
+        villiger.work,
+        Resolution(
+            reference=first, state=ResolutionState.RESOLVED, work=work, level=Level.CERTAIN,
+            layer=Layer.LIBRARY,
+        ),
+    )  # fmt: skip
+    Works(store_db).remove_library_item("LIBM0001")  # the Resolution keeps its Work row
+
+    text = api.get(f"/works/{villiger.work}").json()
+
+    assert text["library_matches"] == []
+    assert not any(c["library_match"] for b in text["blocks"] for c in b["citations"])

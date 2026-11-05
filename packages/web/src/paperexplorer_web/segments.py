@@ -16,13 +16,15 @@ class Segment(BaseModel):
     text: str
     citations: list[int]
     confidence_level: ConfidenceLevel | None
+    library_match: bool = False  # only on a firm link, so a doubtful one keeps its warning
 
 
 def segments(text: str, spans: Sequence[CitationSpan]) -> list[Segment]:
     """The text cut at every span boundary; joined back together the pieces are `text` again.
 
     Spans may overlap or coincide (a printed range's dash stands for several Citations), so a
-    piece can belong to several Citations; it carries the weakest of their links.
+    piece can belong to several Citations; it carries the weakest of their links, and is a
+    Library Match when any of them is.
     """
     cuts = sorted(
         {0, len(text)} | {max(0, min(p, len(text))) for s in spans for p in (s.start, s.end)}
@@ -37,6 +39,8 @@ def segments(text: str, spans: Sequence[CitationSpan]) -> list[Segment]:
                 text=text[start:end],
                 citations=[s.id for s in covering],
                 confidence_level=level,
+                library_match=level in ("certain", "high")
+                and any(s.library_match for s in covering),
             )
         )
     return pieces

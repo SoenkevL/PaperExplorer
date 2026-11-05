@@ -23,13 +23,24 @@ services:
     environment:
       PE_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       PE_OLLAMA_BASE_URL: http://host.docker.internal:11434/v1
+      PE_GROBID_URL: http://grobid:8070
       PE_LANGFUSE_BASE_URL: http://host.docker.internal:3000
       PE_LANGFUSE_ENVIRONMENT: tower
       PE_LANGFUSE_RELEASE: ${PE_LANGFUSE_RELEASE:-}
       PE_LOG_FORMAT: json
+      PE_DATA_DIR: /data
+      PE_ZOTERO_STORAGE_DIR: /zotero/storage
+      # Over `.env`'s empty value, which would otherwise hide the image's model and make OCR download it.
+      PE_TESSDATA_DIR: /opt/tessdata
     extra_hosts: ["host.docker.internal:host-gateway"]
     ports: ["8000:8000"]
-    depends_on: { db: { condition: service_healthy } }
+    # The API runs the Stages the reader starts, so it holds what `pipeline` holds.
+    volumes:
+      - ./data:/data
+      - ${ZOTERO_STORAGE_HOST_DIR:-./data/no-zotero}:/zotero/storage:ro
+    depends_on:
+      db: { condition: service_healthy }
+      grobid: { condition: service_started }
     # Healthy once uvicorn answers, so `up --wait` and `web` wait for it, not just for the process.
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
@@ -60,6 +71,13 @@ services:
     image: grobid/grobid:0.9.1-crf
     init: true
     ports: ["127.0.0.1:8070:8070"]
+    # Slow to load its models; a parse started before it answers fails, and the reader resumes.
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8070/api/isalive"]
+      interval: 5s
+      start_period: 120s
+      start_interval: 2s
+      retries: 6
     restart: unless-stopped
 
   pipeline:
@@ -76,6 +94,8 @@ services:
       PE_LANGFUSE_RELEASE: ${PE_LANGFUSE_RELEASE:-}
       PE_DATA_DIR: /data
       PE_ZOTERO_STORAGE_DIR: /zotero/storage
+      # Over `.env`'s empty value, which would otherwise hide the image's model and make OCR download it.
+      PE_TESSDATA_DIR: /opt/tessdata
     extra_hosts: ["host.docker.internal:host-gateway"]
     volumes:
       - ./data:/data

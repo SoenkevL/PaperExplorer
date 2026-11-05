@@ -1,0 +1,5 @@
+{#- A row whose Work could not be read: after an action it says why; a poll keeps asking, as a
+    restart ends soon. -#}
+<li id="work-{{ work_id }}" class="library-row"{% if not message %} hx-get="/works/{{ work_id }}/row" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
+  <p class="failed">{{ message or "The API could not say how this Work stands; asking again." }}</p>
+</li>

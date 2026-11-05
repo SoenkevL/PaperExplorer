@@ -5,6 +5,7 @@ Character offsets count Unicode code points (Python `str` indices), not UTF-16 u
 `text[start:end]` in Python, not JavaScript.
 """
 
+from datetime import datetime
 from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, Field, JsonValue, StringConstraints, model_validator
@@ -65,6 +66,53 @@ class WorkSummary(BaseModel):
     doi: str | None
     text_origin: TextOrigin | None
     stages: dict[str, StageState]
+
+
+# The Stages of Ingesting, which make a Work Ingested, and of resolving its References, in order.
+INGESTING_STAGES = ("fetch", "parse", "chunk", "embed", "extract_citations")
+RESOLVING_STAGES = ("verify_dois", "resolve")
+# Running these replaces the Chunks a Conversation holds.
+TEXT_STAGES = ("parse", "chunk")
+
+
+class StageStatus(BaseModel):
+    """How a Stage's last run for a Work went; a pending Stage has none."""
+
+    state: StageState
+    counts: dict[str, int]
+    error: str | None
+    started_at: datetime
+    finished_at: datetime | None
+
+
+class LibraryWork(WorkSummary):
+    """A Library Item as the reader finds and ingests it, with each Stage's last status."""
+
+    has_pdf: bool
+    # Its Stage Run, `running` between Stages too, until the last has ended.
+    run: Literal["queued", "running"] | None
+    stage_statuses: dict[str, StageStatus]
+
+
+class LibraryPage(BaseModel):
+    """A page of the Library Items found, and how many there are in all."""
+
+    items: list[LibraryWork]
+    total: int
+
+
+class LibrarySynced(BaseModel):
+    """A sync of the Library: items recorded, Works removed, and whether Zotero was out of reach."""
+
+    items: int
+    removed: int
+    stale: bool
+
+
+class Ingest(BaseModel):
+    """Start Ingesting: from `from_stage` on, else from the first Stage not done."""
+
+    from_stage: str | None = None
 
 
 class WorkText(WorkSummary):

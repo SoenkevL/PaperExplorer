@@ -46,18 +46,17 @@ ollama create paperexplorer-chat -f scripts/paperexplorer-chat.Modelfile   # the
 export PE_LANGFUSE_RELEASE=$(git rev-parse --short HEAD)   # the containers have no git
 docker compose up -d        # db, grobid :8070, api :8000, web :8080
 docker compose run --rm pipeline migrate
-for stage in fetch parse chunk embed extract_citations; do
-  docker compose run --rm pipeline run "$stage" YAAC9XCX   # the Seed's Zotero item key
-done
 ```
 
-Redeploy on merges to `dev`: once, on the tower, run `scripts/setup-deploy.sh` from the main checkout. It puts `dev` in its own checkout (`~/Projects/PaperExplorer-dev`, sharing `.env` and `data/`) and installs a post-merge hook; from then on a pull there that brings new commits rebuilds and restarts db, api and web, migrating first. A failed redeploy leaves the pull in place: read `data/redeploy.log` and run `scripts/redeploy.sh` again.
+Everything else happens in the interface, at `http://tower:8080` (on the Mac, `http://localhost:8080`, where a tunnel to the tower's Postgres must be closed first and the Provider is native Ollama or Melious). The index page syncs the Library as it opens: search it, press **Ingest** on a Library Item, and watch its Stages. A run goes on with the tab closed; start several and they wait their turn. **Resume** continues after a failure, ↻ re-runs a done Stage and the ones after it, and **Resolve References** matches an Ingested Work's References against the Library. The CLI still runs single Stages: `docker compose run --rm pipeline run <stage> <zoteroItemKey>`.
+
+Redeploy on merges to `dev`: once, on the tower, run `scripts/setup-deploy.sh` from the main checkout. It puts `dev` in its own checkout (`~/Projects/PaperExplorer-dev`, sharing `.env` and `data/`) and installs a post-merge hook; from then on a pull there that brings new commits rebuilds and restarts db, api and web (with grobid, which api needs), migrating first. A failed redeploy leaves the pull in place: read `data/redeploy.log` and run `scripts/redeploy.sh` again.
 
 ```sh
 ssh tower 'git -C ~/Projects/PaperExplorer-dev pull --ff-only'   # after a PR merges into dev
 ```
 
-Then open `http://tower:8080`: the Seed's page links every Citation to a panel with its Reference, and its sidebar (a drawer on narrower screens) answers Questions about it; a chip after a sentence of an Answer scrolls the reader to the sentence that bears it out.
+Once a Work is Ingested, its page links every Citation to a panel with its Reference, and its sidebar (a drawer on narrower screens) answers Questions about it; a chip after a sentence of an Answer scrolls the reader to the sentence that bears it out.
 
 Search the Seed's Chunks (hybrid: bge-m3 Vectors and English full text, fused by RRF):
 

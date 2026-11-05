@@ -12,7 +12,8 @@ from paperexplorer_api import schemas
 from paperexplorer_api.routes import Connections
 
 
-def _summary(work: Work, statuses: StageStatuses) -> schemas.WorkSummary:
+def work_summary(work: Work, statuses: StageStatuses) -> schemas.WorkSummary:
+    """The Work's snapshot and where each Stage stands."""
     ran = statuses.for_work(work.id)
     return schemas.WorkSummary(
         id=work.id,
@@ -34,7 +35,7 @@ def router(connections: Connections) -> APIRouter:
     def list_works() -> list[schemas.WorkSummary]:  # pyright: ignore[reportUnusedFunction]
         with connections() as conn:
             statuses = StageStatuses(conn)
-            return [_summary(w, statuses) for w in Works(conn).with_stage_runs()]
+            return [work_summary(w, statuses) for w in Works(conn).with_stage_runs()]
 
     @routes.get("/{work_id}")
     def get_work(work_id: int) -> schemas.WorkText:  # pyright: ignore[reportUnusedFunction]
@@ -56,7 +57,7 @@ def router(connections: Connections) -> APIRouter:
                         confidence_level=confidence_level(c.link).value,
                     )
                 )
-            summary = _summary(work, StageStatuses(conn))
+            summary = work_summary(work, StageStatuses(conn))
         blocks = [
             schemas.Block(
                 position=i,

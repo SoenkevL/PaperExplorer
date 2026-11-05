@@ -1,0 +1,5 @@
+{#- Rows of the Library, then the button loading the next page in its own place. -#}
+{% for row in library.rows %}{% include "library_row.html" %}{% endfor %}
+{% if library.more_url %}
+<li class="more"><button type="button" hx-get="{{ library.more_url }}" hx-target="closest li" hx-swap="outerHTML">Load more</button></li>
+{% endif %}

@@ -50,9 +50,11 @@ def merge(conn: psycopg.Connection[TupleRow], library: Library, keep: Work, othe
 def sync(conn: psycopg.Connection[TupleRow], library: Library, *, full: bool = False) -> SyncResult:
     """Bring the Works up to date with the Library, reading only its changes after the first.
 
-    Runs in the caller's transaction. A Library that cannot be reached leaves the last copy.
+    Runs in the caller's transaction, which holds a lock until it ends: another sync waits for it,
+    then reads only what changed after it. A Library that cannot be reached leaves the last copy.
     """
     versions, works = LibraryVersions(conn), Works(conn)
+    versions.lock()
     since = None if full else versions.last()
     try:
         changes = library.changes(since)

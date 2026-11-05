@@ -1,5 +1,6 @@
 """Registry Checks of a Work or one Reference, Readers' Choices, and Duplicate Items."""
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
@@ -79,7 +80,7 @@ def router(connections: Connections, checking: Checking) -> APIRouter:
     ) -> AsyncIterator[ServerSentEvent]:
         work, refs = found
         with connections() as conn:
-            synced(conn)
+            await asyncio.to_thread(synced, conn)
             events = resolution.registry_check(
                 conn, work, refs, checking.registries(), refresh=check.refresh if check else False
             )
@@ -98,7 +99,7 @@ def router(connections: Connections, checking: Checking) -> APIRouter:
     ) -> schemas.CheckedReference:
         work, ref = found
         with connections() as conn:
-            synced(conn)
+            await asyncio.to_thread(synced, conn)
             checked: Resolution | None = None
             stopped: str | None = None
             try:

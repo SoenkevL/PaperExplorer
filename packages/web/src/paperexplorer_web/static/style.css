@@ -179,6 +179,21 @@ button { font: inherit; color: inherit; }
 .works .byline { display: block; font-size: 13px; margin-top: 0.2rem; }
 .stages { display: flex; flex-wrap: wrap; gap: 0.2rem 0.8rem; margin-top: 0.3rem; font: 11px var(--mono); color: var(--muted); }
 .stage.failed { color: var(--danger); }
+.stage.done { color: var(--accent); }
+.stage.running { color: var(--ink); font-weight: 600; }
+.library { margin-top: 1.5rem; }
+.library-tools { display: flex; gap: 0.5rem; }
+.library-tools input { flex: 1 1 auto; min-width: 0; padding: 0.4rem 0.6rem; font: inherit; color: var(--ink); background: transparent; border: 1px solid var(--rule); border-radius: 6px; }
+.library-row .title { font: 600 1.05rem/1.35 var(--serif); }
+.library p.failed { color: var(--danger); overflow-wrap: anywhere; }
+.library-row p.failed { margin: 0.3rem 0 0; font-size: 13px; }
+.library-row .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.4rem; }
+.library-row .actions:empty { display: none; }
+.library-row .note { display: block; font-size: 12px; }
+.library-row .run { display: inline; font-family: var(--mono); }
+.rerun { margin-left: 0.2rem; padding: 0 0.25rem; font: inherit; color: var(--muted); background: none; border: none; cursor: pointer; }
+.rerun:hover { color: var(--accent); }
+.works .more { text-align: center; }
 
 /* The reader: three panes. Below 80rem the Citation pane is a bottom sheet, below 64rem the
    Conversation a drawer. panes.js sets .no-conversation / .no-citation on .reader. */

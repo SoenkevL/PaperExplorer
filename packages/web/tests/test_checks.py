@@ -352,10 +352,10 @@ def _items(fragment: str) -> list[str]:
     return [_text(li) for li in re.findall(r"<li class=\"duplicate[^>]*>.*?</li>", fragment, re.S)]
 
 
-def test_the_index_shows_duplicate_items_the_standing_item_first() -> None:
+def test_duplicate_items_show_the_standing_item_first() -> None:
     web, _ = _web({("GET", "/duplicates"): _json([PAIR])})
 
-    page = web.get("/").text
+    page = web.get("/duplicates").text
 
     assert "Duplicate Items" in page
     standing, twin = _items(page)
@@ -367,15 +367,14 @@ def test_the_index_shows_duplicate_items_the_standing_item_first() -> None:
     assert _buttons(section[0]) == ["Let stand", "Merge into SMIT2020"]
 
 
-def test_without_duplicate_items_or_their_route_the_index_shows_none() -> None:
+def test_without_duplicate_items_or_their_route_none_show() -> None:
     none, _ = _web({("GET", "/duplicates"): _json([])})
     unserved, _ = _web()
 
     for web in (none, unserved):
-        page = web.get("/")
+        page = web.get("/duplicates")
         assert page.status_code == 200
         assert "Duplicate Items" not in page.text
-        assert 'href="/works/7"' in page.text
 
 
 def test_letting_an_item_stand_shows_the_items_as_they_now_stand() -> None:
@@ -397,7 +396,9 @@ def test_a_merge_asks_the_reader_first_then_merges_in_zotero() -> None:
         return httpx.Response(200, json={"moved": 3})
 
     web, _ = _web({("POST", "/duplicates/merge"): merge, ("GET", "/duplicates"): _json([PAIR])})
-    button = re.search(r"<button[^>]*hx-post=\"/duplicates/merge\"[^>]*>", web.get("/").text)
+    button = re.search(
+        r"<button[^>]*hx-post=\"/duplicates/merge\"[^>]*>", web.get("/duplicates").text
+    )
     assert button
     confirm = html.unescape(re.search(r'hx-confirm="([^"]*)"', button[0])[1])  # pyright: ignore[reportOptionalSubscript]
     assert "TWIN2020" in confirm and "SMIT2020" in confirm and "trash" in confirm

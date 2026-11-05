@@ -1,0 +1,27 @@
+{#- One Library Item: its Stages, what it offers, and a poll while a Stage Run holds it. Swapped whole. -#}
+{%- set w = row.work -%}
+<li id="work-{{ w.id }}" class="library-row"{% if row.polling %} hx-get="/works/{{ w.id }}/row" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
+  {% if w.text_origin %}<a href="/works/{{ w.id }}">{{ w.title or w.zotero_key }}</a>
+  {% else %}<span class="title">{{ w.title or w.zotero_key }}</span>{% endif %}
+  <span class="byline">{{ w.creators | join("; ") }}{% if w.year %} ({{ w.year }}){% endif %}</span>
+  {% if not w.has_pdf %}
+  <span class="note">no PDF</span>
+  {% else %}
+  <span class="stages">
+    {% for stage in row.shown_stages %}
+    <span class="stage {{ w.stages[stage] }}">{{ stage }}: {{ w.stages[stage] }}
+      {%- if stage in row.rerun_confirms %}
+      <button type="button" class="rerun" aria-label="Re-run {{ stage }}" title="Re-run {{ stage }}" hx-post="/works/{{ w.id }}/ingesting" hx-vals='{{ {"from_stage": stage} | tojson }}' hx-target="closest li" hx-swap="outerHTML" hx-confirm="{{ row.rerun_confirms[stage] }}">↻</button>
+      {%- endif %}</span>
+    {% endfor %}
+  </span>
+  {% endif %}
+  {% for error in row.errors %}<p class="failed">{{ error }}</p>{% endfor %}
+  {% if row.message %}<p class="failed">{{ row.message }}</p>{% endif %}
+  <span class="actions">
+    {% if w.run %}<span class="note run">{{ w.run }}</span>{% endif %}
+    {% if w.run == "queued" %}<button type="button" hx-delete="/works/{{ w.id }}/stage-run" hx-target="closest li" hx-swap="outerHTML">Cancel</button>{% endif %}
+    {% if row.start_label %}<button type="button" hx-post="/works/{{ w.id }}/ingesting" hx-target="closest li" hx-swap="outerHTML">{{ row.start_label }}</button>{% endif %}
+    {% if row.resolve_label %}<button type="button" hx-post="/works/{{ w.id }}/resolving" hx-target="closest li" hx-swap="outerHTML">{{ row.resolve_label }}</button>{% endif %}
+  </span>
+</li>

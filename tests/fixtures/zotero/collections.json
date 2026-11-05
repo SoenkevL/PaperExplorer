@@ -1,0 +1,183 @@
+[
+  {
+    "key": "PSYCHED1",
+    "version": 40,
+    "library": {
+      "type": "user",
+      "id": 1234567,
+      "name": "reader",
+      "links": {
+        "alternate": {
+          "href": "https://www.zotero.org/reader",
+          "type": "text/html"
+        }
+      }
+    },
+    "links": {
+      "self": {
+        "href": "https://api.zotero.org/users/1234567/collections/PSYCHED1",
+        "type": "application/json"
+      },
+      "alternate": {
+        "href": "https://www.zotero.org/reader/collections/PSYCHED1",
+        "type": "text/html"
+      }
+    },
+    "meta": {
+      "numCollections": 1,
+      "numItems": 3
+    },
+    "data": {
+      "key": "PSYCHED1",
+      "version": 40,
+      "name": "Psychedelics",
+      "parentCollection": false,
+      "relations": {}
+    }
+  },
+  {
+    "key": "THERAPY2",
+    "version": 41,
+    "library": {
+      "type": "user",
+      "id": 1234567,
+      "name": "reader",
+      "links": {
+        "alternate": {
+          "href": "https://www.zotero.org/reader",
+          "type": "text/html"
+        }
+      }
+    },
+    "links": {
+      "self": {
+        "href": "https://api.zotero.org/users/1234567/collections/THERAPY2",
+        "type": "application/json"
+      },
+      "alternate": {
+        "href": "https://www.zotero.org/reader/collections/THERAPY2",
+        "type": "text/html"
+      }
+    },
+    "meta": {
+      "numCollections": 1,
+      "numItems": 2
+    },
+    "data": {
+      "key": "THERAPY2",
+      "version": 41,
+      "name": "Therapy",
+      "parentCollection": "PSYCHED1",
+      "relations": {}
+    }
+  },
+  {
+    "key": "TRAINING",
+    "version": 42,
+    "library": {
+      "type": "user",
+      "id": 1234567,
+      "name": "reader",
+      "links": {
+        "alternate": {
+          "href": "https://www.zotero.org/reader",
+          "type": "text/html"
+        }
+      }
+    },
+    "links": {
+      "self": {
+        "href": "https://api.zotero.org/users/1234567/collections/TRAINING",
+        "type": "application/json"
+      },
+      "alternate": {
+        "href": "https://www.zotero.org/reader/collections/TRAINING",
+        "type": "text/html"
+      }
+    },
+    "meta": {
+      "numCollections": 0,
+      "numItems": 1
+    },
+    "data": {
+      "key": "TRAINING",
+      "version": 42,
+      "name": "Training",
+      "parentCollection": "THERAPY2",
+      "relations": {}
+    }
+  },
+  {
+    "key": "OLDREAD5",
+    "version": 43,
+    "library": {
+      "type": "user",
+      "id": 1234567,
+      "name": "reader",
+      "links": {
+        "alternate": {
+          "href": "https://www.zotero.org/reader",
+          "type": "text/html"
+        }
+      }
+    },
+    "links": {
+      "self": {
+        "href": "https://api.zotero.org/users/1234567/collections/OLDREAD5",
+        "type": "application/json"
+      },
+      "alternate": {
+        "href": "https://www.zotero.org/reader/collections/OLDREAD5",
+        "type": "text/html"
+      }
+    },
+    "meta": {
+      "numCollections": 1,
+      "numItems": 0
+    },
+    "data": {
+      "key": "OLDREAD5",
+      "version": 43,
+      "name": "Old reading",
+      "parentCollection": false,
+      "relations": {},
+      "deleted": true
+    }
+  },
+  {
+    "key": "OLDSUB66",
+    "version": 44,
+    "library": {
+      "type": "user",
+      "id": 1234567,
+      "name": "reader",
+      "links": {
+        "alternate": {
+          "href": "https://www.zotero.org/reader",
+          "type": "text/html"
+        }
+      }
+    },
+    "links": {
+      "self": {
+        "href": "https://api.zotero.org/users/1234567/collections/OLDSUB66",
+        "type": "application/json"
+      },
+      "alternate": {
+        "href": "https://www.zotero.org/reader/collections/OLDSUB66",
+        "type": "text/html"
+      }
+    },
+    "meta": {
+      "numCollections": 0,
+      "numItems": 2
+    },
+    "data": {
+      "key": "OLDSUB66",
+      "version": 44,
+      "name": "Older still",
+      "parentCollection": "OLDREAD5",
+      "relations": {}
+    }
+  }
+]

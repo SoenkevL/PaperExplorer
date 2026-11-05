@@ -7,7 +7,7 @@ from typing import Any, Self
 import httpx
 
 from paperexplorer.config import Settings
-from paperexplorer.domain import Attachment, LibraryChanges, LibraryItem
+from paperexplorer.domain import Attachment, Collection, LibraryChanges, LibraryItem
 from paperexplorer.library.port import ItemNotFoundError, LibraryUnavailableError
 
 logger = logging.getLogger(__name__)
@@ -18,6 +18,7 @@ _STORED = frozenset({"imported_file", "imported_url"})
 # Children of a Library Item, not Library Items themselves.
 _CHILD_TYPES = frozenset({"attachment", "note", "annotation"})
 _PAGE = 100  # the Web API's largest page
+_MAX_DEPTH = 32  # Zotero allows no cycle; a walk up the tree still stops here
 
 
 class ZoteroLibrary:
@@ -55,10 +56,12 @@ class ZoteroLibrary:
         return _library_item(self._raw(key), self._children(key))
 
     def changes(self, since: int | None) -> LibraryChanges:
-        """Zotero's sync: items changed since a version, then the trashed and deleted keys.
+        """Zotero's sync: items and Collections changed since a version, then those that went.
 
         A full read takes each item's PDF from the attachments in the same listing; after one,
         a changed item's children are read, and so is an attachment's parent that did not change.
+        A trashed Collection counts as deleted, and a full read leaves out its subcollections too,
+        which Zotero does not mark.
         """
         try:
             return self._changes(since)
@@ -66,7 +69,10 @@ class ZoteroLibrary:
             raise LibraryUnavailableError(f"Zotero could not say what changed: {e!r}") from e
 
     def _changes(self, since: int | None) -> LibraryChanges:
-        version, listed = self._listing(since)
+        version, listed = self._listing("/items", since)
+        _, listed_collections = self._listing("/collections", since)
+        collections = [c for c in listed_collections if not c["data"].get("deleted")]
+        trashed = [c["key"] for c in listed_collections if c["data"].get("deleted")]
         regular = {i["key"]: i for i in listed if _is_regular(i)}
         children: dict[str, list[dict[str, Any]]] = {}
         for i in listed:
@@ -74,7 +80,13 @@ class ZoteroLibrary:
                 children.setdefault(parent, []).append(i)
         if since is None:
             items = [_library_item(i, children.get(k, [])) for k, i in regular.items()]
-            return LibraryChanges(version=version, items=items, full=True)
+            live = _outside_trash(listed_collections)
+            return LibraryChanges(
+                version=version,
+                items=items,
+                collections=[_collection(c) for c in collections if c["key"] in live],
+                full=True,
+            )
         for parent in children.keys() - regular.keys():
             response = self._api.get(f"/items/{parent}")
             if response.status_code == 404:  # the attachment's parent went too
@@ -89,8 +101,15 @@ class ZoteroLibrary:
         trash.raise_for_status()
         deleted = self._api.get("/deleted", params={"since": since})
         deleted.raise_for_status()
-        gone = [k for k in trash.text.split() if k] + deleted.json().get("items", [])
-        return LibraryChanges(version=version, items=items, deleted=gone)
+        answer: dict[str, list[str]] = deleted.json()
+        gone = [k for k in trash.text.split() if k] + answer.get("items", [])
+        return LibraryChanges(
+            version=version,
+            items=items,
+            deleted=gone,
+            collections=[_collection(c) for c in collections],
+            deleted_collections=trashed + answer.get("collections", []),
+        )
 
     def merge(self, keep: str, other: str) -> None:
         """Zotero desktop's merge of `other` into `keep`, then `other` to the trash.
@@ -144,10 +163,10 @@ class ZoteroLibrary:
         """An item's Zotero URI, as relations name it."""
         return f"http://zotero.org{self._api.base_url.path.rstrip('/')}/items/{key}"
 
-    def _listing(self, since: int | None) -> tuple[int, list[dict[str, Any]]]:
-        """Every item changed since a version, page by page, and the version of the first page.
+    def _listing(self, path: str, since: int | None) -> tuple[int, list[dict[str, Any]]]:
+        """Every item or Collection changed since a version, paged, and the first page's version.
 
-        Items edited mid-read carry a later version, so the next sync reads them again.
+        Those edited mid-read carry a later version, so the next sync reads them again.
         """
         params: dict[str, str | int] = {"format": "json", "limit": _PAGE}
         if since is not None:
@@ -155,7 +174,7 @@ class ZoteroLibrary:
         listed: list[dict[str, Any]] = []
         version: int | None = None
         while True:
-            response = self._api.get("/items", params=params | {"start": len(listed)})
+            response = self._api.get(path, params=params | {"start": len(listed)})
             response.raise_for_status()
             if version is None:
                 version = int(response.headers["Last-Modified-Version"])
@@ -208,7 +227,32 @@ def _library_item(item: dict[str, Any], children: list[dict[str, Any]]) -> Libra
         replaces=[
             u.rsplit("/", 1)[-1] for u in _uris(data.get("relations", {}).get("dc:replaces", []))
         ],
+        collections=data.get("collections", []),
     )
+
+
+def _collection(collection: dict[str, Any]) -> Collection:
+    """A Web API Collection; Zotero's `parentCollection` is `false` for a root."""
+    data: dict[str, Any] = collection["data"]
+    return Collection(
+        key=data["key"], name=data["name"], parent_key=data["parentCollection"] or None
+    )
+
+
+def _outside_trash(collections: list[dict[str, Any]]) -> set[str]:
+    """The keys of the Collections neither trashed nor under a trashed one.
+
+    Zotero marks only the Collection the reader trashed, not its subcollections.
+    """
+    parent = {c["key"]: c["data"]["parentCollection"] or None for c in collections}
+    trashed = {c["key"] for c in collections if c["data"].get("deleted")}
+
+    def in_trash(key: str | None, depth: int = 0) -> bool:
+        if key is None or depth > _MAX_DEPTH:
+            return False
+        return key in trashed or in_trash(parent.get(key), depth + 1)
+
+    return {key for key in parent if not in_trash(key)}
 
 
 def _uris(value: str | list[str]) -> list[str]:

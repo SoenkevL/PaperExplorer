@@ -20,6 +20,10 @@ _Avoid_: Zotero entry, record
 The reader's Zotero library: every Library Item in it, whether or not an Exploration uses it.
 _Avoid_: Zotero, collection
 
+**Collection**:
+A named group of Library Items in the Library, as Zotero records it. A Collection may hold other Collections, to any depth; a Library Item may sit in several Collections or in none.
+_Avoid_: Folder, shelf, group, tag
+
 **Duplicate Items**:
 Two or more Library Items that hold one DOI: one Work recorded twice in the Library. One of them is its Standing Item; merging them in Zotero leaves one. Not Versions, which are distinct Works.
 _Avoid_: Duplicate Work, copy, twin
@@ -29,7 +33,7 @@ The one of a Work's Duplicate Items that stands for its DOI, the one its Resolut
 _Avoid_: Stand-in, primary, master, chosen item
 
 **Exploration**:
-The reading of one Seed together with the Works it cites, mirrored as one Zotero collection.
+The reading of one Seed together with the Works it cites, mirrored as one Collection.
 _Avoid_: Project, session, collection (when meaning the domain concept)
 
 **Seed**:

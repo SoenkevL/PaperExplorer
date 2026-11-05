@@ -282,7 +282,7 @@ def test_a_one_line_entry_merged_with_the_next_is_split_at_the_hanging_indent(
 
 
 def test_author_and_year_links_split_by_a_comma_make_one_marker() -> None:
-    # Regression: a PDF (recorded from data/cache VHI7PT4K) links `Brown` and `2020` of
+    # Regression: modelled on a PDF (the cached Work VHI7PT4K) that links `Brown` and `2020` of
     # `(Brown, 2020; Kadavath et al., 2022)` separately with `, ` between them; the year stayed a
     # second marker, so the reader showed the year and the `;` as links of their own.
     text = "(OpenAI) (Brown, 2020; Kadavath et al., 2022), and Persky (1995) argued"

@@ -61,10 +61,9 @@
     <p class="legend">Cited Works already in your Library. Click one to step through its Citations.</p>
     <ul>
       {% for m in work.library_matches %}
-      {%- set n = m.citations | length -%}
       <li><button type="button" class="library-match-step" data-citations="{{ m.citations | join(' ') }}">
         <span class="title">{{ m.work.title or m.work.zotero_key }}</span>{% if m.work.year %} <span class="year">({{ m.work.year }})</span>{% endif %}
-        <span class="count">{{ n }} Citation{{ '' if n == 1 else 's' }}</span>
+        <span class="count">{{ plural(m.citations | length, "Citation", "Citations") }}</span>
       </button></li>
       {% endfor %}
     </ul>

@@ -11,15 +11,12 @@ _WEAKEST_FIRST: list[ConfidenceLevel] = ["unlinked", "low", "high", "certain"]
 
 
 class Segment(BaseModel):
-    """A run of the block's text and the Citations whose spans cover all of it.
-
-    `library_match` is drawn only on a firm link, so a doubtful one keeps its warning.
-    """
+    """A run of the block's text and the Citations whose spans cover all of it."""
 
     text: str
     citations: list[int]
     confidence_level: ConfidenceLevel | None
-    library_match: bool = False
+    library_match: bool = False  # only on a firm link, so a doubtful one keeps its warning
 
 
 def segments(text: str, spans: Sequence[CitationSpan]) -> list[Segment]:

@@ -40,6 +40,9 @@ class CitationSpan(BaseModel):
     start: int
     end: int
     confidence_level: ConfidenceLevel
+    library_match: bool = Field(
+        description="Its Reference has a Library Match: the reader holds the cited Work."
+    )
 
 
 class Block(BaseModel):
@@ -115,12 +118,6 @@ class Ingest(BaseModel):
     from_stage: str | None = None
 
 
-class WorkText(WorkSummary):
-    """A Work with its text: blocks in reading order, each with its Citation spans."""
-
-    blocks: list[Block]
-
-
 class WorkBrief(BaseModel):
     """A Work a Resolution names: its Library Item, or a registry's record until it has one."""
 
@@ -130,6 +127,20 @@ class WorkBrief(BaseModel):
     creators: list[str]
     year: int | None
     doi: str | None
+
+
+class LibraryMatch(BaseModel):
+    """A cited Work the reader holds in the Library, with its Citations in reading order."""
+
+    work: WorkBrief
+    citations: list[int]
+
+
+class WorkText(WorkSummary):
+    """A Work with its text: blocks in reading order, each with its Citation spans."""
+
+    blocks: list[Block]
+    library_matches: list[LibraryMatch]
 
 
 class Resolution(BaseModel):

@@ -141,6 +141,15 @@ class Resolution(BaseModel):
             return True
         return self.state is ResolutionState.RESOLVED and self.level is not Level.LOW
 
+    @property
+    def library_match(self) -> bool:
+        """Matched against the Library at certain or high: a Library Match."""
+        return (
+            self.layer is Layer.LIBRARY
+            and self.state is ResolutionState.RESOLVED
+            and self.level in (Level.CERTAIN, Level.HIGH)
+        )
+
     @model_validator(mode="after")
     def _resolved_has_its_work(self) -> Self:
         resolved = self.state is ResolutionState.RESOLVED

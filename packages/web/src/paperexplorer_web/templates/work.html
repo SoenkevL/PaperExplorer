@@ -23,6 +23,7 @@
     <p class="legend">A Citation is drawn as a pill around its printed text; click one for its Reference.</p>
     <ul class="legend">
       <li><span class="citation certain">filled</span> linked</li>
+      <li><span class="citation certain library-match">indigo</span> linked to a Work in your Library</li>
       <li><span class="citation low">outlined</span> linked with low confidence</li>
       <li><span class="citation unlinked">dotted</span> an Unlinked Citation</li>
     </ul>
@@ -39,7 +40,7 @@
   {%- if b.ocr_confidence is not none %} title="OCR confidence {{ '%.2f' | format(b.ocr_confidence) }}"{% endif %}>
   {%- for s in v.segments -%}
   {%- if s.citations -%}
-  <a class="citation {{ s.confidence_level }}" href="{{ panel_url(work.id, s.citations) }}" hx-get="{{ panel_url(work.id, s.citations) }}" hx-target="#panel" hx-push-url="false">{{ s.text }}</a>
+  <a class="citation {{ s.confidence_level }}{% if s.library_match %} library-match{% endif %}" href="{{ panel_url(work.id, s.citations) }}" hx-get="{{ panel_url(work.id, s.citations) }}" hx-target="#panel" hx-push-url="false">{{ s.text }}</a>
   {%- else -%}
   {{ s.text }}
   {%- endif -%}
@@ -54,6 +55,21 @@
     <h2>Citation</h2>
     <button class="pane-close" type="button" data-pane="citation" aria-label="Close the Citation pane">×</button>
   </header>
+  {% if work.library_matches %}
+  <details class="library-matches" open>
+    <summary>Library Matches <span class="count">{{ work.library_matches | length }}</span></summary>
+    <p class="legend">Cited Works already in your Library. Click one to step through its Citations.</p>
+    <ul>
+      {% for m in work.library_matches %}
+      {%- set n = m.citations | length -%}
+      <li><button type="button" class="library-match-step" data-citations="{{ m.citations | join(' ') }}">
+        <span class="title">{{ m.work.title or m.work.zotero_key }}</span>{% if m.work.year %} <span class="year">({{ m.work.year }})</span>{% endif %}
+        <span class="count">{{ n }} Citation{{ '' if n == 1 else 's' }}</span>
+      </button></li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
   <p class="hint">Click a Citation in the Work to see its Reference.</p>
   <div id="panel" class="panel" aria-live="polite"></div>
 </aside>

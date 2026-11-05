@@ -7,9 +7,10 @@ from fastapi import APIRouter, HTTPException
 from paperexplorer.citations import confidence_level
 from paperexplorer.domain import Work, WorkId
 from paperexplorer.pipeline import STAGES
-from paperexplorer.store import CitationGraphs, StageStatuses, Works, WorkTexts
+from paperexplorer.store import CitationGraphs, Resolutions, StageStatuses, Works, WorkTexts
 from paperexplorer_api import schemas
-from paperexplorer_api.routes import Connections
+from paperexplorer_api.routes import Conn, Connections
+from paperexplorer_api.routes.views import brief
 
 
 def work_summary(work: Work, statuses: StageStatuses) -> schemas.WorkSummary:
@@ -25,6 +26,17 @@ def work_summary(work: Work, statuses: StageStatuses) -> schemas.WorkSummary:
         text_origin=work.text_origin.value if work.text_origin else None,
         stages={s: ran[s].state.value if s in ran else "pending" for s in STAGES},
     )
+
+
+def _held_works(conn: Conn, work: WorkId) -> dict[str, Work]:
+    """The Work each Reference's Library Match names, by Reference key, while it has its Item."""
+    works = Works(conn)
+    held: dict[str, Work] = {}
+    for r in Resolutions(conn).for_work(work):
+        found = works.get(r.work) if r.library_match and r.work is not None else None
+        if found is not None and found.zotero_key is not None:
+            held[r.reference] = found
+    return held
 
 
 def router(connections: Connections) -> APIRouter:
@@ -46,15 +58,24 @@ def router(connections: Connections) -> APIRouter:
             parsed = WorkTexts(conn).get(work.id)
             if parsed is None:
                 raise HTTPException(404, f"Work {work_id} has no text yet; run parse")
+            held = _held_works(conn, work.id)
+            matches: dict[WorkId, schemas.LibraryMatch] = {}
             spans: defaultdict[int, list[schemas.CitationSpan]] = defaultdict(list)
             for stored in CitationGraphs(conn).for_work(work.id):
                 c = stored.citation
+                cited = held.get(c.link.reference_id) if c.link else None
+                if cited is not None:
+                    match = matches.setdefault(
+                        cited.id, schemas.LibraryMatch(work=brief(cited), citations=[])
+                    )
+                    match.citations.append(stored.id)
                 spans[c.block].append(
                     schemas.CitationSpan(
                         id=stored.id,
                         start=c.span.start,
                         end=c.span.end,
                         confidence_level=confidence_level(c.link).value,
+                        library_match=cited is not None,
                     )
                 )
             summary = work_summary(work, StageStatuses(conn))
@@ -71,6 +92,8 @@ def router(connections: Connections) -> APIRouter:
             )
             for i, b in enumerate(parsed.blocks)
         ]
-        return schemas.WorkText(**summary.model_dump(), blocks=blocks)
+        return schemas.WorkText(
+            **summary.model_dump(), blocks=blocks, library_matches=list(matches.values())
+        )
 
     return routes

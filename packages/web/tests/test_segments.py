@@ -3,7 +3,7 @@ from paperexplorer_web.segments import segments
 
 
 def _span(id_: int, start: int, end: int, level: ConfidenceLevel = "high") -> CitationSpan:
-    return CitationSpan(id=id_, start=start, end=end, confidence_level=level)
+    return CitationSpan(id=id_, start=start, end=end, confidence_level=level, library_match=False)
 
 
 def test_text_without_citations_is_one_plain_segment() -> None:

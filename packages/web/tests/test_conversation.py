@@ -17,6 +17,7 @@ from paperexplorer_api.schemas import (
     AnswerSentence,
     Block,
     CitationSpan,
+    ConfidenceLevel,
     DeltaEvent,
     ErrorEvent,
     HandlePiece,
@@ -29,6 +30,11 @@ from paperexplorer_api.schemas import (
 )
 from paperexplorer_web.app import create_app, templates
 from paperexplorer_web.relay import PendingQuestion, Views, relay
+
+
+def _span(id_: int, start: int, end: int, level: ConfidenceLevel) -> CitationSpan:
+    return CitationSpan(id=id_, start=start, end=end, confidence_level=level, library_match=False)
+
 
 BLOCK = "Entropy rose after psilocybin (Smith, 2020). It fell after placebo."
 WORK = WorkText(
@@ -45,8 +51,9 @@ WORK = WorkText(
               text="1 Introduction", ocr_confidence=None, citations=[]),
         Block(position=1, kind="paragraph", heading_path=["1 Introduction"], page=1, boxes=[],
               text=BLOCK, ocr_confidence=None,
-              citations=[CitationSpan(id=11, start=30, end=43, confidence_level="certain")]),
+              citations=[_span(11, 30, 43, "certain")]),
     ],
+    library_matches=[],
 )  # fmt: skip
 
 

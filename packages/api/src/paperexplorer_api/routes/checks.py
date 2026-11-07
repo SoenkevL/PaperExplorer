@@ -17,7 +17,7 @@ from paperexplorer.parsing import Reference
 from paperexplorer.store import ReadersChoices, Resolutions, Works, WorkTexts
 from paperexplorer_api import schemas
 from paperexplorer_api.routes import Conn, Connections
-from paperexplorer_api.routes.views import brief, resolution_view
+from paperexplorer_api.routes.views import brief, refile, resolution_view
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,10 @@ class Checking:
 
 
 def router(connections: Connections, checking: Checking) -> APIRouter:
-    """Routes under `/works/{id}/checks`, `/works/{id}/references` and `/duplicates`."""
+    """Routes under `/works/{id}/checks`, `/works/{id}/references` and `/duplicates`.
+
+    A Check or a Reader's Choice files what it changed for the Work's Exploration, if it has one.
+    """
     routes = APIRouter(tags=["checks"])
 
     def references(work_id: int) -> tuple[WorkId, list[Reference]]:
@@ -91,6 +94,8 @@ def router(connections: Connections, checking: Checking) -> APIRouter:
             except resolution.RegistryError as e:
                 sent = schemas.CheckErrorEvent(message=f"Check stopped: {e}; what landed is kept")
                 yield ServerSentEvent(event=sent.type, raw_data=sent.model_dump_json())
+            finally:
+                await asyncio.to_thread(refile, conn, checking.library, work)
 
     @routes.post("/works/{work_id}/references/{key}/checks")
     async def check_reference(  # pyright: ignore[reportUnusedFunction]
@@ -116,6 +121,7 @@ def router(connections: Connections, checking: Checking) -> APIRouter:
                         stopped = event.message
             except resolution.RegistryError as e:
                 stopped = f"Check stopped: {e}"
+            await asyncio.to_thread(refile, conn, checking.library, work)
             view = resolution_view(conn, checked) if checked else None
         return schemas.CheckedReference(resolution=view, stopped=stopped)
 
@@ -133,22 +139,28 @@ def router(connections: Connections, checking: Checking) -> APIRouter:
         choice: schemas.ReadersChoice,
     ) -> schemas.Resolution:  # pyright: ignore[reportUnusedFunction]
         work, ref = found
-        with connections() as conn, conn.transaction():
-            chosen = _chosen(conn, choice)
-            if chosen == work:
-                raise HTTPException(422, "A Work cannot cite itself")
-            ReadersChoices(conn).choose(work, ref.text, chosen)
-            return _resolve_again(conn, work, ref)
+        with connections() as conn:
+            with conn.transaction():
+                chosen = _chosen(conn, choice)
+                if chosen == work:
+                    raise HTTPException(422, "A Work cannot cite itself")
+                ReadersChoices(conn).choose(work, ref.text, chosen)
+                chose = _resolve_again(conn, work, ref)
+            refile(conn, checking.library, work)
+        return chose
 
     @routes.delete("/works/{work_id}/references/{key}/choice")
     def clear_choice(
         found: Annotated[tuple[WorkId, Reference], Depends(reference)],
     ) -> schemas.Resolution:  # pyright: ignore[reportUnusedFunction]
         work, ref = found
-        with connections() as conn, conn.transaction():
-            if not ReadersChoices(conn).clear(work, ref.text):
-                raise HTTPException(404, f"No Reader's Choice for Reference {ref.id}")
-            return _resolve_again(conn, work, ref)
+        with connections() as conn:
+            with conn.transaction():
+                if not ReadersChoices(conn).clear(work, ref.text):
+                    raise HTTPException(404, f"No Reader's Choice for Reference {ref.id}")
+                cleared = _resolve_again(conn, work, ref)
+            refile(conn, checking.library, work)
+        return cleared
 
     @routes.get("/duplicates")
     def duplicates() -> list[schemas.DuplicateItems]:  # pyright: ignore[reportUnusedFunction]

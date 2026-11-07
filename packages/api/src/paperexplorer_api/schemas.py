@@ -112,6 +112,48 @@ class StageStatus(BaseModel):
     finished_at: datetime | None
 
 
+class WorkBrief(BaseModel):
+    """A Work a Resolution names: its Library Item, or a registry's record until it has one."""
+
+    id: int
+    zotero_key: str | None
+    title: str | None
+    creators: list[str]
+    year: int | None
+    doi: str | None
+
+
+class StartExploration(BaseModel):
+    """How to start an Exploration: `check` runs a Registry Check after `resolve`."""
+
+    check: bool = False
+
+
+class FailedFiling(BaseModel):
+    """A Source whose Filing failed, and why; the next reconcile tries it again."""
+
+    work: WorkBrief
+    error: str | None
+
+
+class Exploration(BaseModel):
+    """A Seed's Exploration: its Collection in Zotero, its Filings, and what is still missing."""
+
+    seed: int
+    collection_key: str
+    name: str
+    created: bool  # Zotero holds the Exploration Collection
+    filed: int
+    failed: list[FailedFiling]
+    removed_by_reader: int
+    not_filed: int  # firm Sources a reconcile has not reached yet
+    awaiting_choice: int  # Sources matched only at low confidence
+    unchecked: int  # References no Registry Check has looked up
+    stages_not_done: list[str]
+    # The Seed's Stage Run, the Check after it included, until it has ended.
+    run: Literal["queued", "running"] | None
+
+
 class LibraryWork(WorkSummary):
     """A Library Item as the reader finds and ingests it, with each Stage's last status."""
 
@@ -123,6 +165,8 @@ class LibraryWork(WorkSummary):
     collections: list[str]
     # Whether it sits in the Collection, branch or unfiled part browsed; the whole Library is one.
     in_branch: bool
+    # Its Exploration, when it is the Seed of one under way.
+    exploration: Exploration | None = None
 
 
 class LibraryPage(BaseModel):
@@ -149,6 +193,7 @@ class CollectionCount(BranchCount):
     key: str
     name: str
     parent_key: str | None
+    exploration: bool = False  # it mirrors an Exploration under way
 
 
 class CollectionTree(BaseModel):
@@ -171,17 +216,6 @@ class Ingest(BaseModel):
     """Start Ingesting: `from_stage` and its downstream, else the Stages not done and theirs."""
 
     from_stage: str | None = None
-
-
-class WorkBrief(BaseModel):
-    """A Work a Resolution names: its Library Item, or a registry's record until it has one."""
-
-    id: int
-    zotero_key: str | None
-    title: str | None
-    creators: list[str]
-    year: int | None
-    doi: str | None
 
 
 class LibraryMatch(BaseModel):

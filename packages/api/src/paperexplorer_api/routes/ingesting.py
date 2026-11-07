@@ -14,10 +14,18 @@ from paperexplorer.embedding import Embedder
 from paperexplorer.library import Library, sync
 from paperexplorer.pipeline import INGESTING, RESOLVING, StageContext, remaining
 from paperexplorer.resolution import DoiRegistry
-from paperexplorer.store import Branch, Collections, StageState, StageStatuses, Works
+from paperexplorer.store import (
+    Branch,
+    Collections,
+    Explorations,
+    StageState,
+    StageStatuses,
+    Works,
+)
 from paperexplorer.tracing import Tracing
 from paperexplorer_api import schemas
 from paperexplorer_api.routes import Connections
+from paperexplorer_api.routes.views import exploration_view
 from paperexplorer_api.routes.works import work_summary
 from paperexplorer_api.stage_run_thread import StageRunThread
 
@@ -67,6 +75,7 @@ def router(connections: Connections, ingesting: Ingesting, thread: StageRunThrea
             in_branch=in_branch,
             has_pdf=work.pdf is not None,
             run=run,
+            exploration=exploration_view(conn, work.id, run),
             stage_statuses={
                 name: schemas.StageStatus(
                     state=s.state.value,
@@ -132,7 +141,11 @@ def router(connections: Connections, ingesting: Ingesting, thread: StageRunThrea
     def collections(q: str = "") -> schemas.CollectionTree:  # pyright: ignore[reportUnusedFunction]
         with connections() as conn:
             counts = Collections(conn).counts(done=INGESTING, query=q)
-        return schemas.CollectionTree.model_validate(counts.model_dump())
+            explored = {e.collection_key for e in Explorations(conn).under_way() if e.created}
+        tree = schemas.CollectionTree.model_validate(counts.model_dump())
+        for c in tree.collections:
+            c.exploration = c.key in explored
+        return tree
 
     @routes.post("/library/sync")
     def sync_library() -> schemas.LibrarySynced:  # pyright: ignore[reportUnusedFunction]

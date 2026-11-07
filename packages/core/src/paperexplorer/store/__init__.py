@@ -2,6 +2,7 @@
 
 from paperexplorer.store.chunks import ChunkEmbedding, Chunks, Placing, ScoredChunk, StoredChunk
 from paperexplorer.store.citations import CitationDetail, CitationGraphs, StoredCitation
+from paperexplorer.store.collections import Collections
 from paperexplorer.store.library_sync import LibraryVersions
 from paperexplorer.store.migrate import migrate
 from paperexplorer.store.readers_choices import ReadersChoices
@@ -16,6 +17,7 @@ __all__ = [
     "Chunks",
     "CitationDetail",
     "CitationGraphs",
+    "Collections",
     "LibraryVersions",
     "Placing",
     "ReadersChoices",

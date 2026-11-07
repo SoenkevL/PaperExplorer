@@ -3,7 +3,7 @@
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 
-from paperexplorer.domain import Attachment, LibraryChanges, LibraryItem
+from paperexplorer.domain import Attachment, Collection, LibraryChanges, LibraryItem
 from paperexplorer.library.port import ItemNotFoundError
 
 
@@ -17,6 +17,8 @@ class InMemoryLibrary:
         self._version = 0
         self._items: dict[str, tuple[int, LibraryItem]] = {}
         self._deleted: dict[str, int] = {}
+        self._collections: dict[str, tuple[int, Collection]] = {}
+        self._deleted_collections: dict[str, int] = {}
         self._pdfs = dict(pdfs)
         for item in items:
             self.put(item)
@@ -33,26 +35,33 @@ class InMemoryLibrary:
         return self._pdfs[attachment.key]
 
     def changes(self, since: int | None) -> LibraryChanges:
-        """Items put and keys removed after `since`, in the order they last changed."""
+        """Items and Collections put and keys removed after `since`, in the order they changed."""
         if since is None:
             return LibraryChanges(
-                version=self._version, items=[i for _, i in self._items.values()], full=True
+                version=self._version,
+                items=[i for _, i in self._items.values()],
+                collections=[c for _, c in self._collections.values()],
+                full=True,
             )
-        changed = sorted((v, i.key) for v, i in self._items.values() if v > since)
         return LibraryChanges(
             version=self._version,
-            items=[self._items[key][1] for _, key in changed],
-            deleted=[
-                key for key, v in sorted(self._deleted.items(), key=lambda kv: kv[1]) if v > since
-            ],
+            items=_after(since, self._items),
+            deleted=_gone_after(since, self._deleted),
+            collections=_after(since, self._collections),
+            deleted_collections=_gone_after(since, self._deleted_collections),
         )
 
     def merge(self, keep: str, other: str) -> None:
-        """`keep` takes `other`'s PDF if it has none of its own and replaces it; `other` goes."""
+        """`keep` takes `other`'s Collections, its PDF if it has none, and replaces it."""
         kept, gone = self.item(keep), self.item(other)
+        collections = kept.collections + [c for c in gone.collections if c not in kept.collections]
         self.put(
             kept.model_copy(
-                update={"pdf": kept.pdf or gone.pdf, "replaces": [*kept.replaces, other]}
+                update={
+                    "pdf": kept.pdf or gone.pdf,
+                    "replaces": [*kept.replaces, other],
+                    "collections": collections,
+                }
             )
         )
         self.remove(other)
@@ -68,3 +77,27 @@ class InMemoryLibrary:
         self._version += 1
         del self._items[key]
         self._deleted[key] = self._version
+
+    def put_collection(self, collection: Collection) -> None:
+        """Add or replace a Collection, as creating, renaming or moving it in Zotero would."""
+        self._version += 1
+        self._collections[collection.key] = (self._version, collection)
+        self._deleted_collections.pop(collection.key, None)
+
+    def remove_collection(self, key: str) -> None:
+        """Delete a Collection and its subcollections, each key reported, as Zotero does."""
+        self._version += 1
+        for child in [k for k, (_, c) in self._collections.items() if c.parent_key == key]:
+            self.remove_collection(child)
+        del self._collections[key]
+        self._deleted_collections[key] = self._version
+
+
+def _after[T](since: int, entries: dict[str, tuple[int, T]]) -> list[T]:
+    """The entries changed after `since`, oldest change first."""
+    return [entry for v, entry in sorted(entries.values(), key=lambda e: e[0]) if v > since]
+
+
+def _gone_after(since: int, gone: dict[str, int]) -> list[str]:
+    """The keys removed after `since`, oldest first."""
+    return [key for key, v in sorted(gone.items(), key=lambda kv: kv[1]) if v > since]

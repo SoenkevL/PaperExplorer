@@ -15,3 +15,5 @@ Open-access papers under Creative Commons Attribution licences, redistributed un
 `tessdata/eng.traineddata` is Tesseract's fast English model (tesseract-ocr/tessdata_fast at commit 8741641, Apache-2.0), so OCR tests run offline. The pipeline image uses the more accurate tessdata_best model.
 
 `handle-forms.json` is the table of handle forms that core's `asking` reads, in the resolved Answer and in the streamed draft (`docs/design-asking.md`, Answers): each draft written for the test around a form an eval run recorded, named by its trace, or a plain one. No words of the Seed or of an Answer are in it.
+
+`zotero/collections.json` and `zotero/deleted.json` are hand-written Web API v3 answers to `GET /collections` and `GET /deleted`, built from Zotero's docs and the dataserver source (`docs/research/2026-11-zotero-collections.md`), not recorded: a root, a nested branch, a trashed Collection (`data.deleted: true`) with a subcollection Zotero does not mark, and a deleted key.

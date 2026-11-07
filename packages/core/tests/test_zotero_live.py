@@ -20,3 +20,16 @@ def test_the_real_library_has_the_seed_and_its_pdf() -> None:
     assert item.creators
     assert item.pdf is not None
     assert library.pdf(item.pdf).read_bytes().startswith(b"%PDF")
+
+
+@pytest.mark.tower
+def test_the_real_library_lists_its_collections_and_files_items_in_them() -> None:
+    settings = Settings()
+    if not settings.zotero_library_id or settings.zotero_api_key is None:
+        pytest.skip("PE_ZOTERO_LIBRARY_ID / PE_ZOTERO_API_KEY are not set")
+
+    changes = ZoteroLibrary.from_settings(settings).changes(None)
+
+    keys = {c.key for c in changes.collections}
+    assert keys
+    assert any(set(i.collections) & keys for i in changes.items)

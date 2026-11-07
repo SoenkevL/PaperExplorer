@@ -33,6 +33,20 @@ class Attachment(BaseModel):
     filename: str
 
 
+COLLECTION_DEPTH = 32
+"""How deep a walk through the Collection tree goes; Zotero allows no cycle, but a walk stops."""
+
+
+class Collection(BaseModel):
+    """A Collection as Zotero records it: its key, its name and the key of its parent, if any."""
+
+    model_config = ConfigDict(frozen=True)
+
+    key: str
+    name: str
+    parent_key: str | None = None
+
+
 class LibraryItem(BaseModel):
     """The Zotero record of a Work: its metadata and, if any, its attached PDF."""
 
@@ -44,17 +58,21 @@ class LibraryItem(BaseModel):
     pdf: Attachment | None = None
     added: datetime | None = None  # when it entered the Library; the older of two stands
     replaces: list[str] = []  # keys of items merged into it (`dc:replaces`)
+    collections: list[str] = []  # keys of the Collections it is filed in
 
 
 class LibraryChanges(BaseModel):
-    """What changed in the Library since a version: items as they are now, keys that went.
+    """What changed in the Library since a version: items and Collections now, keys that went.
 
-    A full read (`full`) lists every Library Item, so any key it leaves out has gone too.
+    A full read (`full`) lists every Library Item and Collection, so any key it leaves out has
+    gone too.
     """
 
     version: int
     items: list[LibraryItem]
     deleted: list[str] = []
+    collections: list[Collection] = []
+    deleted_collections: list[str] = []
     full: bool = False
 
 

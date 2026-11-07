@@ -10,7 +10,7 @@ import pytest
 from pydantic import SecretStr
 
 from paperexplorer.config import Settings
-from paperexplorer.domain import Attachment, LibraryItem
+from paperexplorer.domain import Attachment, Collection, LibraryItem
 from paperexplorer.library import (
     InMemoryLibrary,
     ItemNotFoundError,
@@ -199,12 +199,19 @@ def test_changes_since_a_version_give_only_what_changed_and_what_went() -> None:
 
 
 def test_a_merge_gives_the_kept_item_the_others_pdf_and_trashes_the_other() -> None:
-    library = InMemoryLibrary([_item("KEEP1111", doi="10.1/x"), _item("GONE2222", pdf=PDF)], {})
+    library = InMemoryLibrary(
+        [
+            _item("KEEP1111", doi="10.1/x").model_copy(update={"collections": ["COLA"]}),
+            _item("GONE2222", pdf=PDF).model_copy(update={"collections": ["COLA", "COLB"]}),
+        ],
+        {},
+    )
     before = library.changes(None).version
 
     library.merge("KEEP1111", "GONE2222")
 
     assert library.item("KEEP1111").pdf == PDF
+    assert library.item("KEEP1111").collections == ["COLA", "COLB"]
     assert library.item("KEEP1111").replaces == ["GONE2222"]
     with pytest.raises(ItemNotFoundError):
         library.item("GONE2222")
@@ -221,6 +228,39 @@ def test_merging_an_unknown_item_changes_nothing() -> None:
         library.merge("KEEP1111", "NOPE2345")
 
     assert library.changes(before).items == []
+
+
+def test_a_full_read_gives_every_collection_and_each_items_collections() -> None:
+    library = InMemoryLibrary(
+        [LibraryItem(key="AAAA1111", collections=["ROOT1111", "CHILD222"])], {}
+    )
+    library.put_collection(Collection(key="ROOT1111", name="Psychedelics"))
+    library.put_collection(Collection(key="CHILD222", name="Therapy", parent_key="ROOT1111"))
+
+    changes = library.changes(None)
+
+    assert changes.collections == [
+        Collection(key="ROOT1111", name="Psychedelics"),
+        Collection(key="CHILD222", name="Therapy", parent_key="ROOT1111"),
+    ]
+    assert changes.items[0].collections == ["ROOT1111", "CHILD222"]
+    assert changes.deleted_collections == []
+
+
+def test_changes_since_a_version_give_the_collections_that_changed_and_went() -> None:
+    library = InMemoryLibrary([], {})
+    for key in ("KEEP1111", "EDIT2222", "GONE3333"):
+        library.put_collection(Collection(key=key, name=key))
+    library.put_collection(Collection(key="SUBG4444", name="Sub", parent_key="GONE3333"))
+    before = library.changes(None).version
+    library.put_collection(Collection(key="EDIT2222", name="Renamed"))
+    library.remove_collection("GONE3333")
+
+    changes = library.changes(before)
+
+    assert changes.collections == [Collection(key="EDIT2222", name="Renamed")]
+    assert sorted(changes.deleted_collections) == ["GONE3333", "SUBG4444"]  # with its subcollection
+    assert library.changes(changes.version).collections == []
 
 
 def _zitem(
@@ -259,6 +299,8 @@ class SyncingZotero:
         self.items = {i["key"]: i for i in items}
         self.trashed: set[str] = set()
         self.deleted: dict[str, int] = {}
+        self.collections: dict[str, dict[str, Any]] = {}
+        self.deleted_collections: dict[str, int] = {}
         self.requests: list[httpx.Request] = []
         self.writes: list[tuple[str, dict[str, Any], str | None]] = []
 
@@ -280,9 +322,22 @@ class SyncingZotero:
                 assert request.url.params["format"] == "keys"
                 keys = [k for k in self.trashed if self.items[k]["version"] > since]
                 return httpx.Response(200, text="\n".join(keys), headers=headers)
+            case ["collections"]:
+                listed = [c for c in self.collections.values() if c["version"] > since]
+                start, limit = int(request.url.params["start"]), int(request.url.params["limit"])
+                headers["Total-Results"] = str(len(listed))
+                return httpx.Response(200, json=listed[start : start + limit], headers=headers)
             case ["deleted"]:
                 gone = [k for k, v in self.deleted.items() if v > since]
-                return httpx.Response(200, json={"items": gone}, headers=headers)
+                cols = [k for k, v in self.deleted_collections.items() if v > since]
+                body = {
+                    "collections": cols,
+                    "items": gone,
+                    "searches": [],
+                    "tags": [],
+                    "settings": [],
+                }
+                return httpx.Response(200, json=body, headers=headers)
             case ["items", key] if key in self.items:
                 return httpx.Response(200, json=self.items[key], headers=headers)
             case ["items", key, "children"]:
@@ -304,6 +359,25 @@ class SyncingZotero:
         if body.get("deleted"):
             self.trashed.add(key)
         return httpx.Response(204, headers={"Last-Modified-Version": str(self.version)})
+
+    def put_collections(self, collections: list[dict[str, Any]]) -> None:
+        for c in collections:
+            self.collections[c["key"]] = c
+            self.version = max(self.version, c["version"])
+
+    def trash_collection(self, key: str) -> None:
+        """Zotero desktop's trash: the Collection alone is marked, not its subcollections."""
+        self.version += 1
+        c = self.collections[key]
+        c["version"] = c["data"]["version"] = self.version
+        c["data"]["deleted"] = True
+
+    def restore_collection(self, key: str) -> None:
+        """Zotero desktop's restore from the trash: only that Collection's version moves."""
+        self.version += 1
+        c = self.collections[key]
+        c["version"] = c["data"]["version"] = self.version
+        del c["data"]["deleted"]
 
     def touch(self, key: str) -> None:
         self.version += 1
@@ -331,7 +405,11 @@ def test_zotero_reads_the_whole_library_in_pages_with_pdfs_from_the_same_read() 
     assert seventh.creators == ["Lee, Ann"]
     assert seventh.year == 2020
     assert seventh.added is not None and seventh.added.year == 2026
-    assert [r.url.path.rsplit("/", 1)[-1] for r in zotero.requests] == ["items", "items"]
+    assert [r.url.path.rsplit("/", 1)[-1] for r in zotero.requests] == [
+        "items",
+        "items",
+        "collections",
+    ]
 
 
 def test_zotero_changes_since_a_version_carry_each_items_pdf_and_what_went() -> None:
@@ -426,3 +504,55 @@ def test_zotero_that_cannot_say_what_changed_is_unavailable(
 
     with pytest.raises(LibraryUnavailableError):
         library.changes(None)
+
+
+def test_zotero_reads_every_collection_in_pages_leaving_out_the_trashed_branch() -> None:
+    zotero = SyncingZotero(10, [_zitem("FILED111", 5, collections=["THERAPY2", "OLDSUB66"])])
+    zotero.put_collections(_json("collections.json"))
+    zotero.put_collections([_zcollection(f"MANY{n:04d}", 100 + n, f"Many {n}") for n in range(120)])
+
+    changes = zotero.library().changes(None)
+
+    by_key = {c.key: c for c in changes.collections}
+    assert len(by_key) == 123
+    assert by_key["PSYCHED1"] == Collection(key="PSYCHED1", name="Psychedelics")
+    assert by_key["THERAPY2"] == Collection(key="THERAPY2", name="Therapy", parent_key="PSYCHED1")
+    assert "OLDREAD5" not in by_key and "OLDSUB66" not in by_key  # trashed, and under the trash
+    assert changes.items[0].collections == ["THERAPY2", "OLDSUB66"]
+
+
+def test_zotero_changes_since_a_version_give_collections_changed_trashed_and_deleted() -> None:
+    zotero = SyncingZotero(10, [])
+    zotero.put_collections(_json("collections.json")[:3])
+    before = zotero.version
+    zotero.version += 1
+    zotero.put_collections([_zcollection("NEWCOL88", zotero.version, "New", parent="PSYCHED1")])
+    zotero.trash_collection("THERAPY2")
+    zotero.version += 1
+    zotero.deleted_collections["GONECOL7"] = zotero.version
+
+    changes = zotero.library().changes(before)
+
+    assert changes.collections == [Collection(key="NEWCOL88", name="New", parent_key="PSYCHED1")]
+    assert sorted(changes.deleted_collections) == ["GONECOL7", "THERAPY2"]
+
+
+def test_zoteros_deleted_answer_names_the_deleted_collections() -> None:
+    deleted = _json("deleted.json")
+    zotero = SyncingZotero(10, [])
+    zotero.version = 20
+    for key in deleted["collections"]:
+        zotero.deleted_collections[key] = 20
+    for key in deleted["items"]:
+        zotero.deleted[key] = 20
+
+    changes = zotero.library().changes(10)
+
+    assert changes.deleted_collections == ["GONECOL7"]
+    assert changes.deleted == ["GONE5555"]
+
+
+def _zcollection(key: str, version: int, name: str, *, parent: str | None = None) -> dict[str, Any]:
+    """A Web API Collection as Zotero returns it, cut to the fields the adapter reads."""
+    data = {"key": key, "version": version, "name": name, "parentCollection": parent or False}
+    return {"key": key, "version": version, "meta": {}, "data": data | {"relations": {}}}

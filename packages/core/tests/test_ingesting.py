@@ -159,7 +159,7 @@ def _record(conn: Conn, *items: LibraryItem) -> None:
 
 def _keys(conn: Conn, query: str = "", limit: int = 50, offset: int = 0) -> list[str | None]:
     found = Works(conn).library_items(query, limit, offset, done_first=FIVE)
-    return [w.zotero_key for w in found]
+    return [r.work.zotero_key for r in found]
 
 
 def test_the_library_lists_ingested_works_first_then_newest_added(store_db: Conn) -> None:

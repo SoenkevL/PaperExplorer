@@ -14,6 +14,7 @@ from paperexplorer_api.schemas import (
     CheckedReference,
     CheckEvent,
     CitationDetail,
+    CollectionTree,
     Conversation,
     DuplicateItems,
     Health,
@@ -197,10 +198,33 @@ class ApiClient:
         """Merge one Duplicate Item into another in Zotero; the other goes to the trash."""
         return Merged.model_validate(self._send("POST", "/duplicates/merge", merge.model_dump()))
 
-    def library(self, query: str = "", *, limit: int = 50, offset: int = 0) -> LibraryPage:
-        """A page of the Library Items matching `query`, Ingested ones first."""
-        params = urlencode({"q": query, "limit": limit, "offset": offset})
-        return LibraryPage.model_validate(self._get(f"/library?{params}"))
+    def library(
+        self,
+        query: str = "",
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        collection: str | None = None,
+        deep: bool = False,
+        unfiled: bool = False,
+    ) -> LibraryPage:
+        """A page of the Library Items matching `query`, Ingested ones first.
+
+        `collection` (its branch with `deep`) or `unfiled` picks a branch: with no query only its
+        Items, with one the whole Library, the branch's first; `NotFoundError` for an unknown key.
+        """
+        params: dict[str, str | int] = {"q": query, "limit": limit, "offset": offset}
+        if collection is not None:
+            params["collection"] = collection
+        if deep:
+            params["deep"] = "true"
+        if unfiled:
+            params["unfiled"] = "true"
+        return LibraryPage.model_validate(self._get(f"/library?{urlencode(params)}"))
+
+    def collections(self) -> CollectionTree:
+        """Every Collection with its branch's counts, the whole Library's, and the unfiled ones."""
+        return CollectionTree.model_validate(self._get("/collections"))
 
     def sync_library(self) -> LibrarySynced:
         """Bring the Library up to date with Zotero."""

@@ -53,6 +53,8 @@ def _work(
         has_pdf=has_pdf,
         run=run,
         stage_statuses=runs,
+        collections=[],
+        in_branch=True,
     )
 
 
@@ -81,7 +83,8 @@ def _json(model: Any, status: int = 200) -> httpx.Response:
 
 
 def _page(*works: LibraryWork, total: int | None = None) -> httpx.Response:
-    return _json(LibraryPage(items=list(works), total=len(works) if total is None else total))
+    total = len(works) if total is None else total
+    return _json(LibraryPage(items=list(works), total=total, branch_total=total))
 
 
 def _row(html: str, work_id: int = 7) -> str:

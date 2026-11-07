@@ -62,8 +62,9 @@ Resolving References matches a Seed's References to Works and verifies their DOI
 - `store.Explorations`: the PaperExplorer Collection's key, `start`, `of_seed`, `filings`, `record_filing`, `forget_filing`, `end`.
 
 ## The API and the web app
-- `POST /works/{id}/exploration` `{check: bool}` starts or resumes; `GET /works/{id}/exploration` returns its state: the Collection's key and name, Filings by state, firm Sources not yet filed, Sources awaiting a choice, Unchecked References, the Stages not done. `ApiClient` mirrors them.
-- The Work page and the row: *Start Exploration*, or *Exploration* with its state. The start dialog shows the Collection's name, the Check's cost with the box, and starts. A partial Exploration names what is missing (not embedded, 3 Filings failed) beside *Resume*.
+- `POST /works/{id}/exploration` `{check: bool}` starts or resumes; `GET /works/{id}/exploration` returns its state: the Collection's key and name, Filings by state, firm Sources not yet filed, Sources awaiting a choice, Unchecked References, the Stages not done. `GET /works/{id}/exploration/proposal` names the Collection a start would make, for the dialog, since the web app imports no core. `ApiClient` mirrors them.
+- The ticked Check runs on the Stage Run thread, as the Stage Run's last step (`StageRunThread.submit(..., then=)`), after its Stages however they went: it outlives a closed tab, and the row shows the run meanwhile instead of a stream of References. The thread reconciles as `resolve` commits (`after_stage`).
+- The Work page and the row: *Start Exploration*, or *Exploration* with its state. The start dialog shows the Collection's name, the Check's cost with the box (before `parse`, it says the cost comes once the References are parsed), and starts. A partial Exploration names what is missing (`embed not done`, `1 Filing failed`) beside *Resume Exploration*, which stands in for the row's *Resume*.
 - The landing-page tree marks each Exploration Collection, and the PaperExplorer Collection shows like any other.
 
 ## Testing

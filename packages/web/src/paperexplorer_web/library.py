@@ -11,6 +11,7 @@ from paperexplorer_api.schemas import (
     LibraryPage,
     LibraryWork,
     StageState,
+    downstream_of,
 )
 from paperexplorer_web.browsing import Selection, Tree
 
@@ -38,7 +39,7 @@ class Row(BaseModel):
     message: str | None = None
     polling: bool
     start_label: str | None  # "Ingest" or "Resume" when there is something to run
-    resolve_label: str | None  # Resolving References, once Ingested
+    resolve_label: str | None  # Resolving References, once parsed
     pips: list[Pip]
     stages_label: str  # every Stage and its state, for the strip's aria-label
     errors: list[str]
@@ -49,7 +50,7 @@ class Row(BaseModel):
 
 
 def _confirm(stage: str) -> str:
-    stages = INGESTING_STAGES[INGESTING_STAGES.index(stage) :]
+    stages = [stage, *(s for s in downstream_of(stage) if s in INGESTING_STAGES)]
     named = stages[0] if len(stages) == 1 else f"{', '.join(stages[:-1])} and {stages[-1]}"
     question = f"Re-run {named}?"
     if set(TEXT_STAGES).intersection(stages):
@@ -75,6 +76,7 @@ def row(
     idle = work.run is None and "running" not in states
     ingested = all(work.stages.get(s) == "done" for s in INGESTING_STAGES)
     started = any(work.stages.get(s) != "pending" for s in INGESTING_STAGES)
+    parsed = work.stages.get("parse") == "done"
     resolved = all(work.stages.get(s) == "done" for s in RESOLVING_STAGES)
     may_rerun = idle and work.has_pdf
     pips = [
@@ -100,7 +102,7 @@ def row(
         if not idle or not work.has_pdf or ingested
         else ("Resume" if started else "Ingest"),
         resolve_label=None
-        if not ingested or not idle
+        if not parsed or not idle
         else ("Resolve again" if resolved else "Resolve References"),
         pips=pips,
         stages_label="Stages: " + ", ".join(f"{p.stage} {p.state}" for p in pips),

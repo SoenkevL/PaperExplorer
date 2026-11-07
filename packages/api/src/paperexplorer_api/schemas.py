@@ -74,8 +74,27 @@ class WorkSummary(BaseModel):
 # The Stages of Ingesting, which make a Work Ingested, and of resolving its References, in order.
 INGESTING_STAGES = ("fetch", "parse", "chunk", "embed", "extract_citations")
 RESOLVING_STAGES = ("verify_dois", "resolve")
+# What each Stage reads, as `pipeline.READS` has it: after `parse` the Stages branch.
+STAGE_READS: dict[str, tuple[str, ...]] = {
+    "fetch": (),
+    "parse": ("fetch",),
+    "chunk": ("parse",),
+    "embed": ("chunk",),
+    "extract_citations": ("parse",),
+    "verify_dois": ("parse",),
+    "resolve": ("parse", "verify_dois"),
+}
 # Running these replaces the Chunks a Conversation holds.
 TEXT_STAGES = ("parse", "chunk")
+
+
+def downstream_of(stage: str) -> tuple[str, ...]:
+    """The Stages that read what `stage` stores, directly or through another, in Stage order."""
+    found = {stage}
+    for later in STAGE_READS:
+        if any(read in found for read in STAGE_READS[later]):
+            found.add(later)
+    return tuple(s for s in STAGE_READS if s in found and s != stage)
 
 
 class StageStatus(BaseModel):

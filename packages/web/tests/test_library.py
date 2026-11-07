@@ -360,6 +360,8 @@ def test_rerunning_a_stage_asks_first_naming_what_will_run() -> None:
     embed = re.search(r"<button[^>]*Re-run embed[^>]*>", row)
     assert embed
     assert "Conversation" not in embed.group(0)
+    assert 'hx-confirm="Re-run chunk and embed?' in row
+    assert 'hx-confirm="Re-run extract_citations?"' in row
     assert '"from_stage": "parse"' in parse.group(0).replace("&#34;", '"')
 
 
@@ -398,10 +400,15 @@ def test_cancelling_answers_with_the_row_as_it_now_stands() -> None:
     assert ">Ingest<" in row
 
 
-def test_an_ingested_work_offers_resolving_its_references_and_shows_how_that_went() -> None:
+def test_a_parsed_work_offers_resolving_its_references_and_shows_how_that_went() -> None:
     row = _row(Api({"GET /library": _page(_work(done=FIVE))}).web().get("/").text)
     assert 'hx-post="/works/7/resolving"' in row
     assert ">Resolve References<" in row
+
+    unembedded = _work(done=["fetch", "parse", "chunk"], failed=("embed", "429"))
+    row = _row(Api({"GET /library": _page(unembedded)}).web().get("/").text)
+    assert ">Resolve References<" in row
+    assert ">Resume<" in row
 
     half = _row(Api({"GET /library": _page(_work(done=["fetch"]))}).web().get("/").text)
     assert "Resolve References" not in half

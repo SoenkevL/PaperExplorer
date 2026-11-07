@@ -24,6 +24,7 @@ __all__ = [
     "StageContext",
     "StageError",
     "StageResult",
+    "downstream",
     "remaining",
     "run_chain",
     "run_stage",
@@ -31,7 +32,7 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-# The Seed's chain, in order; a Stage reads what the Stages before it stored.
+# Every Stage, in the order its pips show and a Stage Run takes them.
 STAGES: dict[str, Stage] = {
     "fetch": fetch,
     "parse": parse,
@@ -42,21 +43,42 @@ STAGES: dict[str, Stage] = {
     "resolve": resolve,
 }
 
+# What each Stage reads from the store: after `parse` the Stages branch, so a failure in one
+# branch (a rate-limited `embed`) leaves the others to run.
+READS: dict[str, tuple[str, ...]] = {
+    "fetch": (),
+    "parse": ("fetch",),
+    "chunk": ("parse",),
+    "embed": ("chunk",),
+    "extract_citations": ("parse",),
+    "verify_dois": ("parse",),
+    "resolve": ("parse", "verify_dois"),
+}
+
 # The Stages that make a Work Ingested, and the two that resolve its References afterwards.
 INGESTING: tuple[str, ...] = ("fetch", "parse", "chunk", "embed", "extract_citations")
 RESOLVING: tuple[str, ...] = ("verify_dois", "resolve")
+
+
+def downstream(name: str) -> list[str]:
+    """The Stages that read what `name` stores, directly or through another, in Stage order."""
+    found = {name}
+    for later in STAGES:
+        if any(read in found for read in READS[later]):
+            found.add(later)
+    return [s for s in STAGES if s in found and s != name]
 
 
 def run_stage(ctx: StageContext, name: str, work: WorkId) -> StageResult:
     """Run one Stage for one Work and record its status.
 
     The Stage's writes are one transaction: a failure keeps none of them and is recorded with
-    its error, then raised. Success makes every later Stage pending, since what they read changed.
+    its error, then raised. Success makes its downstream Stages pending, since what they read
+    changed.
     """
     if name not in STAGES:
         raise ValueError(f"No Stage {name!r}; the Stages are {', '.join(STAGES)}")
-    names = list(STAGES)
-    later = names[names.index(name) + 1 :]
+    later = downstream(name)
     statuses = StageStatuses(ctx.conn)
     logger.info("Stage %s started for Work %d", name, work)
     with ctx.conn.transaction():
@@ -82,16 +104,32 @@ def run_chain(
     *,
     after: Callable[[str], None] | None = None,
 ) -> None:
-    """Run the Stages in order, calling `after` as each commits; the first failure ends it."""
+    """Run the Stages in order, calling `after` as each commits.
+
+    A failure skips the Stages downstream of it; the others still run, then the first failure
+    is raised.
+    """
+    failed: Exception | None = None
+    skipped: set[str] = set()
     for name in names:
-        run_stage(ctx, name, work)
+        if name in skipped:
+            continue
+        try:
+            run_stage(ctx, name, work)
+        except Exception as e:
+            failed = failed or e
+            skipped.update(downstream(name))
+            continue
         if after is not None:
             after(name)
+    if failed is not None:
+        raise failed
 
 
 def remaining(ran: Mapping[str, StageStatus]) -> list[str]:
-    """The Ingesting Stages from the first not done on: all of them need to run from there."""
-    for i, name in enumerate(INGESTING):
+    """The Ingesting Stages not done, with those downstream of them: all need to run."""
+    found: set[str] = set()
+    for name in INGESTING:
         if name not in ran or ran[name].state is not StageState.DONE:
-            return list(INGESTING[i:])
-    return []
+            found.update([name, *downstream(name)])
+    return [s for s in INGESTING if s in found]

@@ -12,7 +12,7 @@ from paperexplorer.config import Settings
 from paperexplorer.domain import Work, WorkId
 from paperexplorer.embedding import Embedder
 from paperexplorer.library import Library, sync
-from paperexplorer.pipeline import INGESTING, RESOLVING, StageContext, remaining
+from paperexplorer.pipeline import INGESTING, RESOLVING, StageContext, downstream, remaining
 from paperexplorer.resolution import DoiRegistry
 from paperexplorer.store import Branch, Collections, StageState, StageStatuses, Works
 from paperexplorer.tracing import Tracing
@@ -157,7 +157,7 @@ def router(connections: Connections, ingesting: Ingesting, thread: StageRunThrea
             if work.pdf is None:
                 raise HTTPException(409, f"{work.zotero_key} has no PDF stored in Zotero")
             if from_stage is not None:
-                stages = list(INGESTING[INGESTING.index(from_stage) :])
+                stages = [from_stage, *(s for s in downstream(from_stage) if s in INGESTING)]
             else:
                 stages = remaining(StageStatuses(conn).for_work(work.id))
             if not stages:
@@ -178,8 +178,9 @@ def router(connections: Connections, ingesting: Ingesting, thread: StageRunThrea
     def resolving(work_id: int) -> schemas.LibraryWork:  # pyright: ignore[reportUnusedFunction]
         with connections() as conn:
             work = found(conn, work_id)
-            if remaining(StageStatuses(conn).for_work(work.id)):
-                raise HTTPException(409, f"Work {work_id} is not Ingested yet")
+            parsed = StageStatuses(conn).for_work(work.id).get("parse")
+            if parsed is None or parsed.state is not StageState.DONE:
+                raise HTTPException(409, f"Work {work_id} is not parsed yet")
             return start(conn, work, list(RESOLVING))
 
     return routes

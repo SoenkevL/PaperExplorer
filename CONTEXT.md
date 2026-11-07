@@ -33,8 +33,20 @@ The one of a Work's Duplicate Items that stands for its DOI, the one its Resolut
 _Avoid_: Stand-in, primary, master, chosen item
 
 **Exploration**:
-The reading of one Seed together with the Works it cites, mirrored as one Collection.
+The reading of one Seed together with the Works it cites, mirrored as its Exploration Collection. The reader starts one; a Seed has at most one.
 _Avoid_: Project, session, collection (when meaning the domain concept)
+
+**PaperExplorer Collection**:
+The top-level Collection named "PaperExplorer" that holds every Exploration Collection. It is the only branch of Collections PaperExplorer writes to; the reader's other Collections are never changed.
+_Avoid_: Root collection, meta collection, PE folder
+
+**Exploration Collection**:
+The Collection in the PaperExplorer Collection that mirrors one Exploration: its Seed and the Library Items of its firmly resolved Sources. Deleting it in Zotero ends the Exploration.
+_Avoid_: Exploration (for the Collection itself), project collection
+
+**Filing**:
+Putting a Library Item into an Exploration Collection; Unfiling takes out only what PaperExplorer filed. A Source the reader unfiled in Zotero is not filed again until the reader chooses it.
+_Avoid_: Adding, syncing, cataloguing
 
 **Seed**:
 The Work an Exploration starts from. A Seed always has full text.
@@ -71,7 +83,7 @@ Said of a Work whose Ingesting Stages are all done.
 _Avoid_: Indexed, processed, ready
 
 **Resolving References**:
-Running the Stages that verify an Ingested Work's printed DOIs and match its References against the Library. It spends no Registry Check.
+Running the Stages that verify a parsed Work's printed DOIs and match its References against the Library. It needs none of the other Ingesting Stages, and spends no Registry Check.
 _Avoid_: Matching, lookup, Registry Check
 
 ## Inside a Work

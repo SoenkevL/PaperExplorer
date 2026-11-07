@@ -11,7 +11,7 @@ from paperexplorer_api.schemas import (
     LibraryPage,
     LibraryWork,
     StageState,
-    downstream_of,
+    rerun_stages,
 )
 from paperexplorer_web.browsing import Selection, Tree
 
@@ -50,7 +50,7 @@ class Row(BaseModel):
 
 
 def _confirm(stage: str) -> str:
-    stages = [stage, *(s for s in downstream_of(stage) if s in INGESTING_STAGES)]
+    stages = rerun_stages(stage)
     named = stages[0] if len(stages) == 1 else f"{', '.join(stages[:-1])} and {stages[-1]}"
     question = f"Re-run {named}?"
     if set(TEXT_STAGES).intersection(stages):

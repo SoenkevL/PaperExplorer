@@ -11,14 +11,17 @@ import pytest
 from psycopg.rows import TupleRow
 
 from paperexplorer.config import Settings
-from paperexplorer.domain import Attachment, LibraryChanges, LibraryItem
+from paperexplorer.domain import Attachment, LibraryChanges, LibraryItem, WorkId
 from paperexplorer.embedding import FakeEmbedder, Vector
 from paperexplorer.library import InMemoryLibrary, sync
 from paperexplorer.pipeline import (
     INGESTING,
+    READS,
     RESOLVING,
+    STAGES,
     StageContext,
     StageError,
+    StageResult,
     downstream,
     remaining,
     run_chain,
@@ -76,7 +79,7 @@ def test_a_chain_runs_its_stages_and_leaves_none_remaining(ctx: StageContext) ->
     assert remaining(StageStatuses(ctx.conn).for_work(work)) == []
 
 
-def test_a_chain_stops_at_the_first_failure_and_resumes_there(ctx: StageContext) -> None:
+def test_a_failed_fetch_skips_every_stage_and_ingesting_resumes_there(ctx: StageContext) -> None:
     work = Works(ctx.conn).ensure("NOPDF234")
 
     with pytest.raises(StageError, match="no PDF"):
@@ -117,6 +120,24 @@ def test_a_failed_embed_ends_only_its_branch_and_the_references_are_still_resolv
     assert remaining(StageStatuses(ctx.conn).for_work(work)) == ["embed"]
 
 
+def test_a_lost_store_after_a_failure_ends_the_chain_with_the_store_s_error(
+    ctx: StageContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression: the chain once ran on past a lost connection and raised the earlier 429."""
+    work = Works(ctx.conn).ensure("VILL2024")
+    limited = dataclasses.replace(ctx, embedder=_RateLimitedEmbedder())
+
+    def lose_the_store(ctx: StageContext, work: WorkId) -> StageResult:
+        raise psycopg.OperationalError("the connection was lost")
+
+    monkeypatch.setitem(STAGES, "extract_citations", lose_the_store)
+
+    with pytest.raises(psycopg.OperationalError, match="connection was lost"):
+        run_chain(limited, [*INGESTING, *RESOLVING], work)
+
+    assert "verify_dois" not in StageStatuses(ctx.conn).for_work(work)
+
+
 def test_a_rerun_makes_pending_only_the_stages_that_read_it(ctx: StageContext) -> None:
     work = Works(ctx.conn).ensure("VILL2024")
     run_chain(ctx, [*INGESTING, *RESOLVING], work)
@@ -127,6 +148,12 @@ def test_a_rerun_makes_pending_only_the_stages_that_read_it(ctx: StageContext) -
     assert "embed" not in states
     assert states["extract_citations"] is StageState.DONE
     assert states["resolve"] is StageState.DONE
+
+
+def test_each_stage_reads_only_stages_before_it() -> None:
+    order = list(STAGES)
+    for name, reads in READS.items():
+        assert all(order.index(read) < order.index(name) for read in reads), name
 
 
 def test_downstream_names_the_stages_that_read_a_stage_directly_or_further_on() -> None:

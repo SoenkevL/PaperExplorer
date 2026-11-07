@@ -24,7 +24,7 @@ Resolving References matches a Seed's References to Works and verifies their DOI
 - The CLI: `paperexplorer explore <key> [--check]` starts or resumes; `paperexplorer exploration <key>` prints its state.
 
 ## The Stages branch after `parse`
-- Today `run_chain` runs `fetch → parse → chunk → embed → extract_citations → verify_dois → resolve` and stops at the first failure, yet `extract_citations` reads only `parse`'s text. A hosted Provider's rate limit on `embed` would block every Source from being filed.
+- Before PR 1, `run_chain` ran `fetch → parse → chunk → embed → extract_citations → verify_dois → resolve` and stopped at the first failure, yet `extract_citations` reads only `parse`'s text, so a hosted Provider's rate limit on `embed` blocked every Source from being filed.
 - The Stages branch after `parse` by what each reads: `chunk → embed`, `extract_citations`, and `verify_dois → resolve` (References come from `parse`'s text, so `resolve` does not read `extract_citations`). Resolving References needs only `parse` done. A failure ends its own branch only. Each Stage names the Stages it reads, and a Stage's success makes pending only those that read it, so a rerun `embed` or `extract_citations` no longer makes `resolve` pending.
 - The pips keep their order. *Resume* and `remaining` run every Ingesting Stage not done with those downstream of it; a re-run from the row runs its Stage and the Ingesting Stages downstream of it; *Resolve References* is offered once the Work is parsed.
 

@@ -97,6 +97,11 @@ def downstream_of(stage: str) -> tuple[str, ...]:
     return tuple(s for s in STAGE_READS if s in found and s != stage)
 
 
+def rerun_stages(stage: str) -> list[str]:
+    """What re-running an Ingesting Stage runs: it and the Ingesting Stages downstream of it."""
+    return [stage, *(s for s in downstream_of(stage) if s in INGESTING_STAGES)]
+
+
 class StageStatus(BaseModel):
     """How a Stage's last run for a Work went; a pending Stage has none."""
 
@@ -163,7 +168,7 @@ class LibrarySynced(BaseModel):
 
 
 class Ingest(BaseModel):
-    """Start Ingesting: from `from_stage` on, else from the first Stage not done."""
+    """Start Ingesting: `from_stage` and its downstream, else the Stages not done and theirs."""
 
     from_stage: str | None = None
 

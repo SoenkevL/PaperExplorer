@@ -347,7 +347,7 @@ def create_app(api: ApiClient) -> FastAPI:
     def resolve_references(  # pyright: ignore[reportUnusedFunction]
         request: Request, work_id: int, tint: Annotated[str, Form()] = ""
     ) -> HTMLResponse:
-        """Start the Stages that resolve an Ingested Work's References."""
+        """Start the Stages that resolve a parsed Work's References."""
         try:
             work = api.resolve_references(work_id)
         except (httpx.HTTPError, ConflictError, NotFoundError) as e:

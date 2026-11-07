@@ -12,7 +12,7 @@ from paperexplorer.config import Settings
 from paperexplorer.domain import Work, WorkId
 from paperexplorer.embedding import Embedder
 from paperexplorer.library import Library, sync
-from paperexplorer.pipeline import INGESTING, RESOLVING, StageContext, downstream, remaining
+from paperexplorer.pipeline import INGESTING, RESOLVING, StageContext, remaining
 from paperexplorer.resolution import DoiRegistry
 from paperexplorer.store import Branch, Collections, StageState, StageStatuses, Works
 from paperexplorer.tracing import Tracing
@@ -157,7 +157,7 @@ def router(connections: Connections, ingesting: Ingesting, thread: StageRunThrea
             if work.pdf is None:
                 raise HTTPException(409, f"{work.zotero_key} has no PDF stored in Zotero")
             if from_stage is not None:
-                stages = [from_stage, *(s for s in downstream(from_stage) if s in INGESTING)]
+                stages = schemas.rerun_stages(from_stage)
             else:
                 stages = remaining(StageStatuses(conn).for_work(work.id))
             if not stages:

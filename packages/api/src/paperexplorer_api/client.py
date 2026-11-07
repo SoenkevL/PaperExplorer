@@ -253,7 +253,7 @@ class ApiClient:
         _check(self._http.request("DELETE", path), path)
 
     def resolve_references(self, work_id: int) -> LibraryWork:
-        """Start the Stages that resolve an Ingested Work's References."""
+        """Start the Stages that resolve a parsed Work's References."""
         return LibraryWork.model_validate(self._send("POST", f"/works/{work_id}/resolving"))
 
     def _get(self, path: str) -> Any:

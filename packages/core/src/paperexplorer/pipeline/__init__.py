@@ -3,6 +3,8 @@
 import logging
 from collections.abc import Callable, Iterable, Mapping
 
+import psycopg
+
 from paperexplorer.domain import WorkId
 from paperexplorer.pipeline.stage import Stage, StageContext, StageError, StageResult
 from paperexplorer.pipeline.stages import (
@@ -18,6 +20,7 @@ from paperexplorer.store import StageState, StageStatus, StageStatuses
 
 __all__ = [
     "INGESTING",
+    "READS",
     "RESOLVING",
     "STAGES",
     "Stage",
@@ -44,7 +47,8 @@ STAGES: dict[str, Stage] = {
 }
 
 # What each Stage reads from the store: after `parse` the Stages branch, so a failure in one
-# branch (a rate-limited `embed`) leaves the others to run.
+# branch (a rate-limited `embed`) leaves the others to run. A Stage reads only Stages before it
+# in `STAGES`, which `downstream`'s single pass relies on.
 READS: dict[str, tuple[str, ...]] = {
     "fetch": (),
     "parse": ("fetch",),
@@ -107,7 +111,7 @@ def run_chain(
     """Run the Stages in order, calling `after` as each commits.
 
     A failure skips the Stages downstream of it; the others still run, then the first failure
-    is raised.
+    is raised. A store error ends the chain at once: no later Stage could run on its connection.
     """
     failed: Exception | None = None
     skipped: set[str] = set()
@@ -116,6 +120,8 @@ def run_chain(
             continue
         try:
             run_stage(ctx, name, work)
+        except psycopg.Error:
+            raise
         except Exception as e:
             failed = failed or e
             skipped.update(downstream(name))

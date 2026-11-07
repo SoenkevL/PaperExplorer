@@ -188,7 +188,7 @@ button { font: inherit; color: inherit; }
 .stage.done { color: var(--accent); }
 .stage.running { color: var(--ink); font-weight: 600; }
 .library { margin-top: 1.5rem; }
-.library-tools { display: flex; gap: 0.5rem; }
+.library-tools { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .library-tools input { flex: 1 1 auto; min-width: 0; padding: 0.4rem 0.6rem; font: inherit; color: var(--ink); background: transparent; border: 1px solid var(--rule); border-radius: 6px; }
 .library-row .title { font: 600 1.05rem/1.35 var(--serif); }
 .library p.failed { color: var(--danger); overflow-wrap: anywhere; }
@@ -200,6 +200,69 @@ button { font: inherit; color: inherit; }
 .rerun { margin-left: 0.2rem; padding: 0 0.25rem; font: inherit; color: var(--muted); background: none; border: none; cursor: pointer; }
 .rerun:hover { color: var(--accent); }
 .works .more { text-align: center; }
+
+/* The landing page's two views: the switch, then the List or the Collections view, where the
+   navigator pane stands beside the Works side (above it, behind a button, under 48rem). */
+.page:has(.library-browser) { max-width: 72rem; }
+.view-switch { display: inline-flex; flex: none; padding: 2px; border-radius: 8px; background: var(--track); }
+.view-switch a { padding: 0.3rem 0.7rem; border-radius: 6px; color: var(--ink2); font-size: 13px; text-decoration: none; }
+.view-switch a[aria-current="page"] { background: var(--seg-on); color: var(--ink); box-shadow: var(--seg-shadow); }
+.library-browser { display: grid; grid-template-columns: 16.5rem minmax(0, 1fr); gap: 2rem; margin-top: 1rem; }
+.library-pane { position: sticky; top: 1rem; align-self: start; max-height: calc(100vh - 2rem); overflow-y: auto; }
+.tree, .tree [role="group"] { list-style: none; margin: 0; padding: 0; }
+.tree [role="group"] { padding-left: 0.9rem; }
+.tree [role="treeitem"] { outline: none; }
+.tree-row { display: flex; align-items: baseline; gap: 0.4rem; padding: 0.25rem 0.4rem 0.25rem 1.1rem; position: relative; border-radius: 6px; font-size: 14px; }
+.tree [role="treeitem"]:focus-visible > .tree-row { box-shadow: 0 0 0 2px var(--accent); }
+.tree [aria-selected="true"] > .tree-row { background: var(--accent-soft); }
+.tree [aria-selected="true"] > .tree-row a { color: var(--accent); font-weight: 600; }
+.tree-row a { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); text-decoration: none; }
+.tree-row a:hover { color: var(--accent); }
+.tree-count { flex: none; font: 11px var(--mono); color: var(--muted); }
+.tree-matches { flex: none; min-width: 1.3rem; padding: 0 0.3rem; border-radius: 9px; background: var(--accent); color: var(--sheet); font: 600 11px/1.5 var(--mono); text-align: center; }
+.tree-matches:empty { display: none; }
+.tree .no-match > .tree-row { opacity: 0.45; }
+.twisty { position: absolute; left: 0.2rem; top: 0.25rem; width: 0.9rem; height: 1.2rem; cursor: pointer; }
+.twisty::before { content: ""; position: absolute; left: 0.25rem; top: 0.45rem; border: 0.25rem solid transparent; border-left: 0.32rem solid var(--muted); transition: transform 0.12s; transform-origin: 25% 50%; }
+[aria-expanded="true"] > .tree-row > .twisty::before { transform: rotate(90deg); }
+.crumbs { display: flex; align-items: center; gap: 0.6rem; font-size: 13px; color: var(--muted); }
+.crumbs ol { display: flex; flex-wrap: wrap; list-style: none; margin: 0; padding: 0; }
+.crumbs li + li::before { content: "›"; padding: 0 0.4rem; color: var(--faint); }
+.crumbs a { color: var(--ink2); }
+.pane-toggle { display: none; }
+.selection-name { font: 600 1.5rem/1.25 var(--serif); margin: 0.5rem 0 0.3rem; }
+.meter-line { display: flex; align-items: center; gap: 0.6rem; margin: 0; font-size: 12px; color: var(--muted); }
+.meter-line meter { width: 8rem; height: 0.5rem; }
+.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; list-style: none; margin: 0.9rem 0 0; padding: 0; }
+.chip { display: inline-block; padding: 0.2rem 0.65rem; border: 1px solid var(--rule); border-radius: 999px; color: var(--ink); font-size: 13px; text-decoration: none; }
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+.chip-count, .chip-within { color: var(--muted); font: 11px var(--mono); }
+.deep { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.8rem; font-size: 13px; color: var(--ink2); }
+.works li.in-branch { background: color-mix(in srgb, var(--accent-soft) 45%, transparent); margin: 0 -0.6rem; padding-left: 0.6rem; padding-right: 0.6rem; }
+.works li.elsewhere { padding: 1.2rem 0 0.4rem; border-top: 0; }
+.works li.elsewhere h3 { margin: 0; font: 600 11px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.library-row .filed { margin: 0.25rem 0 0; font-size: 12px; color: var(--muted); }
+.works .library-row .filed a { font: inherit; color: var(--ink2); text-decoration: underline; text-decoration-color: var(--rule); }
+@media (max-width: 48rem) {
+  .library-browser { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+  .library-pane { display: none; position: static; max-height: none; grid-row: 1; padding: 0.6rem; border: 1px solid var(--rule); border-radius: 8px; }
+  .library-browser.pane-open .library-pane { display: block; }
+  .pane-toggle { display: inline-block; padding: 0.2rem 0.6rem; font: inherit; color: var(--ink); background: transparent; border: 1px solid var(--rule); border-radius: 6px; cursor: pointer; }
+}
+
+/* A row's Stages as pips: five Ingesting, a gap, two Resolving. Filled is done, a ring pending,
+   a pulse running (steady with reduced motion), red failed; a done pip that may run again is
+   the button re-running it. */
+.pips { display: inline-flex; align-items: center; gap: 4px; margin-top: 0.35rem; vertical-align: middle; }
+.pip { display: inline-block; box-sizing: border-box; width: 10px; height: 10px; padding: 0; border-radius: 50%; border: 1.5px solid var(--faint); background: transparent; }
+.pip.done { border-color: var(--accent); background: var(--accent); }
+.pip.failed { border-color: var(--danger); background: var(--danger); }
+.pip.running { border-color: var(--accent); background: var(--accent-soft); animation: pip-pulse 1.2s ease-in-out infinite; }
+button.pip { cursor: pointer; }
+button.pip:hover, button.pip:focus-visible { outline: 2px solid var(--accent-soft); outline-offset: 1px; background: var(--sheet); }
+.pip-gap { display: inline-block; width: 6px; }
+@keyframes pip-pulse { 50% { background: var(--accent); } }
+@media (prefers-reduced-motion: reduce) { .pip.running { animation: none; background: var(--accent); opacity: 0.6; } }
 
 /* The reader: three panes. Below 80rem the Citation pane is a bottom sheet, below 64rem the
    Conversation a drawer. panes.js sets .no-conversation / .no-citation on .reader. */

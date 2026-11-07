@@ -182,6 +182,15 @@ def test_the_collections_come_flat_with_their_branch_counts(harness: Harness) ->
     assert (tree.library.works, tree.unfiled.works) == (3, 1)
 
 
+def test_a_search_counts_each_branch_s_matches(harness: Harness) -> None:
+    _filed(harness)
+
+    tree = harness.client.collections("Villiger")
+
+    assert [(c.key, c.works) for c in tree.collections] == [("ROOT", 1), ("SUB", 1)]
+    assert (tree.library.works, tree.unfiled.works) == (1, 0)
+
+
 def test_a_collection_lists_what_is_filed_in_it_and_deep_its_branch(harness: Harness) -> None:
     _filed(harness)
     harness.library.put_collection(Collection(key="LEAF", name="Leaf", parent_key="SUB"))

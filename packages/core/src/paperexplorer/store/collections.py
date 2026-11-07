@@ -1,16 +1,17 @@
 """Collections and which Works are filed in them, as the last Library sync found them."""
 
 from collections.abc import Iterable, Sequence
+from typing import LiteralString
 
 import psycopg
 from psycopg.rows import TupleRow, class_row
 from pydantic import BaseModel
 
 from paperexplorer.domain import COLLECTION_DEPTH, Collection, WorkId
-from paperexplorer.store.works import DONE_ALL
+from paperexplorer.store.works import DONE_ALL, library_search
 
-# The Library Items, each with whether every Stage in `done` is done.
-_LIBRARY = f"SELECT id, {DONE_ALL} AS done FROM works WHERE zotero_key IS NOT NULL"
+# The Library Items, each with whether every Stage in `done` is done; a search's WHERE follows.
+_LIBRARY = f"SELECT id, {DONE_ALL} AS done FROM works"
 
 
 class BranchCount(BaseModel):
@@ -109,16 +110,22 @@ class Collections:
             found[WorkId(work)].append(key)
         return found
 
-    def counts(self, *, done: Sequence[str]) -> CollectionCounts:
-        """Each Collection by name, its branch's Works counted once; Ingested is `done` all done."""
-        stages = (list(done), len(done))
+    def counts(self, *, done: Sequence[str], query: str = "") -> CollectionCounts:
+        """Each Collection by name, its branch's Works counted once; Ingested is `done` all done.
+
+        With a query only the Library Items whose title, creators, year, key or DOI hold every
+        word count, as `Works.library_items` finds them.
+        """
+        where, words = library_search(query)
+        library: LiteralString = _LIBRARY + where
+        stages = (list(done), len(done), *words)
         with self._conn.cursor(row_factory=class_row(CollectionCount)) as cur:
             collections = cur.execute(
                 "WITH RECURSIVE branch (top, key, depth) AS ("
                 " SELECT key, key, 0 FROM collections"
                 " UNION SELECT b.top, c.key, b.depth + 1 FROM collections c"
                 " JOIN branch b ON c.parent_key = b.key WHERE b.depth < %s),"
-                f" library AS ({_LIBRARY})"
+                f" library AS ({library})"
                 " SELECT c.key, c.name, c.parent_key, count(DISTINCT l.id) AS works,"
                 " count(DISTINCT l.id) FILTER (WHERE l.done) AS ingested"
                 " FROM collections c JOIN branch b ON b.top = c.key"
@@ -128,7 +135,7 @@ class Collections:
                 (COLLECTION_DEPTH, *stages),
             ).fetchall()
         row = self._conn.execute(
-            f"WITH library AS ({_LIBRARY}),"
+            f"WITH library AS ({library}),"
             " unfiled AS (SELECT * FROM library l WHERE NOT EXISTS"
             " (SELECT 1 FROM work_collections f WHERE f.work_id = l.id))"
             " SELECT (SELECT count(*) FROM library), (SELECT count(*) FROM library WHERE done),"

@@ -222,9 +222,13 @@ class ApiClient:
             params["unfiled"] = "true"
         return LibraryPage.model_validate(self._get(f"/library?{urlencode(params)}"))
 
-    def collections(self) -> CollectionTree:
-        """Every Collection with its branch's counts, the whole Library's, and the unfiled ones."""
-        return CollectionTree.model_validate(self._get("/collections"))
+    def collections(self, query: str = "") -> CollectionTree:
+        """Every Collection with its branch's counts, the whole Library's, and the unfiled ones.
+
+        With a query the counts are of the Library Items matching it, as `library` finds them.
+        """
+        path = f"/collections?{urlencode({'q': query})}" if query.split() else "/collections"
+        return CollectionTree.model_validate(self._get(path))
 
     def sync_library(self) -> LibrarySynced:
         """Bring the Library up to date with Zotero."""

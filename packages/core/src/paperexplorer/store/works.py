@@ -99,7 +99,7 @@ DONE_ALL: LiteralString = (
 _SEARCHED = "concat_ws(' ', title, array_to_string(creators, ' '), year, zotero_key, doi)"
 
 
-def _search(query: str) -> tuple[LiteralString, list[str]]:
+def library_search(query: str) -> tuple[LiteralString, list[str]]:
     """The WHERE clause for a search of the Library, and its parameters: every word must match."""
     words = [w.replace("\\", r"\\").replace("%", r"\%").replace("_", r"\_") for w in query.split()]
     where: LiteralString = " WHERE zotero_key IS NOT NULL"
@@ -210,7 +210,7 @@ class Works:
         With no query only the Branch's are listed; a query searches the whole Library, the
         Branch's matches first.
         """
-        where, words = _search(query)
+        where, words = library_search(query)
         cte, in_branch, cte_params = _in_branch(branch)
         only: LiteralString = "" if query.split() else f" AND {in_branch}"
         with self._conn.cursor(row_factory=dict_row) as cur:
@@ -226,7 +226,7 @@ class Works:
 
     def library_count(self, query: str, branch: Branch | None = None) -> int:
         """How many Library Items match `query`, of those in the Branch if one is given."""
-        where, words = _search(query)
+        where, words = library_search(query)
         cte, in_branch, cte_params = _in_branch(branch)
         row = self._conn.execute(
             f"{cte}SELECT count(*) FROM works" + where + f" AND {in_branch}", [*cte_params, *words]

@@ -14,6 +14,7 @@ from paperexplorer_api.schemas import (
     rerun_stages,
 )
 from paperexplorer_web.browsing import Selection, Tree
+from paperexplorer_web.explorations import ExplorationView, exploration_view
 
 
 class Pip(BaseModel):
@@ -40,6 +41,8 @@ class Row(BaseModel):
     polling: bool
     start_label: str | None  # "Ingest" or "Resume" when there is something to run
     resolve_label: str | None  # Resolving References, once parsed
+    explore: bool  # *Start Exploration*: a Work with a PDF that is the Seed of none
+    exploration: ExplorationView | None  # the Exploration it is the Seed of
     pips: list[Pip]
     stages_label: str  # every Stage and its state, for the strip's aria-label
     errors: list[str]
@@ -94,16 +97,20 @@ def row(
         for key in work.collections
         if key != selected and pane is not None and (node := pane.by_key.get(key)) is not None
     ]
+    explored = exploration_view(work.exploration, idle=idle) if work.exploration else None
     return Row(
         work=work,
         message=message,
         polling=not idle,
+        # *Resume Exploration* runs every Stage not done, so it stands in for *Resume*.
         start_label=None
-        if not idle or not work.has_pdf or ingested
+        if not idle or not work.has_pdf or ingested or (explored is not None and explored.resume)
         else ("Resume" if started else "Ingest"),
         resolve_label=None
         if not parsed or not idle
         else ("Resolve again" if resolved else "Resolve References"),
+        explore=idle and work.has_pdf and work.exploration is None,
+        exploration=explored,
         pips=pips,
         stages_label="Stages: " + ", ".join(f"{p.stage} {p.state}" for p in pips),
         errors=[

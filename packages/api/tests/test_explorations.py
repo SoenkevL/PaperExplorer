@@ -267,3 +267,16 @@ def test_the_seeds_row_carries_its_exploration_and_the_tree_marks_its_collection
     marked = {c.key: c.exploration for c in tree.collections}
     assert marked[row.exploration.collection_key]
     assert [k for k, m in marked.items() if m] == [row.exploration.collection_key]
+
+
+def test_the_start_dialog_learns_the_collections_name_before_anything_is_written(
+    harness: Harness,
+) -> None:
+    works = harness.synced()
+
+    proposal = harness.client.exploration_proposal(works["VILL2024"].id)
+
+    assert proposal.name.startswith("Villiger 2024 \N{EN DASH} Personal psychedelic")
+    assert harness.library.changes(None).collections == []
+    with pytest.raises(ConflictError, match="PDF"):
+        harness.client.exploration_proposal(works["NOPDF234"].id)

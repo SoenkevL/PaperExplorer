@@ -42,11 +42,14 @@ from paperexplorer_web.browsing import (
     works_side,
 )
 from paperexplorer_web.checks import PendingCheck, relay_check
+from paperexplorer_web.explorations import ExplorationView, exploration_view
 from paperexplorer_web.library import LibraryList, library_list, row
 from paperexplorer_web.relay import Pending, PendingQuestion, Views, not_embedded, relay
 from paperexplorer_web.segments import Segment, segments
 
 logger = logging.getLogger(__name__)
+
+type Place = Literal["row", "page"]  # where the start dialog was opened, and its answer goes
 
 # How long the cookies remembering the view and the selection last.
 REMEMBERED_S = 365 * 24 * 3600
@@ -354,6 +357,69 @@ def create_app(api: ApiClient) -> FastAPI:
             logger.warning("Work %d's References not started", work_id, exc_info=True)
             return row_view(request, work_id, f"Not started: {_why(e)}", tint=tint == "1")
         return row_of(request, work, tint=tint == "1")
+
+    def check_cost(work_id: int) -> CheckCost | None:
+        """A Check's cost, or `None` while the Work's References are not parsed or unreachable."""
+        try:
+            return api.check_cost(work_id)
+        except NotFoundError:
+            return None
+        except httpx.HTTPError:
+            logger.warning("Check cost of Work %d failed", work_id, exc_info=True)
+            return None
+
+    @app.get("/works/{work_id}/exploration/start", response_class=HTMLResponse)
+    def exploration_start(  # pyright: ignore[reportUnusedFunction]
+        request: Request, work_id: int, place: Place = "row"
+    ) -> HTMLResponse:
+        """The start dialog: the Collection it makes, and the Check with its cost, ticked."""
+        context: dict[str, object] = {"work_id": work_id, "place": place}
+        try:
+            context["name"] = api.exploration_proposal(work_id).name
+        except (httpx.HTTPError, ConflictError, NotFoundError) as e:
+            context["message"] = f"No Exploration: {_why(e)}"
+        else:
+            context["cost"] = check_cost(work_id)
+        return pages.TemplateResponse(request, "exploration_start.html", context)
+
+    def exploration_section(
+        request: Request, work_id: int, message: str | None = None
+    ) -> HTMLResponse:
+        """The Work page's Exploration: its state, or *Start Exploration*."""
+        explored: ExplorationView | None = None
+        try:
+            explored = exploration_view(api.exploration(work_id), idle=True)
+        except NotFoundError:
+            pass
+        except httpx.HTTPError:
+            logger.warning("Work %d's Exploration could not be read", work_id, exc_info=True)
+            message = message or "The Exploration could not be read: the API is unreachable."
+        context = {"work_id": work_id, "explored": explored, "message": message}
+        return pages.TemplateResponse(request, "exploration.html", context)
+
+    @app.get("/works/{work_id}/exploration", response_class=HTMLResponse)
+    def exploration(request: Request, work_id: int) -> HTMLResponse:  # pyright: ignore[reportUnusedFunction]
+        """The Work page's Exploration section, polled while a Stage Run holds the Seed."""
+        return exploration_section(request, work_id)
+
+    @app.post("/works/{work_id}/exploration", response_class=HTMLResponse)
+    def start_exploration(  # pyright: ignore[reportUnusedFunction]
+        request: Request,
+        work_id: int,
+        check: Annotated[str | None, Form()] = None,
+        place: Annotated[Place, Form()] = "row",
+        tint: Annotated[str, Form()] = "",
+    ) -> HTMLResponse:
+        """Start the Seed's Exploration or resume it, with the Check if the box was left ticked."""
+        message: str | None = None
+        try:
+            api.start_exploration(work_id, check=check is not None)
+        except (httpx.HTTPError, ConflictError, NotFoundError) as e:
+            logger.warning("Exploration of Work %d not started", work_id, exc_info=True)
+            message = f"Not started: {_why(e)}"
+        if place == "page":
+            return exploration_section(request, work_id, message)
+        return row_view(request, work_id, message, tint=tint == "1")
 
     def duplicate_items() -> list[DuplicateItems]:
         """Each DOI's Duplicate Items; none when the API serves none (no Zotero keys) or is down."""

@@ -129,6 +129,12 @@ class StartExploration(BaseModel):
     check: bool = False
 
 
+class ExplorationProposal(BaseModel):
+    """What starting an Exploration would make: its Collection's name."""
+
+    name: str
+
+
 class FailedFiling(BaseModel):
     """A Source whose Filing failed, and why; the next reconcile tries it again."""
 

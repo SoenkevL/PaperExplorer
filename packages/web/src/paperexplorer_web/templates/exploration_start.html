@@ -1,0 +1,28 @@
+{#- The start dialog of an Exploration, on a row or the Work page: the Collection it makes, and a
+    Registry Check of the Unchecked References with its cost, ticked (ADR 0011: leaving it ticked
+    is the reader asking). -#}
+{%- if place == "page" -%}
+{%- set target = 'hx-target="#exploration" hx-swap="innerHTML"' -%}
+{%- set cancel = 'hx-get="/works/' ~ work_id ~ '/exploration" hx-target="#exploration" hx-swap="innerHTML"' -%}
+{%- else -%}
+{%- set target = 'hx-target="closest li" hx-swap="outerHTML"' -%}
+{%- set cancel = 'hx-get="/works/' ~ work_id ~ '/row" hx-target="closest li" hx-swap="outerHTML"' -%}
+{%- endif -%}
+{%- if message %}
+<p class="failed">{{ message }}</p>
+<button type="button" {{ cancel | safe }}>Close</button>
+{%- else %}
+<form class="exploration-start" hx-post="/works/{{ work_id }}/exploration" {{ target | safe }} hx-disabled-elt="find button">
+  <input type="hidden" name="place" value="{{ place }}">
+  <p>Makes <strong>{{ name }}</strong> in your PaperExplorer Collection in Zotero, files this Work and its firmly resolved Sources there, and runs the Stages not done. Your other Collections are left as they are.</p>
+  {%- if cost is none %}
+  <label><input type="checkbox" name="check" checked> Then check the Unchecked References with the registries; the Check's cost shows once its References are parsed.</label>
+  {%- elif cost.unchecked %}
+  <label><input type="checkbox" name="check" checked> Then check {{ plural(cost.unchecked, "Unchecked Reference", "Unchecked References") }}: at most ${{ usd(cost.openalex_usd) }} of OpenAlex's day
+    {%- if cost.budget_usd is not none %}, ${{ usd(cost.budget_usd) }} left{% if cost.budget_usd < cost.openalex_usd %}, so the Check may stop before it is done{% endif %}{% endif %}.</label>
+  {%- else %}
+  <p class="note">No Unchecked References, so no Check.</p>
+  {%- endif %}
+  <span class="actions"><button type="submit">Start Exploration</button><button type="button" {{ cancel | safe }}>Cancel</button></span>
+</form>
+{%- endif %}

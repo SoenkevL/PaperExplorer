@@ -60,6 +60,16 @@ def router(
                 logger.info("Queued %s for the Exploration of Work %d", ", ".join(stages), seed)
             return explored(conn, seed)
 
+    @routes.get("/works/{work_id}/exploration/proposal")
+    def proposal(work_id: int) -> schemas.ExplorationProposal:  # pyright: ignore[reportUnusedFunction]
+        with connections() as conn:
+            work = Works(conn).get(WorkId(work_id))
+        if work is None:
+            raise HTTPException(404, f"No Work {work_id}")
+        if work.pdf is None:
+            raise HTTPException(409, f"Work {work_id} has no PDF; a Seed needs its text")
+        return schemas.ExplorationProposal(name=catalog.exploration_name(work))
+
     @routes.get("/works/{work_id}/exploration")
     def exploration(work_id: int) -> schemas.Exploration:  # pyright: ignore[reportUnusedFunction]
         with connections() as conn:

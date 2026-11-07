@@ -18,6 +18,7 @@ from paperexplorer_api.schemas import (
     Conversation,
     DuplicateItems,
     Exploration,
+    ExplorationProposal,
     Health,
     Ingest,
     LibraryPage,
@@ -265,6 +266,11 @@ class ApiClient:
         """
         body = StartExploration(check=check).model_dump()
         return Exploration.model_validate(self._send("POST", f"/works/{work_id}/exploration", body))
+
+    def exploration_proposal(self, work_id: int) -> ExplorationProposal:
+        """What starting the Work's Exploration would make; `ConflictError` if it has no PDF."""
+        path = f"/works/{work_id}/exploration/proposal"
+        return ExplorationProposal.model_validate(self._get(path))
 
     def exploration(self, work_id: int) -> Exploration:
         """Where the Seed's Exploration stands; `NotFoundError` if it has none."""

@@ -1,6 +1,7 @@
 {#- One Library Item: its Collections, its Stages as pips, what it offers, and a poll while a Stage
     Run holds it. Swapped whole; the same in both views and the poll. -#}
 {%- from "library_nav.html" import nav -%}
+{%- from "exploration_line.html" import exploration_line -%}
 {%- set w = row.work -%}
 <li id="work-{{ w.id }}" class="library-row{% if row.tint %} in-branch{% endif %}"{% if row.tint %} hx-vals='{"tint": "1"}'{% endif %}{% if row.polling %} hx-get="/works/{{ w.id }}/row" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
   {% if w.text_origin %}<a href="/works/{{ w.id }}">{{ w.title or w.zotero_key }}</a>
@@ -23,6 +24,7 @@
   {% if row.filed %}
   <p class="filed">{{ row.filed_label }} {% for f in row.filed %}<a {% if row.browsing %}{{ nav(f.url) }}{% else %}href="{{ f.url }}"{% endif %} title="{{ f.path }}">{{ f.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p>
   {% endif %}
+  {% if row.exploration %}{{ exploration_line(row.exploration, w.id, "row") }}{% endif %}
   {% for error in row.errors %}<p class="failed">{{ error }}</p>{% endfor %}
   {% if row.message %}<p class="failed">{{ row.message }}</p>{% endif %}
   <span class="actions">
@@ -30,5 +32,7 @@
     {% if w.run == "queued" %}<button type="button" hx-delete="/works/{{ w.id }}/stage-run" hx-target="closest li" hx-swap="outerHTML">Cancel</button>{% endif %}
     {% if row.start_label %}<button type="button" hx-post="/works/{{ w.id }}/ingesting" hx-target="closest li" hx-swap="outerHTML">{{ row.start_label }}</button>{% endif %}
     {% if row.resolve_label %}<button type="button" hx-post="/works/{{ w.id }}/resolving" hx-target="closest li" hx-swap="outerHTML">{{ row.resolve_label }}</button>{% endif %}
+    {% if row.explore %}<button type="button" hx-get="/works/{{ w.id }}/exploration/start" hx-target="#explore-{{ w.id }}">Start Exploration</button>{% endif %}
   </span>
+  {% if row.explore %}<div id="explore-{{ w.id }}" class="explore" aria-live="polite"></div>{% endif %}
 </li>

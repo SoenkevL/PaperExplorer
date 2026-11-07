@@ -1,0 +1,12 @@
+{#- The Work page's Exploration: its state, polled while a Stage Run holds the Seed, or the
+    button opening the start dialog here. -#}
+{%- from "exploration_line.html" import exploration_line -%}
+<div{% if explored and explored.polling %} hx-get="/works/{{ work_id }}/exploration" hx-trigger="every 2s" hx-target="#exploration" hx-swap="innerHTML"{% endif %}>
+{%- if message %}<p class="failed">{{ message }}</p>{% endif %}
+{%- if explored %}
+{{ exploration_line(explored, work_id, "page") }}
+{%- if explored.polling %}<p class="note">running</p>{% endif %}
+{%- else %}
+<button type="button" hx-get="/works/{{ work_id }}/exploration/start?place=page" hx-target="#exploration" hx-swap="innerHTML">Start Exploration</button>
+{%- endif %}
+</div>

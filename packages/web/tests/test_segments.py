@@ -2,8 +2,10 @@ from paperexplorer_api.schemas import CitationSpan, ConfidenceLevel
 from paperexplorer_web.segments import segments
 
 
-def _span(id_: int, start: int, end: int, level: ConfidenceLevel = "high") -> CitationSpan:
-    return CitationSpan(id=id_, start=start, end=end, confidence_level=level)
+def _span(
+    id_: int, start: int, end: int, level: ConfidenceLevel = "high", *, held: bool = False
+) -> CitationSpan:
+    return CitationSpan(id=id_, start=start, end=end, confidence_level=level, library_match=held)
 
 
 def test_text_without_citations_is_one_plain_segment() -> None:
@@ -52,3 +54,23 @@ def test_a_nested_citation_splits_the_outer_one_and_joins_its_text_back() -> Non
         ("2004)", [1, 2], "unlinked"),
         (" for", [], None),
     ]
+
+
+def test_a_printed_range_is_a_library_match_when_any_firm_citation_in_it_is() -> None:
+    text = "data [1\u20133]."  # the dash stands for Citation 2; only 2 is a Library Match
+    spans = [_span(1, 5, 7), _span(2, 7, 8, held=True), _span(3, 7, 10)]  # 3 also holds the dash
+
+    parts = segments(text, spans)
+
+    assert [(p.text, p.library_match) for p in parts] == [
+        ("data ", False), ("[1", False), ("\u2013", True), ("3]", False), (".", False),
+    ]  # fmt: skip
+
+
+def test_a_printed_range_with_a_low_link_keeps_its_warning_over_a_library_match() -> None:
+    text = "data [1\u20133]."
+    spans = [_span(2, 7, 8, held=True), _span(3, 7, 8, "low")]
+
+    [dash] = [p for p in segments(text, spans) if p.citations]
+
+    assert (dash.confidence_level, dash.library_match) == ("low", False)

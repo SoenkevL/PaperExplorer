@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from psycopg.rows import TupleRow
 
 from paperexplorer.config import Settings
-from paperexplorer.domain import Attachment, LibraryChanges, LibraryItem, Vector
+from paperexplorer.domain import Attachment, Collection, LibraryChanges, LibraryItem, Vector
 from paperexplorer.embedding import FakeEmbedder
 from paperexplorer.library import InMemoryLibrary, LibraryUnavailableError, sync
 from paperexplorer.parsing import ParsedWork
@@ -159,6 +159,97 @@ def test_the_library_is_searched_and_paged(harness: Harness) -> None:
     page = harness.client.library(limit=1, offset=1)
     assert page.total == 3
     assert len(page.items) == 1
+
+
+def _filed(harness: Harness) -> None:
+    """ROOT holds SUB; VILLIGER sits in both, OTHER only in SUB, NO_PDF in none."""
+    harness.library.put_collection(Collection(key="ROOT", name="Root"))
+    harness.library.put_collection(Collection(key="SUB", name="Sub", parent_key="ROOT"))
+    harness.library.put(VILLIGER.model_copy(update={"collections": ["ROOT", "SUB"]}))
+    harness.library.put(OTHER.model_copy(update={"collections": ["SUB"]}))
+    harness.client.sync_library()
+
+
+def test_the_collections_come_flat_with_their_branch_counts(harness: Harness) -> None:
+    _filed(harness)
+
+    tree = harness.client.collections()
+
+    assert [(c.key, c.name, c.parent_key, c.works, c.ingested) for c in tree.collections] == [
+        ("ROOT", "Root", None, 2, 0),
+        ("SUB", "Sub", "ROOT", 2, 0),
+    ]
+    assert (tree.library.works, tree.unfiled.works) == (3, 1)
+
+
+def test_a_collection_lists_what_is_filed_in_it_and_deep_its_branch(harness: Harness) -> None:
+    _filed(harness)
+    harness.library.put_collection(Collection(key="LEAF", name="Leaf", parent_key="SUB"))
+    harness.library.put(NO_PDF.model_copy(update={"collections": ["LEAF"]}))
+    harness.client.sync_library()
+
+    direct = harness.client.library(collection="ROOT")
+    deep = harness.client.library(collection="ROOT", deep=True)
+
+    assert [w.zotero_key for w in direct.items] == ["VILL2024"]
+    assert (direct.total, direct.branch_total) == (1, 1)
+    assert direct.items[0].in_branch
+    assert direct.items[0].collections == ["ROOT", "SUB"]
+    assert sorted(w.zotero_key or "" for w in deep.items) == ["NOPDF234", "OTHR2024", "VILL2024"]
+    assert deep.total == 3
+
+
+def test_the_unfiled_library_items_are_listed(harness: Harness) -> None:
+    _filed(harness)
+
+    page = harness.client.library(unfiled=True)
+
+    assert [(w.zotero_key, w.collections) for w in page.items] == [("NOPDF234", [])]
+
+
+def test_a_search_from_a_collection_covers_the_library_its_matches_first(
+    harness: Harness,
+) -> None:
+    _filed(harness)
+    harness.library.put(NO_PDF.model_copy(update={"title": "Only metadata, psychedelic"}))
+    harness.client.sync_library()
+
+    page = harness.client.library("psychedelic", collection="ROOT")
+
+    assert [(w.zotero_key, w.in_branch) for w in page.items] == [
+        ("VILL2024", True),
+        ("NOPDF234", False),
+    ]
+    assert (page.total, page.branch_total) == (2, 1)
+
+
+def test_the_whole_library_is_one_branch(harness: Harness) -> None:
+    harness.client.sync_library()
+
+    page = harness.client.library("olive")
+
+    assert (page.total, page.branch_total) == (1, 1)
+    assert page.items[0].in_branch
+
+
+def test_an_unknown_collection_is_not_found(harness: Harness) -> None:
+    harness.client.sync_library()
+
+    with pytest.raises(NotFoundError):
+        harness.client.library(collection="GONE1234")
+
+
+def test_a_collection_and_the_unfiled_items_cannot_be_asked_at_once(harness: Harness) -> None:
+    _filed(harness)
+
+    with pytest.raises(Exception, match="422"):
+        harness.client.library(collection="ROOT", unfiled=True)
+
+
+def test_deep_without_a_collection_is_ignored(harness: Harness) -> None:
+    harness.client.sync_library()
+
+    assert harness.client.library(deep=True).total == 3
 
 
 def test_a_library_that_cannot_be_reached_leaves_the_last_copy(

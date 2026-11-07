@@ -1,20 +1,78 @@
 """Works: one row per Work, holding its Library Item's metadata snapshot (ADR 0001)."""
 
 from collections.abc import Collection, Sequence
-from typing import LiteralString
+from typing import LiteralString, Self
 
 import psycopg
-from psycopg.rows import TupleRow, class_row
+from psycopg.rows import TupleRow, class_row, dict_row
+from pydantic import BaseModel, ConfigDict, model_validator
 
-from paperexplorer.domain import LibraryItem, RegistryRecord, Work, WorkId, normalize_doi
+from paperexplorer.domain import (
+    COLLECTION_DEPTH,
+    LibraryItem,
+    RegistryRecord,
+    Work,
+    WorkId,
+    normalize_doi,
+)
 
-_WORK = """
-    SELECT id, zotero_key, title, creators, year, doi, synced_at, text_origin, added_at AS added,
-           CASE WHEN pdf_attachment_key IS NOT NULL THEN
-               jsonb_build_object('key', pdf_attachment_key, 'filename', pdf_filename)
-           END AS pdf
-    FROM works
+_COLUMNS = """
+    id, zotero_key, title, creators, year, doi, synced_at, text_origin, added_at AS added,
+    CASE WHEN pdf_attachment_key IS NOT NULL THEN
+        jsonb_build_object('key', pdf_attachment_key, 'filename', pdf_filename)
+    END AS pdf
 """
+_WORK = f"SELECT {_COLUMNS} FROM works"
+
+
+class Branch(BaseModel):
+    """Where the reader browses the Library: one Collection, its whole branch, or no Collection."""
+
+    model_config = ConfigDict(frozen=True)
+
+    collection: str | None = None
+    deep: bool = False  # the Collection's subcollections too, to `COLLECTION_DEPTH`
+    unfiled: bool = False
+
+    @model_validator(mode="after")
+    def _one_place(self) -> Self:
+        if (self.collection is None) == (not self.unfiled):
+            raise ValueError("a Branch is either one Collection or the unfiled Library Items")
+        return self
+
+
+class LibraryRow(BaseModel):
+    """A Library Item found, and whether it sits in the Branch browsed."""
+
+    work: Work
+    in_branch: bool
+
+
+_FILED_IN_BRANCH: LiteralString = (
+    "EXISTS (SELECT 1 FROM work_collections f WHERE f.work_id = works.id"
+    " AND f.collection_key IN (SELECT key FROM branch))"
+)
+
+
+def _in_branch(branch: Branch | None) -> tuple[LiteralString, LiteralString, list[object]]:
+    """The CTE a Branch needs, a test of whether `works` is in it, and the CTE's parameters."""
+    if branch is None:
+        return "", "true", []
+    if branch.unfiled:
+        return "", "NOT EXISTS (SELECT 1 FROM work_collections f WHERE f.work_id = works.id)", []
+    if not branch.deep:
+        return (
+            "WITH branch (key) AS (SELECT %s::text) ",
+            _FILED_IN_BRANCH,
+            [branch.collection],
+        )
+    return (
+        "WITH RECURSIVE branch (key, depth) AS (SELECT %s::text, 0"
+        " UNION SELECT c.key, b.depth + 1 FROM collections c"
+        " JOIN branch b ON c.parent_key = b.key WHERE b.depth < %s) ",
+        _FILED_IN_BRANCH,
+        [branch.collection, COLLECTION_DEPTH],
+    )
 
 
 # Which of the Works holding one DOI is its Standing Item: the one the reader let stand, a Library
@@ -23,6 +81,11 @@ _STANDING = (
     "stands_by_reader DESC, zotero_key IS NULL, pdf_attachment_key IS NULL, added_at NULLS LAST, id"
 )
 _CANDIDATES = 10
+# Whether every Stage named in the first parameter (its length the second) is done for `works.id`.
+DONE_ALL: LiteralString = (
+    "(SELECT count(*) FROM stage_status s WHERE s.work_id = works.id"
+    " AND s.state = 'done' AND s.stage = ANY(%s)) = %s"
+)
 _SEARCHED = "concat_ws(' ', title, array_to_string(creators, ' '), year, zotero_key, doi)"
 
 
@@ -124,25 +187,40 @@ class Works:
             ).fetchall()
 
     def library_items(
-        self, query: str, limit: int, offset: int, *, done_first: Sequence[str]
-    ) -> list[Work]:
-        """A page of the Library Items matching `query`: `done_first` all done, then the newest."""
-        where, words = _search(query)
-        done = (
-            "(SELECT count(*) FROM stage_status s WHERE s.work_id = works.id"
-            " AND s.state = 'done' AND s.stage = ANY(%s)) = %s"
-        )
-        with self._conn.cursor(row_factory=class_row(Work)) as cur:
-            return cur.execute(
-                _WORK + where + f" ORDER BY {done} DESC, added_at DESC NULLS LAST, id"
-                " LIMIT %s OFFSET %s",
-                [*words, list(done_first), len(done_first), limit, offset],
-            ).fetchall()
+        self,
+        query: str,
+        limit: int,
+        offset: int,
+        *,
+        done_first: Sequence[str],
+        branch: Branch | None = None,
+    ) -> list[LibraryRow]:
+        """A page of the Library Items matching `query`: `done_first` all done, then the newest.
 
-    def library_count(self, query: str) -> int:
-        """How many Library Items match `query`."""
+        With no query only the Branch's are listed; a query searches the whole Library, the
+        Branch's matches first.
+        """
         where, words = _search(query)
-        row = self._conn.execute("SELECT count(*) FROM works" + where, words).fetchone()
+        cte, in_branch, cte_params = _in_branch(branch)
+        only: LiteralString = "" if query.split() else f" AND {in_branch}"
+        with self._conn.cursor(row_factory=dict_row) as cur:
+            rows = cur.execute(
+                f"{cte}SELECT {in_branch} AS in_branch, {_COLUMNS} FROM works"
+                + where
+                + only
+                + f" ORDER BY in_branch DESC, {DONE_ALL} DESC, added_at DESC NULLS LAST, id"
+                " LIMIT %s OFFSET %s",
+                [*cte_params, *words, list(done_first), len(done_first), limit, offset],
+            ).fetchall()
+        return [LibraryRow(in_branch=r.pop("in_branch"), work=Work.model_validate(r)) for r in rows]
+
+    def library_count(self, query: str, branch: Branch | None = None) -> int:
+        """How many Library Items match `query`, of those in the Branch if one is given."""
+        where, words = _search(query)
+        cte, in_branch, cte_params = _in_branch(branch)
+        row = self._conn.execute(
+            f"{cte}SELECT count(*) FROM works" + where + f" AND {in_branch}", [*cte_params, *words]
+        ).fetchone()
         assert row is not None
         return row[0]
 

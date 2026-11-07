@@ -14,7 +14,7 @@ from paperexplorer.embedding import Embedder
 from paperexplorer.library import Library, sync
 from paperexplorer.pipeline import INGESTING, RESOLVING, StageContext, remaining
 from paperexplorer.resolution import DoiRegistry
-from paperexplorer.store import StageState, StageStatuses, Works
+from paperexplorer.store import Branch, Collections, StageState, StageStatuses, Works
 from paperexplorer.tracing import Tracing
 from paperexplorer_api import schemas
 from paperexplorer_api.routes import Connections
@@ -50,13 +50,23 @@ def router(connections: Connections, ingesting: Ingesting, thread: StageRunThrea
     """Routes under `/library` and `/works/{id}`: its Stages and Stage Runs."""
     routes = APIRouter(tags=["ingesting"])
 
-    def view(conn: psycopg.Connection[TupleRow], work: Work) -> schemas.LibraryWork:
+    def view(
+        conn: psycopg.Connection[TupleRow],
+        work: Work,
+        *,
+        in_branch: bool = True,
+        collections: list[str] | None = None,
+    ) -> schemas.LibraryWork:
+        # The run before the Stages: a run seen ended leaves its Stages final when read after it.
+        run = thread.run_of(work.id)
         statuses = StageStatuses(conn)
         ran = statuses.for_work(work.id)
         return schemas.LibraryWork(
             **work_summary(work, statuses).model_dump(),
+            collections=Collections(conn).of_work(work.id) if collections is None else collections,
+            in_branch=in_branch,
             has_pdf=work.pdf is not None,
-            run=thread.run_of(work.id),
+            run=run,
             stage_statuses={
                 name: schemas.StageStatus(
                     state=s.state.value,
@@ -93,13 +103,43 @@ def router(connections: Connections, ingesting: Ingesting, thread: StageRunThrea
         q: str = "",
         limit: Annotated[int, Query(ge=1, le=200)] = 50,
         offset: Annotated[int, Query(ge=0)] = 0,
+        collection: str | None = None,
+        deep: bool = False,
+        unfiled: bool = False,
     ) -> schemas.LibraryPage:
-        with connections() as conn:
-            works = Works(conn)
-            items = works.library_items(q, limit, offset, done_first=INGESTING)
-            return schemas.LibraryPage(
-                items=[view(conn, w) for w in items], total=works.library_count(q)
+        if collection is not None and unfiled:
+            raise HTTPException(
+                422, "Ask for one Collection or the unfiled Library Items, not both"
             )
+        branch = (
+            Branch(collection=collection, deep=deep)
+            if collection is not None
+            else Branch(unfiled=True)
+            if unfiled
+            else None
+        )
+        with connections() as conn:
+            held = Collections(conn).keys()
+            if collection is not None and collection not in held:
+                raise HTTPException(404, f"No Collection {collection}")
+            works = Works(conn)
+            rows = works.library_items(q, limit, offset, done_first=INGESTING, branch=branch)
+            filed = Collections(conn).of_works(r.work.id for r in rows)
+            branch_total = works.library_count(q, branch)
+            return schemas.LibraryPage(
+                items=[
+                    view(conn, r.work, in_branch=r.in_branch, collections=filed[r.work.id])
+                    for r in rows
+                ],
+                total=works.library_count(q) if q.split() else branch_total,
+                branch_total=branch_total,
+            )
+
+    @routes.get("/collections")
+    def collections() -> schemas.CollectionTree:  # pyright: ignore[reportUnusedFunction]
+        with connections() as conn:
+            counts = Collections(conn).counts(done=INGESTING)
+        return schemas.CollectionTree.model_validate(counts.model_dump())
 
     @routes.post("/library/sync")
     def sync_library() -> schemas.LibrarySynced:  # pyright: ignore[reportUnusedFunction]

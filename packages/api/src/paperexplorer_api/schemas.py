@@ -95,13 +95,44 @@ class LibraryWork(WorkSummary):
     # Its Stage Run, `running` between Stages too, until the last has ended.
     run: Literal["queued", "running"] | None
     stage_statuses: dict[str, StageStatus]
+    # The keys of the Collections it is filed in, sorted.
+    collections: list[str] = []
+    # Whether it sits in the Collection, branch or unfiled part browsed; the whole Library is one.
+    in_branch: bool = True
 
 
 class LibraryPage(BaseModel):
-    """A page of the Library Items found, and how many there are in all."""
+    """A page of the Library Items found, how many there are in all, and how many in the branch.
+
+    The branch's rows come first, so the rows from `branch_total` on are elsewhere in the Library.
+    """
 
     items: list[LibraryWork]
     total: int
+    branch_total: int
+
+
+class BranchCount(BaseModel):
+    """How many Works a branch holds, each once, and how many of them are Ingested."""
+
+    works: int
+    ingested: int
+
+
+class CollectionCount(BranchCount):
+    """A Collection with the counts of its whole branch, subcollections included."""
+
+    key: str
+    name: str
+    parent_key: str | None
+
+
+class CollectionTree(BaseModel):
+    """Every Collection, flat and by name, beside the whole Library and the Items filed nowhere."""
+
+    collections: list[CollectionCount]
+    library: BranchCount
+    unfiled: BranchCount
 
 
 class LibrarySynced(BaseModel):

@@ -1,0 +1,41 @@
+{
+ "DOI": "10.1016/j.neubiorev.2022.104689",
+ "type": "journal-article",
+ "title": [
+  "Psychedelic resting-state neuroimaging: A review and perspective on balancing replication and novel analyses"
+ ],
+ "author": [
+  {
+   "given": "Drummond E-Wen",
+   "family": "McCulloch",
+   "sequence": "first"
+  },
+  {
+   "given": "Gitte Moos",
+   "family": "Knudsen",
+   "sequence": "additional"
+  },
+  {
+   "given": "Frederick Streeter",
+   "family": "Barrett",
+   "sequence": "additional"
+  }
+ ],
+ "issued": {
+  "date-parts": [
+   [
+    2022,
+    7
+   ]
+  ]
+ },
+ "container-title": [
+  "Neuroscience &amp; Biobehavioral Reviews"
+ ],
+ "short-container-title": [
+  "Neuroscience &amp; Biobehavioral Reviews"
+ ],
+ "volume": "138",
+ "page": "104689",
+ "publisher": "Elsevier BV"
+}

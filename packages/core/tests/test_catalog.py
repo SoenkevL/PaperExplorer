@@ -1,5 +1,8 @@
 """Explorations in Zotero: started on a Seed, firm Sources filed, the reader's edits respected."""
 
+import json
+from pathlib import Path
+
 import psycopg
 import pytest
 from psycopg.rows import TupleRow
@@ -31,6 +34,7 @@ from paperexplorer.store import (
 )
 
 Conn = psycopg.Connection[TupleRow]
+FIXTURES = Path(__file__).resolve().parents[3] / "tests" / "fixtures"
 
 MINE = Collection(key="MINE2345", name="My reading")
 SEED = LibraryItem(
@@ -449,3 +453,15 @@ def test_a_choice_of_another_work_unfiles_the_first_and_files_the_second(
 
     assert result is not None and (result.filed, result.unfiled) == (1, 1)
     assert sorted(_filed_in(library, key)) == [OTHER.key, SEED.key]
+
+
+def test_a_crossref_record_with_html_entities_drafts_plain_text() -> None:
+    """Regression: the tower's first Exploration made a journal `Neuroscience &amp; ...`."""
+    fixture = FIXTURES / "crossref-neubiorev-2022-104689.json"
+    record = json.loads(fixture.read_text())
+
+    made = new_items.from_crossref(record)
+
+    assert made.publication == "Neuroscience & Biobehavioral Reviews"
+    assert made.date == "2022-07"
+    assert made.creators[0] == "McCulloch, Drummond E-Wen"

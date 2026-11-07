@@ -19,12 +19,27 @@ from paperexplorer_api.schemas import (
     Block,
     CheckCost,
     CitationDetail,
+    CollectionTree,
     DuplicateItems,
+    LibraryPage,
+    LibraryWork,
     Merge,
     ReadersChoice,
     Resolution,
     WorkBrief,
     WorkSummary,
+)
+from paperexplorer_web.browsing import (
+    COLLECTION_COOKIE,
+    DEEP_COOKIE,
+    VIEW_COOKIE,
+    Selection,
+    Tree,
+    View,
+    selection_of,
+    tree,
+    view_of,
+    works_side,
 )
 from paperexplorer_web.checks import PendingCheck, relay_check
 from paperexplorer_web.library import LibraryList, library_list, row
@@ -32,6 +47,9 @@ from paperexplorer_web.relay import Pending, PendingQuestion, Views, not_embedde
 from paperexplorer_web.segments import Segment, segments
 
 logger = logging.getLogger(__name__)
+
+# How long the cookies remembering the view and the selection last.
+REMEMBERED_S = 365 * 24 * 3600
 
 _HERE = Path(__file__).parent
 # How the panel names each kind of evidence a Citation Link rests on.
@@ -109,12 +127,49 @@ def create_app(api: ApiClient) -> FastAPI:
             request, "not_found.html", {"message": message}, status_code=404
         )
 
+    def remember(response: Response, view: View, selection: Selection | None) -> None:
+        """Keep the view and the selection, so the next visit renders them with no flash."""
+        for name, value in (
+            (VIEW_COOKIE, view),
+            *(
+                (
+                    (COLLECTION_COOKIE, selection.cookie),
+                    (DEEP_COOKIE, "1" if selection.deep else "0"),
+                )
+                if selection
+                else ()
+            ),
+        ):
+            response.set_cookie(name, value, max_age=REMEMBERED_S, samesite="lax")
+
+    def collection_tree(query: str = "") -> CollectionTree | None:
+        """The Collections with their counts (a query's matches); none if they cannot be read."""
+        try:
+            return api.collections(query)
+        except httpx.HTTPError, NotFoundError:
+            logger.warning("The Collections could not be read", exc_info=True)
+            return None
+
+    def library_page(query: str, selection: Selection, offset: int = 0) -> LibraryPage:
+        """A page of the selection's Items; a search covers its whole branch, whatever the box."""
+        return api.library(
+            query,
+            offset=offset,
+            collection=selection.collection,
+            deep=selection.deep or bool(query.split()),
+            unfiled=selection.unfiled,
+        )
+
     @app.get("/", response_class=HTMLResponse)
-    def index(request: Request) -> HTMLResponse:  # pyright: ignore[reportUnusedFunction]
+    def index(request: Request, q: str = "") -> HTMLResponse:  # pyright: ignore[reportUnusedFunction]
+        """The landing page: the Library in the List or the Collections view."""
         works: list[WorkSummary] = []
         library: LibraryList | None = None
+        pane: Tree | None = None
         has_library = False
         message: str | None = None
+        view = view_of(request.query_params, request.cookies)
+        selection = selection_of(request.query_params, request.cookies)
         try:
             api_version: str | None = api.health().version
         except httpx.HTTPError:
@@ -122,22 +177,56 @@ def create_app(api: ApiClient) -> FastAPI:
             api_version = None
         if api_version is not None:
             try:
-                library = library_list(api.library(), "", 0)
+                try:
+                    collections: CollectionTree | None = api.collections()
+                except httpx.HTTPError:
+                    # Without the tree the List view still lists; rows lose only their Collections
+                    logger.warning("The Collections could not be read", exc_info=True)
+                    collections = None
                 has_library = True
+                if selection.collection and selection.collection not in {
+                    c.key for c in (collections.collections if collections else [])
+                }:
+                    selection = Selection()  # gone since the cookie or the link named it
+                if collections is None:
+                    library = library_list(api.library(q), q, 0)
+                elif view == "collections":
+                    matches = collection_tree(q) if q.split() else None
+                    pane = tree(collections, selection, q, matches)
+                    try:
+                        page = library_page(q, selection)
+                    except NotFoundError:  # gone between the two reads
+                        selection = Selection()
+                        pane = tree(collections, selection, q, matches)
+                        page = library_page(q, selection)
+                    library = library_list(page, q, 0, selection=selection, pane=pane)
+                else:
+                    pane = tree(collections, Selection())
+                    library = library_list(api.library(q), q, 0, pane=pane)
             except NotFoundError:
                 works = _works_or_none()
             except httpx.HTTPError as e:
                 logger.warning("The Library could not be read", exc_info=True)
                 has_library = True
                 message = f"The Library could not be read: {_why(e)}"
+        browsing = view == "collections" and pane is not None
         context = {
             "api_version": api_version,
             "works": works,
             "library": library,
             "has_library": has_library,
             "message": message,
+            "view": view,
+            "browsing": browsing,
+            "tree": pane,
+            "selection": selection,
+            "side": works_side(pane, selection, q) if browsing and pane else None,
+            "query": q,
         }
-        return pages.TemplateResponse(request, "index.html", context)
+        response = pages.TemplateResponse(request, "index.html", context)
+        if has_library:
+            remember(response, view, selection if browsing else None)
+        return response
 
     def _works_or_none() -> list[WorkSummary]:
         try:
@@ -150,9 +239,19 @@ def create_app(api: ApiClient) -> FastAPI:
     def library_search(  # pyright: ignore[reportUnusedFunction]
         request: Request, q: str = "", offset: Annotated[int, Query(ge=0)] = 0
     ) -> HTMLResponse:
-        """The list for a search; a later page's rows alone, to go after those shown."""
+        """The List view's rows for a search, or a later page of either view's rows.
+
+        A later page carries the Collections view's selection, if any, as the page's address does.
+        """
+        browsing = "collection" in request.query_params or "unfiled" in request.query_params
+        selection = selection_of(request.query_params, {}) if browsing else Selection()
+        collections = collection_tree()
+        pane = tree(collections, selection) if collections else None
         try:
-            library = library_list(api.library(q, offset=offset), q, offset)
+            page = library_page(q, selection, offset)
+            library = library_list(
+                page, q, offset, selection=selection if browsing else None, pane=pane
+            )
         except (httpx.HTTPError, NotFoundError) as e:
             logger.warning("The Library could not be read", exc_info=True)
             message = f"The Library could not be read: {_why(e)}"
@@ -187,7 +286,20 @@ def create_app(api: ApiClient) -> FastAPI:
             headers={"HX-Trigger": "library-synced"},
         )
 
-    def row_view(request: Request, work_id: int, message: str | None = None) -> HTMLResponse:
+    def row_of(
+        request: Request, work: LibraryWork, message: str | None = None, *, tint: bool = False
+    ) -> HTMLResponse:
+        """A Work's row as the view the reader is in shows it, its Collections named."""
+        browsing = view_of({}, request.cookies) == "collections"
+        selected = selection_of({}, request.cookies).collection if browsing else None
+        collections = collection_tree() if work.collections else None
+        pane = tree(collections, Selection()) if collections else None
+        shown = row(work, message, pane=pane, selected=selected, browsing=browsing, tint=tint)
+        return pages.TemplateResponse(request, "library_row.html", {"row": shown})
+
+    def row_view(
+        request: Request, work_id: int, message: str | None = None, *, tint: bool = False
+    ) -> HTMLResponse:
         """A Work's row as it now stands; `message` says why when an action was refused."""
         lost = {"work_id": work_id, "message": message}
         try:
@@ -199,44 +311,49 @@ def create_app(api: ApiClient) -> FastAPI:
         except httpx.HTTPError:
             logger.warning("Work %d's Stages could not be read", work_id, exc_info=True)
             return pages.TemplateResponse(request, "library_row_lost.html", lost)
-        return pages.TemplateResponse(request, "library_row.html", {"row": row(work, message)})
+        return row_of(request, work, message, tint=tint)
 
     @app.get("/works/{work_id}/row", response_class=HTMLResponse)
-    def work_row(request: Request, work_id: int) -> HTMLResponse:  # pyright: ignore[reportUnusedFunction]
+    def work_row(request: Request, work_id: int, tint: str = "") -> HTMLResponse:  # pyright: ignore[reportUnusedFunction]
         """A Work's row, as polled while a Stage Run holds it."""
-        return row_view(request, work_id)
+        return row_view(request, work_id, tint=tint == "1")
 
     @app.post("/works/{work_id}/ingesting", response_class=HTMLResponse)
     def ingest(  # pyright: ignore[reportUnusedFunction]
-        request: Request, work_id: int, from_stage: Annotated[str | None, Form()] = None
+        request: Request,
+        work_id: int,
+        from_stage: Annotated[str | None, Form()] = None,
+        tint: Annotated[str, Form()] = "",
     ) -> HTMLResponse:
         """Start Ingesting a Work, from a Stage the reader confirmed or where it stopped."""
         try:
             work = api.ingest(work_id, from_stage=from_stage)
         except (httpx.HTTPError, ConflictError, NotFoundError) as e:
             logger.warning("Work %d not started", work_id, exc_info=True)
-            return row_view(request, work_id, f"Not started: {_why(e)}")
-        return pages.TemplateResponse(request, "library_row.html", {"row": row(work)})
+            return row_view(request, work_id, f"Not started: {_why(e)}", tint=tint == "1")
+        return row_of(request, work, tint=tint == "1")
 
     @app.delete("/works/{work_id}/stage-run", response_class=HTMLResponse)
-    def cancel_stage_run(request: Request, work_id: int) -> HTMLResponse:  # pyright: ignore[reportUnusedFunction]
+    def cancel_stage_run(request: Request, work_id: int, tint: str = "") -> HTMLResponse:  # pyright: ignore[reportUnusedFunction]
         """Cancel a Work's waiting Stage Run."""
         try:
             api.cancel_stage_run(work_id)
         except (httpx.HTTPError, ConflictError, NotFoundError) as e:
             logger.warning("Work %d not cancelled", work_id, exc_info=True)
-            return row_view(request, work_id, f"Not cancelled: {_why(e)}")
-        return row_view(request, work_id)
+            return row_view(request, work_id, f"Not cancelled: {_why(e)}", tint=tint == "1")
+        return row_view(request, work_id, tint=tint == "1")
 
     @app.post("/works/{work_id}/resolving", response_class=HTMLResponse)
-    def resolve_references(request: Request, work_id: int) -> HTMLResponse:  # pyright: ignore[reportUnusedFunction]
+    def resolve_references(  # pyright: ignore[reportUnusedFunction]
+        request: Request, work_id: int, tint: Annotated[str, Form()] = ""
+    ) -> HTMLResponse:
         """Start the Stages that resolve an Ingested Work's References."""
         try:
             work = api.resolve_references(work_id)
         except (httpx.HTTPError, ConflictError, NotFoundError) as e:
             logger.warning("Work %d's References not started", work_id, exc_info=True)
-            return row_view(request, work_id, f"Not started: {_why(e)}")
-        return pages.TemplateResponse(request, "library_row.html", {"row": row(work)})
+            return row_view(request, work_id, f"Not started: {_why(e)}", tint=tint == "1")
+        return row_of(request, work, tint=tint == "1")
 
     def duplicate_items() -> list[DuplicateItems]:
         """Each DOI's Duplicate Items; none when the API serves none (no Zotero keys) or is down."""

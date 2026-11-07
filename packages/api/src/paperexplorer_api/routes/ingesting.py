@@ -129,9 +129,9 @@ def router(connections: Connections, ingesting: Ingesting, thread: StageRunThrea
             )
 
     @routes.get("/collections")
-    def collections() -> schemas.CollectionTree:  # pyright: ignore[reportUnusedFunction]
+    def collections(q: str = "") -> schemas.CollectionTree:  # pyright: ignore[reportUnusedFunction]
         with connections() as conn:
-            counts = Collections(conn).counts(done=INGESTING)
+            counts = Collections(conn).counts(done=INGESTING, query=q)
         return schemas.CollectionTree.model_validate(counts.model_dump())
 
     @routes.post("/library/sync")

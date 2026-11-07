@@ -1,0 +1,42 @@
+{#- The Works side: where the selection sits, its meter and subcollections, then its rows (with a
+    search, the whole Library's, the branch's first). It reads itself again after a sync. -#}
+{%- from "library_nav.html" import nav -%}
+<div id="library-works" class="library-works" hx-get="/" hx-trigger="library-synced from:body" hx-include="#library-search, #library-selection" hx-select="#library-works" hx-select-oob="#library-tree" hx-target="this" hx-swap="outerHTML" hx-disinherit="*">
+  <span id="library-selection" hidden>
+    {%- if selection.unfiled %}<input type="hidden" name="unfiled" value="1">
+    {%- else %}<input type="hidden" name="collection" value="{{ selection.collection or '' }}">
+    {%- if selection.deep %}<input type="hidden" name="deep" value="1">{% endif %}{% endif -%}
+  </span>
+  <nav class="crumbs" aria-label="Breadcrumbs">
+    <button type="button" class="collections-toggle" aria-controls="library-pane" aria-expanded="false">Collections</button>
+    <ol>
+      {% for crumb in side.crumbs %}<li><a {{ nav(crumb.url) }}>{{ crumb.name }}</a></li>{% endfor %}
+      <li aria-current="location">{{ side.name if side.crumbs else "Library" }}</li>
+    </ol>
+  </nav>
+  <h2 class="selection-name">{{ side.name }}</h2>
+  <p class="meter-line">
+    <meter min="0" max="{{ side.works or 1 }}" value="{{ side.ingested }}" aria-label="Works Ingested"></meter>
+    {{ side.ingested }} of {{ plural(side.works, "Work", "Works") }} Ingested
+  </p>
+  {% if side.collection and side.collection.children %}
+  <ul class="chips" aria-label="Subcollections">
+    {% for n in side.collection.children %}
+    <li><a class="chip" {{ nav(n.url) }} title="{{ n.path }}">{{ n.name }} <span class="chip-count">{{ n.works }}</span>{% if n.children %} <span class="chip-within">· {{ plural(n.collections_within, "subcollection", "subcollections") }}</span>{% endif %}</a></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% if side.deep_url %}
+  <label class="deep"><input type="checkbox"{% if selection.deep %} checked{% endif %} hx-get="{{ side.deep_url }}" hx-trigger="change" hx-target="#library-works" hx-select="#library-works" hx-select-oob="#library-tree" hx-swap="outerHTML" hx-push-url="true" hx-sync="#library-browser:replace"> Show Works in subcollections</label>
+  {% endif %}
+  {% if message %}<p class="failed">{{ message }}</p>{% endif %}
+  {% if library %}
+  {% if library.rows %}
+  <ul class="works">{% include "library_rows.html" %}</ul>
+  {% elif side.collection and side.collection.children and not selection.deep and not query %}
+  <p class="note">Nothing is filed directly in {{ side.name }}. Its subcollections hold {{ plural(side.works, "Work", "Works") }}: pick one above, or show Works in subcollections.</p>
+  {% else %}
+  <p class="note">No Library Items found.</p>
+  {% endif %}
+  {% endif %}
+</div>

@@ -1,0 +1,5 @@
+{#- A link that selects in the Collections view: the Works side and the pane swap in, the address
+    is pushed so Back and Forward work, and a newer selection replaces one still loading. -#}
+{%- macro nav(url) -%}
+href="{{ url }}" hx-get="{{ url }}" hx-target="#library-works" hx-select="#library-works" hx-select-oob="#library-tree" hx-swap="outerHTML" hx-push-url="true" hx-sync="#library-browser:replace"
+{%- endmacro -%}

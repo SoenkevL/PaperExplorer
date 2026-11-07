@@ -57,6 +57,22 @@ def test_a_work_in_two_sibling_collections_counts_once_in_their_parent(store_db:
     assert counts.unfiled == BranchCount(works=1, ingested=0)
 
 
+def test_a_search_counts_only_the_matching_works_in_each_branch(store_db: Conn) -> None:
+    _tree(store_db, *TREE)
+    _filed(store_db, "BOTH", "A", "B", title="Consciousness explained")
+    _filed(store_db, "DEEP", "A1", title="Consciousness and time")
+    _filed(store_db, "OTHER", "B", title="Perception")
+    _filed(store_db, "LOOSE", title="Conscious machines")
+    _ingested(store_db, "DEEP")
+
+    counts = Collections(store_db).counts(done=FIVE, query="conscious")
+
+    by_key = {c.key: (c.works, c.ingested) for c in counts.collections}
+    assert by_key == {"ROOT": (2, 1), "A": (2, 1), "B": (1, 0), "A1": (1, 1)}
+    assert counts.library == BranchCount(works=3, ingested=1)
+    assert counts.unfiled == BranchCount(works=1, ingested=0)
+
+
 def test_an_empty_collection_counts_nothing(store_db: Conn) -> None:
     _tree(store_db, Collection(key="EMPTY", name="Empty"))
 

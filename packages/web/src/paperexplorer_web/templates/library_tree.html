@@ -1,0 +1,30 @@
+{#- The pane's tree (WAI-ARIA): the whole Library, the root Collections by name, each with its
+    branch's Work count, then the Items in no Collection. While searching it marks each branch's
+    matches and dims those with none. The selected Collection's ancestors render open;
+    library-tree.js reopens what the reader left open and moves through it by keyboard. -#}
+{%- from "library_nav.html" import nav -%}
+{%- macro mark(matches) -%}
+{%- if tree.searching -%}
+<span class="tree-matches"{% if matches %} title="{{ plural(matches, 'match', 'matches') }}">{{ matches }}{% else %}>{% endif %}</span>
+{%- endif -%}
+{%- endmacro -%}
+{%- macro entry(e, key) -%}
+<li role="treeitem" aria-level="1" aria-selected="{{ 'true' if e.selected else 'false' }}" tabindex="{{ '0' if e.selected else '-1' }}" data-key="{{ key }}"{% if tree.searching and not e.matches %} class="no-match"{% endif %}>
+  <span class="tree-row"><a {{ nav(e.url) }} tabindex="-1">{{ e.name }}</a><span class="tree-count" title="{{ plural(e.works, 'Work', 'Works') }}">{{ e.works }}</span>{{ mark(e.matches) }}</span>
+</li>
+{%- endmacro -%}
+{%- macro item(n) -%}
+<li role="treeitem" aria-level="{{ n.level }}" aria-selected="{{ 'true' if n.selected else 'false' }}" tabindex="{{ '0' if n.selected else '-1' }}" data-key="{{ n.key }}"{% if n.children %} aria-expanded="{{ 'true' if n.open else 'false' }}"{% endif %}{% if tree.searching and not n.matches %} class="no-match"{% endif %}>
+  <span class="tree-row">{% if n.children %}<span class="twisty" aria-hidden="true"></span>{% endif %}<a {{ nav(n.url) }} tabindex="-1" title="{{ n.path }}">{{ n.name }}</a><span class="tree-count" title="{{ plural(n.works, 'Work', 'Works') }}">{{ n.works }}</span>{{ mark(n.matches) }}</span>
+  {%- if n.children %}
+  <ul role="group"{% if not n.open %} hidden{% endif %}>
+    {% for child in n.children %}{{ item(child) }}{% endfor %}
+  </ul>
+  {%- endif %}
+</li>
+{%- endmacro -%}
+<ul id="library-tree" role="tree" aria-label="Collections" class="tree{% if tree.searching %} searching{% endif %}">
+  {{ entry(tree.library, "") }}
+  {% for n in tree.roots %}{{ item(n) }}{% endfor %}
+  {{ entry(tree.unfiled, "unfiled") }}
+</ul>

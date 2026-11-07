@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block scripts %}<script src="{{ static_url('library-tree.js') }}" defer></script>{% endblock %}
 {% block content %}
 <h1>PaperExplorer</h1>
 {% if api_version %}
@@ -10,13 +11,22 @@
 {% with groups = [], message = none %}{% include "duplicates.html" %}{% endwith %}
 <section id="library" class="library">
   <div class="library-tools">
-    <input id="library-search" type="search" name="q" placeholder="Search title, author, year, key or DOI" aria-label="Search the Library"
+    <nav class="view-switch" aria-label="View">
+      <a href="/?view=list"{% if view == "list" %} aria-current="page"{% endif %}>List</a>
+      <a href="/?view=collections"{% if view == "collections" %} aria-current="page"{% endif %}>Collections</a>
+    </nav>
+    {% if browsing %}
+    <input id="library-search" type="search" name="q" value="{{ query }}" placeholder="Search the whole Library: title, author, year, key or DOI" aria-label="Search the Library"
+      hx-get="/" hx-trigger="input changed delay:300ms, search" hx-include="#library-selection" hx-target="#library-works" hx-select="#library-works" hx-select-oob="#library-tree" hx-swap="outerHTML" hx-replace-url="true" hx-sync="#library-browser:replace">
+    {% else %}
+    <input id="library-search" type="search" name="q" value="{{ query }}" placeholder="Search title, author, year, key or DOI" aria-label="Search the Library"
       hx-get="/library" hx-trigger="input changed delay:300ms, search" hx-target="#library-list" hx-swap="outerHTML">
+    {% endif %}
     <button type="button" hx-post="/library/sync" hx-target="#library-sync-status" hx-swap="outerHTML">Sync</button>
     <span hx-post="/library/sync" hx-trigger="load" hx-target="#library-sync-status" hx-swap="outerHTML"></span>
   </div>
   {% with message = none %}{% include "library_sync_status.html" %}{% endwith %}
-  {% include "library_list.html" %}
+  {% if browsing %}{% include "library_browser.html" %}{% else %}{% include "library_list.html" %}{% endif %}
 </section>
 {% else %}
 {% if api_version %}<p class="note">Finding and Ingesting Library Items needs Zotero's keys in <code>.env</code> (<code>PE_ZOTERO_LIBRARY_ID</code>, <code>PE_ZOTERO_API_KEY</code>): the Library needs Zotero.</p>{% endif %}

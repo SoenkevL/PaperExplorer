@@ -146,8 +146,8 @@ def library_list(
     if selection is not None:
         if selection.unfiled:
             params["unfiled"] = "1"
-        elif selection.collection:
-            params["collection"] = selection.collection
+        else:  # with no key, the whole Library, still in the Collections view
+            params["collection"] = selection.collection or ""
             if selection.deep:
                 params["deep"] = "1"
     selected = selection.collection if selection else None

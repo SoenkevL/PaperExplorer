@@ -711,3 +711,39 @@ def test_a_polled_row_names_its_collections_as_the_view_shows_them() -> None:
     assert re.search(r"also in <a [^>]*>Vision</a></p>", row)
     assert 'class="library-row in-branch"' in row
     assert 'hx-trigger="every 2s"' in row
+
+
+def test_the_list_view_still_lists_when_the_collections_cannot_be_read() -> None:
+    api = _tree_api(**{"GET /collections": httpx.Response(500, text="boom")})
+
+    text = api.web().get("/", params={"view": "list"}).text
+
+    assert "could not be read" not in text
+    assert _row(text)
+
+
+def test_the_collections_view_falls_back_to_the_list_when_its_tree_cannot_be_read() -> None:
+    api = _tree_api(**{"GET /collections": httpx.Response(500, text="boom")})
+
+    text = api.web().get("/").text
+
+    assert 'role="tree"' not in text
+    assert _row(text)
+
+
+def test_load_more_on_the_whole_library_keeps_the_collections_view() -> None:
+    api = _tree_api(**{"GET /library": _page(_work(), total=51)})
+
+    text = api.web().get("/", params={"collection": ""}).text
+
+    assert "/library?q=&amp;offset=1&amp;collection=" in text
+
+
+def test_a_tinted_row_keeps_its_tint_through_a_cancel() -> None:
+    api = _tree_api(
+        **{"DELETE /works/7/stage-run": httpx.Response(204), "GET /works/7/stages": _json(_work())}
+    )
+
+    row = _row(api.web().delete("/works/7/stage-run", params={"tint": "1"}).text)
+
+    assert 'class="library-row in-branch"' in row

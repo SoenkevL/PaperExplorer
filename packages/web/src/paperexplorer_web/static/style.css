@@ -229,7 +229,7 @@ button { font: inherit; color: inherit; }
 .crumbs ol { display: flex; flex-wrap: wrap; list-style: none; margin: 0; padding: 0; }
 .crumbs li + li::before { content: "›"; padding: 0 0.4rem; color: var(--faint); }
 .crumbs a { color: var(--ink2); }
-.pane-toggle { display: none; }
+.collections-toggle { display: none; }
 .selection-name { font: 600 1.5rem/1.25 var(--serif); margin: 0.5rem 0 0.3rem; }
 .meter-line { display: flex; align-items: center; gap: 0.6rem; margin: 0; font-size: 12px; color: var(--muted); }
 .meter-line meter { width: 8rem; height: 0.5rem; }
@@ -247,7 +247,7 @@ button { font: inherit; color: inherit; }
   .library-browser { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
   .library-pane { display: none; position: static; max-height: none; grid-row: 1; padding: 0.6rem; border: 1px solid var(--rule); border-radius: 8px; }
   .library-browser.pane-open .library-pane { display: block; }
-  .pane-toggle { display: inline-block; padding: 0.2rem 0.6rem; font: inherit; color: var(--ink); background: transparent; border: 1px solid var(--rule); border-radius: 6px; cursor: pointer; }
+  .collections-toggle { display: inline-block; padding: 0.2rem 0.6rem; font: inherit; color: var(--ink); background: transparent; border: 1px solid var(--rule); border-radius: 6px; cursor: pointer; }
 }
 
 /* A row's Stages as pips: five Ingesting, a gap, two Resolving. Filled is done, a ring pending,

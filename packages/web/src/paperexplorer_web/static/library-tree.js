@@ -2,7 +2,8 @@
 // This script reopens the branches the reader left open (localStorage `pe.tree.open`), moves
 // through the tree by keyboard with a roving tabindex (selection follows focus: moving selects,
 // by clicking the item's link, which htmx swaps in), and opens the pane behind its button in a
-// narrow window. The page works without it, the tree as rendered.
+// narrow window. A move by keyboard replaces the address rather than pushing one, so Back skips
+// the Collections passed on the way. The page works without it, the tree as rendered.
 (() => {
   const STORE = "pe.tree.open";
   let refocus = false; // whether the tree had focus when a selection went out, to take it back
@@ -46,7 +47,10 @@
       for (const other of items(root)) other.setAttribute("aria-selected", "false");
       item.setAttribute("aria-selected", "true");
       refocus = true;
-      item.querySelector(":scope > .tree-row > a").click();
+      const link = item.querySelector(":scope > .tree-row > a");
+      link.removeAttribute("hx-push-url");
+      link.setAttribute("hx-replace-url", "true");
+      link.click();
     }
   };
 
@@ -60,10 +64,12 @@
         group(item).hidden = false;
       }
     }
-    if (refocus) {
-      refocus = false;
+    // Back to the tree only if the reader has not moved on while the selection loaded
+    const here = document.activeElement;
+    if (refocus && (!here || here === document.body || root.contains(here))) {
       (root.querySelector('[tabindex="0"]') || items(root)[0])?.focus();
     }
+    refocus = false;
   };
 
   document.addEventListener("click", (event) => {
@@ -73,7 +79,15 @@
       setOpen(item, !isOpen(item));
       return;
     }
-    const toggle = event.target.closest(".pane-toggle");
+    const link = event.target.closest("#library-tree a");
+    if (link) {
+      // The item, not its link, holds focus, so the arrows go on from it
+      const item = link.closest('[role="treeitem"]');
+      for (const other of items(tree())) other.tabIndex = other === item ? 0 : -1;
+      item.focus();
+      refocus = true;
+    }
+    const toggle = event.target.closest(".collections-toggle");
     if (toggle) {
       const browser = document.getElementById("library-browser");
       const opened = !browser.classList.contains("pane-open");
@@ -138,6 +152,13 @@
   // The tree comes again with each selection (out of band) and with Back and Forward.
   document.addEventListener("htmx:load", (event) => {
     if (event.target.id === "library-tree" || event.target.querySelector?.("#library-tree")) init();
+    // A selection closes the pane a narrow window opened, as its new button says it is closed
+    if (event.target.id === "library-works") document.getElementById("library-browser")?.classList.remove("pane-open");
+  });
+  // History keeps the page's markup: the search box keeps what was typed, not what it rendered with
+  document.addEventListener("htmx:beforeHistorySave", () => {
+    const search = document.getElementById("library-search");
+    if (search) search.setAttribute("value", search.value);
   });
   document.addEventListener("htmx:historyRestore", init);
   document.addEventListener("DOMContentLoaded", init);

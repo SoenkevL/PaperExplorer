@@ -177,13 +177,20 @@ def create_app(api: ApiClient) -> FastAPI:
             api_version = None
         if api_version is not None:
             try:
-                collections = api.collections()
+                try:
+                    collections: CollectionTree | None = api.collections()
+                except httpx.HTTPError:
+                    # Without the tree the List view still lists; rows lose only their Collections
+                    logger.warning("The Collections could not be read", exc_info=True)
+                    collections = None
                 has_library = True
                 if selection.collection and selection.collection not in {
-                    c.key for c in collections.collections
+                    c.key for c in (collections.collections if collections else [])
                 }:
                     selection = Selection()  # gone since the cookie or the link named it
-                if view == "collections":
+                if collections is None:
+                    library = library_list(api.library(q), q, 0)
+                elif view == "collections":
                     matches = collection_tree(q) if q.split() else None
                     pane = tree(collections, selection, q, matches)
                     try:

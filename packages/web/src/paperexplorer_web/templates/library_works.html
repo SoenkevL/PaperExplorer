@@ -8,7 +8,7 @@
     {%- if selection.deep %}<input type="hidden" name="deep" value="1">{% endif %}{% endif -%}
   </span>
   <nav class="crumbs" aria-label="Breadcrumbs">
-    <button type="button" class="pane-toggle" aria-controls="library-pane" aria-expanded="false">Collections</button>
+    <button type="button" class="collections-toggle" aria-controls="library-pane" aria-expanded="false">Collections</button>
     <ol>
       {% for crumb in side.crumbs %}<li><a {{ nav(crumb.url) }}>{{ crumb.name }}</a></li>{% endfor %}
       <li aria-current="location">{{ side.name if side.crumbs else "Library" }}</li>
@@ -27,7 +27,7 @@
   </ul>
   {% endif %}
   {% if side.deep_url %}
-  <label class="deep"><input type="checkbox"{% if selection.deep %} checked{% endif %} hx-get="{{ side.deep_url }}" hx-trigger="change" hx-target="#library-works" hx-select="#library-works" hx-select-oob="#library-tree" hx-swap="outerHTML" hx-push-url="true"> Show Works in subcollections</label>
+  <label class="deep"><input type="checkbox"{% if selection.deep %} checked{% endif %} hx-get="{{ side.deep_url }}" hx-trigger="change" hx-target="#library-works" hx-select="#library-works" hx-select-oob="#library-tree" hx-swap="outerHTML" hx-push-url="true" hx-sync="#library-browser:replace"> Show Works in subcollections</label>
   {% endif %}
   {% if message %}<p class="failed">{{ message }}</p>{% endif %}
   {% if library %}

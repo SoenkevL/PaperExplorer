@@ -38,7 +38,16 @@ class Branch(BaseModel):
     def _one_place(self) -> Self:
         if (self.collection is None) == (not self.unfiled):
             raise ValueError("a Branch is either one Collection or the unfiled Library Items")
+        if self.deep and self.collection is None:
+            raise ValueError("only a Collection's branch goes deep")
         return self
+
+    @classmethod
+    def of(cls, collection: str | None, *, deep: bool, unfiled: bool) -> Branch | None:
+        """The Branch these request parameters name, or None for the whole Library."""
+        if collection is not None:
+            return cls(collection=collection, deep=deep)
+        return cls(unfiled=True) if unfiled else None
 
 
 class LibraryRow(BaseModel):
@@ -81,7 +90,8 @@ _STANDING = (
     "stands_by_reader DESC, zotero_key IS NULL, pdf_attachment_key IS NULL, added_at NULLS LAST, id"
 )
 _CANDIDATES = 10
-# Whether every Stage named in the first parameter (its length the second) is done for `works.id`.
+# Whether every Stage named in the first parameter (its length the second) is done for `works.id`;
+# a caller passes both, as `[list(stages), len(stages)]`, where the fragment sits.
 DONE_ALL: LiteralString = (
     "(SELECT count(*) FROM stage_status s WHERE s.work_id = works.id"
     " AND s.state = 'done' AND s.stage = ANY(%s)) = %s"

@@ -65,6 +65,13 @@ class Collections:
         """The key of every stored Collection."""
         return {r[0] for r in self._conn.execute("SELECT key FROM collections").fetchall()}
 
+    def has(self, key: str) -> bool:
+        """Whether a Collection with this key is stored."""
+        return (
+            self._conn.execute("SELECT 1 FROM collections WHERE key = %s", (key,)).fetchone()
+            is not None
+        )
+
     def file(self, work: WorkId, keys: Iterable[str]) -> None:
         """File the Work in exactly these Collections, skipping any key not stored."""
         self._conn.execute("DELETE FROM work_collections WHERE work_id = %s", (work,))

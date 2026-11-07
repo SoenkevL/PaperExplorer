@@ -1,6 +1,7 @@
 """Browsing the Library by Collection: branch counts, filtering, and the branch-first search."""
 
 import psycopg
+import pytest
 from psycopg.rows import TupleRow
 
 from paperexplorer.domain import Collection, LibraryItem
@@ -126,7 +127,7 @@ def test_a_search_covers_the_whole_library_with_the_branch_first_across_pages(
     store_db: Conn,
 ) -> None:
     _tree(store_db, *TREE)
-    # Added in key order, so the newest-first order inside each part is E5 … E1, then B2, B1.
+    # Added in this order, so newest first is B2, B1 in the branch, then E3, E2, E1 elsewhere.
     for key, filed in [("E1", ()), ("B1", ("A",)), ("E2", ("B",)), ("B2", ("A",)), ("E3", ())]:
         _filed(store_db, key, *filed, title=f"entropy {key}")
     _filed(store_db, "NOMATCH", "A")
@@ -158,3 +159,10 @@ def test_each_work_lists_the_collections_it_is_filed_in(store_db: Conn) -> None:
     both, loose = works.ensure("BOTH"), works.ensure("LOOSE")
 
     assert Collections(store_db).of_works([both, loose]) == {both: ["A", "B"], loose: []}
+
+
+def test_only_a_collection_goes_deep(store_db: Conn) -> None:
+    with pytest.raises(ValueError, match="deep"):
+        Branch(unfiled=True, deep=True)
+    assert Branch.of(None, deep=True, unfiled=False) is None
+    assert Collections(store_db).has("NOPE") is False

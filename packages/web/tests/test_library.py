@@ -53,6 +53,8 @@ def _work(
         has_pdf=has_pdf,
         run=run,
         stage_statuses=runs,
+        collections=[],
+        in_branch=True,
     )
 
 

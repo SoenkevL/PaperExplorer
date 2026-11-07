@@ -96,9 +96,9 @@ class LibraryWork(WorkSummary):
     run: Literal["queued", "running"] | None
     stage_statuses: dict[str, StageStatus]
     # The keys of the Collections it is filed in, sorted.
-    collections: list[str] = []
+    collections: list[str]
     # Whether it sits in the Collection, branch or unfiled part browsed; the whole Library is one.
-    in_branch: bool = True
+    in_branch: bool
 
 
 class LibraryPage(BaseModel):

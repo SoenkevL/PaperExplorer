@@ -111,16 +111,9 @@ def router(connections: Connections, ingesting: Ingesting, thread: StageRunThrea
             raise HTTPException(
                 422, "Ask for one Collection or the unfiled Library Items, not both"
             )
-        branch = (
-            Branch(collection=collection, deep=deep)
-            if collection is not None
-            else Branch(unfiled=True)
-            if unfiled
-            else None
-        )
+        branch = Branch.of(collection, deep=deep, unfiled=unfiled)
         with connections() as conn:
-            held = Collections(conn).keys()
-            if collection is not None and collection not in held:
+            if collection is not None and not Collections(conn).has(collection):
                 raise HTTPException(404, f"No Collection {collection}")
             works = Works(conn)
             rows = works.library_items(q, limit, offset, done_first=INGESTING, branch=branch)
@@ -131,7 +124,7 @@ def router(connections: Connections, ingesting: Ingesting, thread: StageRunThrea
                     view(conn, r.work, in_branch=r.in_branch, collections=filed[r.work.id])
                     for r in rows
                 ],
-                total=works.library_count(q) if q.split() else branch_total,
+                total=works.library_count(q) if q.split() and branch else branch_total,
                 branch_total=branch_total,
             )
 

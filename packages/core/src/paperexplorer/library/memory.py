@@ -3,8 +3,20 @@
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 
-from paperexplorer.domain import Attachment, Collection, LibraryChanges, LibraryItem
-from paperexplorer.library.port import ItemNotFoundError
+from paperexplorer.domain import (
+    COLLECTION_DEPTH,
+    Attachment,
+    Collection,
+    ItemDraft,
+    LibraryChanges,
+    LibraryItem,
+)
+from paperexplorer.library.port import (
+    PAPEREXPLORER,
+    SEED_TAG,
+    ItemNotFoundError,
+    OutsidePaperExplorerError,
+)
 
 
 class InMemoryLibrary:
@@ -20,6 +32,10 @@ class InMemoryLibrary:
         self._collections: dict[str, tuple[int, Collection]] = {}
         self._deleted_collections: dict[str, int] = {}
         self._pdfs = dict(pdfs)
+        self.tags: dict[str, list[str]] = {}
+        """Each item's tags; only `tag_seed` and `untag_seed` change them."""
+        self.drafts: dict[str, ItemDraft] = {}
+        """The draft each item PaperExplorer created was made from."""
         for item in items:
             self.put(item)
 
@@ -91,6 +107,80 @@ class InMemoryLibrary:
             self.remove_collection(child)
         del self._collections[key]
         self._deleted_collections[key] = self._version
+
+    def create_paperexplorer_collection(self, key: str) -> None:
+        """A top-level Collection named PaperExplorer, unless this key exists already."""
+        if key not in self._collections:
+            self.put_collection(Collection(key=key, name=PAPEREXPLORER))
+
+    def create_collection(self, key: str, name: str, *, within: str) -> None:
+        """A Collection in the PaperExplorer Collection, unless this key exists already."""
+        self._check_root(within)
+        if key not in self._collections:
+            self.put_collection(Collection(key=key, name=name, parent_key=within))
+
+    def create_item(self, key: str, draft: ItemDraft, *, collection: str, within: str) -> None:
+        """A Library Item from the draft, filed in `collection`, unless this key exists already."""
+        self._check(collection, within)
+        if key in self._items:
+            return
+        year = draft.date[:4] if draft.date else ""
+        self.drafts[key] = draft
+        self.put(
+            LibraryItem(
+                key=key,
+                title=draft.title,
+                creators=draft.creators,
+                year=int(year) if year.isdigit() else None,
+                doi=draft.doi,
+                collections=[collection],
+            )
+        )
+
+    def file(self, item: str, collection: str, *, within: str) -> None:
+        """The item filed in `collection` too."""
+        self._check(collection, within)
+        held = self.item(item)
+        if collection not in held.collections:
+            self.put(held.model_copy(update={"collections": [*held.collections, collection]}))
+
+    def unfile(self, item: str, collection: str, *, within: str) -> None:
+        """The item no longer filed in `collection`."""
+        self._check(collection, within)
+        held = self.item(item)
+        if collection in held.collections:
+            kept = [c for c in held.collections if c != collection]
+            self.put(held.model_copy(update={"collections": kept}))
+
+    def tag_seed(self, item: str) -> None:
+        """The item tagged `pe:seed`."""
+        self.item(item)
+        tags = self.tags.setdefault(item, [])
+        if SEED_TAG not in tags:
+            tags.append(SEED_TAG)
+
+    def untag_seed(self, item: str) -> None:
+        """The item no longer tagged `pe:seed`."""
+        self.item(item)
+        self.tags[item] = [t for t in self.tags.get(item, []) if t != SEED_TAG]
+
+    def _check_root(self, within: str) -> None:
+        held = self._collections.get(within)
+        if held is None or held[1].parent_key is not None or held[1].name != PAPEREXPLORER:
+            raise OutsidePaperExplorerError(f"{within} is not the top-level {PAPEREXPLORER}")
+
+    def _check(self, collection: str, within: str) -> None:
+        """Raise unless `collection` sits under `within`, a top-level Collection."""
+        self._check_root(within)
+        key: str | None = collection
+        for _ in range(COLLECTION_DEPTH):
+            held = self._collections.get(key) if key else None
+            if held is None:
+                break
+            key = held[1].parent_key
+            if key == within:
+                return
+        raise OutsidePaperExplorerError(f"{collection} is not in the PaperExplorer Collection")
 
 
 def _after[T](since: int, entries: dict[str, tuple[int, T]]) -> list[T]:

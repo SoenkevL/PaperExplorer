@@ -556,3 +556,23 @@ def _zcollection(key: str, version: int, name: str, *, parent: str | None = None
     """A Web API Collection as Zotero returns it, cut to the fields the adapter reads."""
     data = {"key": key, "version": version, "name": name, "parentCollection": parent or False}
     return {"key": key, "version": version, "meta": {}, "data": data | {"relations": {}}}
+
+
+@pytest.mark.parametrize(
+    ("doi", "extra", "found"),
+    [
+        ("", "DOI: 10.1000/ABC\nPMID: 123", "10.1000/ABC"),
+        ("", "Some note\ndoi:10.1000/xyz ", "10.1000/xyz"),
+        ("10.1000/field", "DOI: 10.1000/other", "10.1000/field"),
+        ("", "Not a DOI: here", None),
+    ],
+    ids=["extra", "extra-lowercase", "field-wins", "none"],
+)
+def test_zotero_reads_a_doi_from_extra_when_the_item_has_none_in_its_field(
+    doi: str, extra: str, found: str | None
+) -> None:
+    zotero = SyncingZotero(10, [_zitem("OLDITEM1", 5, doi=doi, extra=extra)])
+
+    (item,) = zotero.library().changes(None).items
+
+    assert item.doi == found

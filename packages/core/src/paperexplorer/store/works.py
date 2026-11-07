@@ -173,6 +173,16 @@ class Works:
         assert row is not None
         return WorkId(row[0])
 
+    def assign_library_item(self, work: WorkId, zotero_key: str) -> None:
+        """Give a Work known only from a registry the Library Item just created for it.
+
+        The next sync fills its metadata from the item, as for any Library Item.
+        """
+        self._conn.execute(
+            "UPDATE works SET zotero_key = %s WHERE id = %s AND zotero_key IS NULL",
+            (zotero_key, work),
+        )
+
     def get(self, work: WorkId) -> Work | None:
         """The Work with this id, if there is one."""
         with self._conn.cursor(row_factory=class_row(Work)) as cur:

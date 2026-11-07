@@ -18,6 +18,7 @@ from psycopg.rows import TupleRow
 from paperexplorer import (
     __version__,
     asking,
+    catalog,
     citations,
     evals,
     parsing,
@@ -28,7 +29,7 @@ from paperexplorer import (
 )
 from paperexplorer.citations import ConfidenceLevel, confidence_level
 from paperexplorer.config import Settings
-from paperexplorer.domain import Answer, Level, Resolution, Scope, Work
+from paperexplorer.domain import Answer, Level, Resolution, ResolutionState, Scope, Work, WorkId
 from paperexplorer.library import NotDuplicateItemsError, ZoteroLibrary, check_duplicates, sync
 from paperexplorer.library import merge as library_merge
 from paperexplorer.logs import configure_logging
@@ -335,32 +336,150 @@ def check_command(
         with conn.transaction():
             if sync(conn, ZoteroLibrary.from_settings(settings)).stale:
                 typer.echo("Zotero could not be reached; checking against the last copy", err=True)
-        registries = resolution.Registries(settings)
-
-        async def run() -> resolution.RegistryCheckEvent | None:
-            last: resolution.RegistryCheckEvent | None = None
-            checking = resolution.registry_check(conn, found.id, refs, registries, refresh=refresh)
-            async for event in checking:
-                if isinstance(event, resolution.ReferenceChecked):
-                    r = event.resolution
-                    layer = r.layer.value if r.layer else "-"
-                    typer.echo(f"{r.reference:<6} {_state(r):<10} {layer}")
-                last = event
-            return last
-
-        started = time.monotonic()
-        try:
-            last = asyncio.run(run())
-        except resolution.RegistryError as e:
-            typer.echo(f"Check stopped: {e}; what landed is kept", err=True)
-            raise typer.Exit(1) from e
+        last, seconds = _registry_check(conn, settings, found.id, refs, refresh=refresh)
+        filed = catalog.reconcile(conn, ZoteroLibrary.from_settings(settings), found.id)
     if isinstance(last, resolution.BudgetSpent):
         typer.echo(last.message, err=True)
         raise typer.Exit(1)
     if isinstance(last, resolution.RegistryCheckFinished):
         summary = ", ".join(f"{n} {k}" for k, n in last.counts.items() if k != "references")
         typer.echo(f"Checked {last.counts['references']} References in "
-                   f"{time.monotonic() - started:.1f} s: {summary}")  # fmt: skip
+                   f"{seconds:.1f} s: {summary}")  # fmt: skip
+    if filed is not None:
+        typer.echo(_filed(filed))
+
+
+def _registry_check(
+    conn: psycopg.Connection[TupleRow],
+    settings: Settings,
+    work: WorkId,
+    refs: list[parsing.Reference],
+    *,
+    refresh: bool = False,
+) -> tuple[resolution.RegistryCheckEvent | None, float]:
+    """Run a Registry Check, printing each Reference as it lands; its last event and seconds."""
+    registries = resolution.Registries(settings)
+
+    async def run() -> resolution.RegistryCheckEvent | None:
+        last: resolution.RegistryCheckEvent | None = None
+        checking = resolution.registry_check(conn, work, refs, registries, refresh=refresh)
+        async for event in checking:
+            if isinstance(event, resolution.ReferenceChecked):
+                r = event.resolution
+                layer = r.layer.value if r.layer else "-"
+                typer.echo(f"{r.reference:<6} {_state(r):<10} {layer}")
+            last = event
+        return last
+
+    started = time.monotonic()
+    try:
+        last = asyncio.run(run())
+    except resolution.RegistryError as e:
+        typer.echo(f"Check stopped: {e}; what landed is kept", err=True)
+        raise typer.Exit(1) from e
+    return last, time.monotonic() - started
+
+
+def _filed(result: catalog.ReconcileResult) -> str:
+    return (
+        f"Filed {result.filed} in Zotero ({result.created} new items), unfiled {result.unfiled}"
+        + (f", {result.failed} failed" if result.failed else "")
+    )
+
+
+def _print_exploration(state: catalog.ExplorationState) -> None:
+    e = state.exploration
+    typer.echo(f"Exploration Collection: {e.name} ({e.collection_key})")
+    typer.echo(
+        f"{state.filed} filed, {state.unfiled} firm Sources not filed,"
+        f" {state.removed_by_reader} removed in Zotero, {state.awaiting_choice} awaiting a choice,"
+        f" {state.unchecked} Unchecked"
+    )
+    for filing in state.failed:
+        typer.echo(f"Failed: {filing.item_key}: {filing.error}")
+
+
+@app.command("explore")
+def explore_command(
+    ctx: typer.Context,
+    work: Annotated[str, typer.Argument(help="The Seed's Zotero item key, e.g. YAAC9XCX.")],
+    check: Annotated[
+        bool, typer.Option("--check", help="Run a Registry Check of the Unchecked References.")
+    ] = False,
+) -> None:
+    """Start or resume the Seed's Exploration: its Collection in Zotero, the Stages not done."""
+    settings = Settings()
+    library = ZoteroLibrary.from_settings(settings)
+    with psycopg.connect(settings.database_url, autocommit=True) as conn:
+        store.migrate(conn)
+        with conn.transaction():
+            sync(conn, library)
+        found = store.Works(conn).find(work)
+        if found is None:
+            typer.echo(f"No Library Item {work}", err=True)
+            raise typer.Exit(1)
+        try:
+            catalog.start(conn, library, found.id)
+        except (catalog.NotASeedError, catalog.AmbiguousPaperExplorerError) as e:
+            typer.echo(str(e), err=True)
+            raise typer.Exit(1) from e
+        ran = store.StageStatuses(conn).for_work(found.id)
+        stages = [
+            s for s in pipeline.STAGES if s not in ran or ran[s].state is not store.StageState.DONE
+        ]
+        failed = False
+        if stages:
+            wiring = _wiring(ctx, settings)
+            stage_ctx = pipeline.StageContext(
+                conn=conn,
+                settings=settings,
+                library=library,
+                embedder=wiring.embedder,
+                tracing=wiring.tracing,
+                doi_registry=resolution.DoiOrgRegistry.from_settings(settings),
+            )
+
+            def after(name: str) -> None:
+                if name == "resolve":
+                    catalog.reconcile(conn, library, found.id)
+
+            try:
+                pipeline.run_chain(stage_ctx, stages, found.id, after=after)
+            except Exception as e:  # each failure is recorded with its Stage
+                typer.echo(f"A Stage failed for {work}: {e}", err=True)
+                failed = True
+            finally:
+                wiring.tracing.flush()
+        parsed = store.WorkTexts(conn).get(found.id)
+        if check and parsed is not None:
+            unchecked = {
+                r.reference
+                for r in store.Resolutions(conn).for_work(found.id)
+                if r.state is ResolutionState.UNCHECKED
+            }
+            refs = [r for r in parsed.references if r.id in unchecked]
+            if refs:
+                _registry_check(conn, settings, found.id, refs)
+        catalog.reconcile(conn, library, found.id)
+        state = catalog.state(conn, found.id)
+    assert state is not None
+    _print_exploration(state)
+    if failed or state.failed:
+        raise typer.Exit(1)
+
+
+@app.command("exploration")
+def exploration_command(
+    work: Annotated[str, typer.Argument(help="The Seed's Zotero item key, e.g. YAAC9XCX.")],
+) -> None:
+    """Where the Seed's Exploration stands: what is filed, failed or still waiting."""
+    settings = Settings()
+    with _work_or_exit(settings, work) as (conn, found):
+        state = catalog.state(conn, found.id)
+    if state is None:
+        typer.echo(f"{work} has no Exploration; start one with `paperexplorer explore {work}`")
+        raise typer.Exit(1)
+    _print_exploration(state)
 
 
 @app.command("search")

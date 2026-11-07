@@ -1,6 +1,8 @@
 """The Library in Zotero, read through its Web API; PDFs from local storage or downloaded."""
 
 import logging
+import re
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Self
 
@@ -11,10 +13,18 @@ from paperexplorer.domain import (
     COLLECTION_DEPTH,
     Attachment,
     Collection,
+    ItemDraft,
     LibraryChanges,
     LibraryItem,
 )
-from paperexplorer.library.port import ItemNotFoundError, LibraryUnavailableError
+from paperexplorer.library.port import (
+    PAPEREXPLORER,
+    SEED_TAG,
+    ItemNotFoundError,
+    LibraryUnavailableError,
+    LibraryWriteError,
+    OutsidePaperExplorerError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +34,17 @@ _STORED = frozenset({"imported_file", "imported_url"})
 # Children of a Library Item, not Library Items themselves.
 _CHILD_TYPES = frozenset({"attachment", "note", "annotation"})
 _PAGE = 100  # the Web API's largest page
+ADDED_BY = "Added by PaperExplorer"  # in `extra`, so the reader can find what PaperExplorer made
+# The fields a draft fills, by item type; Zotero refuses a field its type lacks. Every type has
+# `DOI`, `url` and `extra` (docs/research/2026-11-zotero-writes.md).
+_PUBLICATION = {
+    "journalArticle": "publicationTitle",
+    "conferencePaper": "proceedingsTitle",
+    "bookSection": "bookTitle",
+    "preprint": "repository",
+}
+_VOLUME_ISSUE = frozenset({"journalArticle"})
+_PAGES = frozenset({"journalArticle", "conferencePaper", "bookSection"})
 
 
 class ZoteroLibrary:
@@ -37,6 +58,8 @@ class ZoteroLibrary:
         self._files = files
         self._storage = storage_dir
         self._cache = cache_dir / "pdfs"
+        self._parents: dict[str, str | None] = {}  # Collections the guard has read, by key
+        self._roots: set[str] = set()  # PaperExplorer Collections the guard has read
 
     @classmethod
     def from_settings(cls, settings: Settings) -> Self:
@@ -143,6 +166,119 @@ class ZoteroLibrary:
         self._patch(gone, {"deleted": 1})
         logger.info("Merged Zotero item %s into %s; %s is in the trash", other, keep, other)
 
+    def create_paperexplorer_collection(self, key: str) -> None:
+        """Post the top-level PaperExplorer Collection with this key, once."""
+        self._create("/collections", {"name": PAPEREXPLORER, "parentCollection": False}, key)
+        self._parents[key] = None
+        self._roots.add(key)
+
+    def create_collection(self, key: str, name: str, *, within: str) -> None:
+        """Post a Collection in the PaperExplorer Collection, once."""
+        self._check_root(within)
+        self._create("/collections", {"name": name, "parentCollection": within}, key)
+        self._parents[key] = within
+
+    def create_item(self, key: str, draft: ItemDraft, *, collection: str, within: str) -> None:
+        """Post a Library Item made from the draft, filed in `collection`, once."""
+        self._check(collection, within)
+        self._create("/items", _item_fields(draft) | {"collections": [collection]}, key)
+
+    def file(self, item: str, collection: str, *, within: str) -> None:
+        """Patch the item's Collections to include `collection`."""
+        self._check(collection, within)
+        self._update(item, "collections", lambda held: _union(held, [collection]))
+
+    def unfile(self, item: str, collection: str, *, within: str) -> None:
+        """Patch the item's Collections to leave out `collection`."""
+        self._check(collection, within)
+        self._update(item, "collections", lambda held: [c for c in held if c != collection])
+
+    def tag_seed(self, item: str) -> None:
+        """Patch the item's tags to include `pe:seed`."""
+        seed = {"tag": SEED_TAG}
+        self._update(item, "tags", lambda held: held if seed in held else [*held, seed])
+
+    def untag_seed(self, item: str) -> None:
+        """Patch the item's tags to leave out `pe:seed`."""
+        self._update(item, "tags", lambda held: [t for t in held if t.get("tag") != SEED_TAG])
+
+    def _check_root(self, within: str) -> None:
+        """Raise unless `within` is a top-level Collection named PaperExplorer, not trashed."""
+        if within in self._roots:
+            return
+        data = self._collection_data(within)
+        if data is None or data["parentCollection"] or data["name"] != PAPEREXPLORER:
+            raise OutsidePaperExplorerError(f"{within} is not the top-level {PAPEREXPLORER}")
+        self._roots.add(within)
+
+    def _check(self, collection: str, within: str) -> None:
+        """Raise unless `collection` sits under the PaperExplorer Collection `within`."""
+        self._check_root(within)
+        key: str | None = collection
+        for _ in range(COLLECTION_DEPTH):
+            if key is None:
+                break
+            if key not in self._parents:
+                data = self._collection_data(key)
+                if data is None:
+                    break
+                self._parents[key] = data["parentCollection"] or None
+            key = self._parents[key]
+            if key == within:
+                return
+        raise OutsidePaperExplorerError(f"{collection} is not in the {PAPEREXPLORER} Collection")
+
+    def _collection_data(self, key: str) -> dict[str, Any] | None:
+        """A Collection's `data` as Zotero holds it, `None` if it is missing or trashed."""
+        try:
+            response = self._api.get(f"/collections/{key}")
+        except httpx.HTTPError as e:
+            raise LibraryWriteError(f"Zotero could not be reached: {e!r}") from e
+        if response.status_code == 404:
+            return None
+        _raise_for(response)
+        data: dict[str, Any] = response.json()["data"]
+        return None if data.get("deleted") else data
+
+    def _create(self, path: str, fields: dict[str, Any], key: str) -> None:
+        """Post one object with a key made here at version 0; a key Zotero holds is done."""
+        try:
+            response = self._api.post(path, json=[{"key": key, "version": 0} | fields])
+        except httpx.HTTPError as e:
+            raise LibraryWriteError(f"Zotero could not be reached: {e!r}") from e
+        _raise_for(response)
+        failed: dict[str, Any] | None = response.json().get("failed", {}).get("0")
+        if failed is not None and failed.get("code") != 412:  # 412: created already
+            raise LibraryWriteError(f"Zotero refused {key}: {failed['code']} {failed['message']}")
+        logger.info("Created Zotero object %s at %s", key, path)
+
+    def _update(self, item: str, field: str, change: Callable[[list[Any]], list[Any]]) -> None:
+        """Read the item, change one array field and patch it at that version, retried once."""
+        for attempt in range(2):
+            raw = self._raw_for_write(item)
+            held: list[Any] = raw["data"].get(field, [])
+            wanted = change(held)
+            if wanted == held:
+                return
+            try:
+                response = self._api.patch(
+                    f"/items/{item}",
+                    json={field: wanted},
+                    headers={"If-Unmodified-Since-Version": str(raw["data"]["version"])},
+                )
+            except httpx.HTTPError as e:
+                raise LibraryWriteError(f"Zotero could not be reached: {e!r}") from e
+            if response.status_code == 412 and attempt == 0:
+                continue  # edited since it was read: read it again
+            _raise_for(response)
+            return
+
+    def _raw_for_write(self, key: str) -> dict[str, Any]:
+        try:
+            return self._raw(key)
+        except httpx.HTTPError as e:
+            raise LibraryWriteError(f"Zotero could not read {key}: {e!r}") from e
+
     def _children(self, key: str) -> list[dict[str, Any]]:
         response = self._api.get(f"/items/{key}/children")
         response.raise_for_status()
@@ -209,6 +345,45 @@ class ZoteroLibrary:
         return cached
 
 
+def _raise_for(response: httpx.Response) -> None:
+    """Raise `LibraryWriteError` with Zotero's reason for a refused request."""
+    if response.is_success:
+        return
+    reason = response.text.strip()[:200]
+    raise LibraryWriteError(f"Zotero answered {response.status_code}: {reason}")
+
+
+def _item_fields(draft: ItemDraft) -> dict[str, Any]:
+    """The Web API fields of a new item made from the draft, only those its type has."""
+    kind = draft.item_type
+    fields: dict[str, Any] = {"itemType": kind}
+    if draft.title:
+        fields["title"] = draft.title
+    if draft.creators:
+        fields["creators"] = [_creator(c) for c in draft.creators]
+    if draft.date:
+        fields["date"] = draft.date
+    if draft.doi:
+        fields["DOI"] = draft.doi
+    if draft.publication and kind in _PUBLICATION:
+        fields[_PUBLICATION[kind]] = draft.publication
+    if kind in _VOLUME_ISSUE:
+        fields |= {k: v for k, v in (("volume", draft.volume), ("issue", draft.issue)) if v}
+    if draft.pages and kind in _PAGES:
+        fields["pages"] = draft.pages
+    if draft.url:
+        fields["url"] = draft.url
+    return fields | {"extra": ADDED_BY}
+
+
+def _creator(name: str) -> dict[str, str]:
+    """`Last, First` as Zotero's two fields, a name with no comma as its single field."""
+    last, comma, first = name.partition(",")
+    if not comma:
+        return {"creatorType": "author", "name": name.strip()}
+    return {"creatorType": "author", "lastName": last.strip(), "firstName": first.strip()}
+
+
 def _is_regular(item: dict[str, Any]) -> bool:
     """Whether a Web API item is a Library Item rather than an attachment, note or annotation."""
     data: dict[str, Any] = item["data"]
@@ -226,7 +401,7 @@ def _library_item(item: dict[str, Any], children: list[dict[str, Any]]) -> Libra
         title=data.get("title") or None,
         creators=[_name(c) for c in authors],
         year=int(parsed_date[:4]) if parsed_date[:4].isdigit() else None,
-        doi=data.get("DOI") or None,
+        doi=data.get("DOI") or _extra_doi(data.get("extra", "")),
         pdf=_stored_pdf(children),
         added=data.get("dateAdded") or None,
         replaces=[
@@ -234,6 +409,16 @@ def _library_item(item: dict[str, Any], children: list[dict[str, Any]]) -> Libra
         ],
         collections=data.get("collections", []),
     )
+
+
+# A `DOI: …` line in `extra`, where items of types that once had no DOI field keep theirs.
+_EXTRA_DOI = re.compile(r"^\s*doi:\s*(10\.\S+)\s*$", re.IGNORECASE | re.MULTILINE)
+
+
+def _extra_doi(extra: str) -> str | None:
+    """The DOI on a `DOI:` line of an item's `extra`, if it has one."""
+    found = _EXTRA_DOI.search(extra)
+    return found.group(1) if found else None
 
 
 def _collection(collection: dict[str, Any]) -> Collection:

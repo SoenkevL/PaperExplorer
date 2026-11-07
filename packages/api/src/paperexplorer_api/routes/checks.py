@@ -53,6 +53,10 @@ def router(connections: Connections, checking: Checking) -> APIRouter:
             raise HTTPException(404, f"Work {work_id} prints no Reference {key}")
         return work, found
 
+    def refile_alone(work: WorkId) -> None:
+        with connections() as conn:
+            refile(conn, checking.library, work)
+
     def synced(conn: Conn) -> None:
         with conn.transaction():
             if sync(conn, checking.library).stale:
@@ -95,7 +99,8 @@ def router(connections: Connections, checking: Checking) -> APIRouter:
                 sent = schemas.CheckErrorEvent(message=f"Check stopped: {e}; what landed is kept")
                 yield ServerSentEvent(event=sent.type, raw_data=sent.model_dump_json())
             finally:
-                await asyncio.to_thread(refile, conn, checking.library, work)
+                # On a connection of its own: a closed stream may close `conn` under the thread.
+                await asyncio.to_thread(refile_alone, work)
 
     @routes.post("/works/{work_id}/references/{key}/checks")
     async def check_reference(  # pyright: ignore[reportUnusedFunction]

@@ -183,3 +183,20 @@ def test_the_tree_marks_each_exploration_collection() -> None:
     root = re.search(r'<li role="treeitem"[^>]*data-key="ROOT2345"[^>]*>.*?<a ', text, re.S)
     assert explored and 'class="tree-mark"' in explored.group(0)
     assert root and "tree-mark" not in root.group(0)
+
+
+def test_a_cost_the_api_could_not_give_leaves_the_check_unticked_and_says_so() -> None:
+    def down(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("refused", request=request)
+
+    api = Api({
+        "GET /works/7/exploration/proposal": _json(ExplorationProposal(name=NAME)),
+        "GET /works/7/checks/cost": down,
+    })  # fmt: skip
+
+    form = api.web().get("/works/7/exploration/start").text
+
+    assert "once its References are parsed" not in form
+    assert "cost could not be read" in form
+    box = re.search(r'<input type="checkbox" name="check"[^>]*>', form)
+    assert box and "checked" not in box.group(0)

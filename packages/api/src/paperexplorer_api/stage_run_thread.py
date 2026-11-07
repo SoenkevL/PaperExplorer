@@ -138,7 +138,14 @@ class StageRunThread:
                 finally:
                     ctx.tracing.flush()
                 if queued.then is not None:
-                    queued.then(conn)
+                    try:
+                        queued.then(conn)
+                    except psycopg.Error:
+                        raise
+                    except Exception:  # no Stage holds it; a Stage's own failure still follows
+                        logger.warning(
+                            "What followed the Stages of Work %d failed", queued.work, exc_info=True
+                        )
                 if failed is not None:
                     raise failed
         except Exception as e:

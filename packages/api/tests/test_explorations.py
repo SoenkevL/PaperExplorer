@@ -280,3 +280,21 @@ def test_the_start_dialog_learns_the_collections_name_before_anything_is_written
     assert harness.library.changes(None).collections == []
     with pytest.raises(ConflictError, match="PDF"):
         harness.client.exploration_proposal(works["NOPDF234"].id)
+
+
+def test_a_check_that_breaks_leaves_the_stages_done_and_the_sources_filed(
+    harness: Harness, registry: Registry
+) -> None:
+    def broken(request: httpx.Request) -> httpx.Response:
+        raise RuntimeError("a registry answered nonsense")
+
+    registry.handle = broken  # type: ignore[method-assign]
+    seed = harness.synced()["VILL2024"].id
+
+    harness.client.start_exploration(seed, check=True)
+    row = harness.settled(seed)
+
+    assert all(s.state == "done" for s in row.stage_statuses.values())
+    explored = harness.client.exploration(seed)
+    assert explored.filed == 2
+    assert explored.stages_not_done == []

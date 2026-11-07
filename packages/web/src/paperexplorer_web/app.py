@@ -358,16 +358,6 @@ def create_app(api: ApiClient) -> FastAPI:
             return row_view(request, work_id, f"Not started: {_why(e)}", tint=tint == "1")
         return row_of(request, work, tint=tint == "1")
 
-    def check_cost(work_id: int) -> CheckCost | None:
-        """A Check's cost, or `None` while the Work's References are not parsed or unreachable."""
-        try:
-            return api.check_cost(work_id)
-        except NotFoundError:
-            return None
-        except httpx.HTTPError:
-            logger.warning("Check cost of Work %d failed", work_id, exc_info=True)
-            return None
-
     @app.get("/works/{work_id}/exploration/start", response_class=HTMLResponse)
     def exploration_start(  # pyright: ignore[reportUnusedFunction]
         request: Request, work_id: int, place: Place = "row"
@@ -379,7 +369,14 @@ def create_app(api: ApiClient) -> FastAPI:
         except (httpx.HTTPError, ConflictError, NotFoundError) as e:
             context["message"] = f"No Exploration: {_why(e)}"
         else:
-            context["cost"] = check_cost(work_id)
+            context["cost"] = None  # until the Work's References are parsed
+            try:
+                context["cost"] = api.check_cost(work_id)
+            except NotFoundError:
+                pass
+            except httpx.HTTPError:
+                logger.warning("Check cost of Work %d failed", work_id, exc_info=True)
+                context["cost_unread"] = True
         return pages.TemplateResponse(request, "exploration_start.html", context)
 
     def exploration_section(

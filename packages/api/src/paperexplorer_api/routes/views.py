@@ -1,6 +1,7 @@
-"""Core's values as the API's schemas, for every route group."""
+"""Core's values as the API's schemas, for every route group, and the Filing they share."""
 
 import logging
+from collections.abc import Mapping
 from typing import Literal
 
 import psycopg
@@ -9,7 +10,7 @@ from paperexplorer import catalog
 from paperexplorer.domain import Layer, Resolution, Work, WorkId
 from paperexplorer.library import Library
 from paperexplorer.pipeline import STAGES
-from paperexplorer.store import Explorations, StageState, StageStatuses, Works
+from paperexplorer.store import Explorations, StageState, StageStatus, StageStatuses, Works
 from paperexplorer_api import schemas
 from paperexplorer_api.routes import Conn
 
@@ -71,9 +72,14 @@ def exploration_view(
         not_filed=state.not_filed,
         awaiting_choice=state.awaiting_choice,
         unchecked=state.unchecked,
-        stages_not_done=[s for s in STAGES if s not in ran or ran[s].state is not StageState.DONE],
+        stages_not_done=stages_not_done(ran),
         run=run,
     )
+
+
+def stages_not_done(ran: Mapping[str, StageStatus]) -> list[str]:
+    """Every Stage not done, in order: what an Exploration's start or *Resume* runs."""
+    return [s for s in STAGES if s not in ran or ran[s].state is not StageState.DONE]
 
 
 def refile(conn: Conn, library: Library, seed: WorkId) -> None:

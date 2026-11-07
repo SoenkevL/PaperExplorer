@@ -15,7 +15,7 @@
 {%- endmacro -%}
 {%- macro item(n) -%}
 <li role="treeitem" aria-level="{{ n.level }}" aria-selected="{{ 'true' if n.selected else 'false' }}" tabindex="{{ '0' if n.selected else '-1' }}" data-key="{{ n.key }}"{% if n.children %} aria-expanded="{{ 'true' if n.open else 'false' }}"{% endif %}{% if tree.searching and not n.matches %} class="no-match"{% endif %}>
-  <span class="tree-row">{% if n.children %}<span class="twisty" aria-hidden="true"></span>{% endif %}<a {{ nav(n.url) }} tabindex="-1" title="{{ n.path }}">{{ n.name }}</a>{% if n.exploration %}<span class="tree-mark" title="An Exploration's Collection" aria-label="Exploration"></span>{% endif %}<span class="tree-count" title="{{ plural(n.works, 'Work', 'Works') }}">{{ n.works }}</span>{{ mark(n.matches) }}</span>
+  <span class="tree-row">{% if n.children %}<span class="twisty" aria-hidden="true"></span>{% endif %}<a {{ nav(n.url) }} tabindex="-1" title="{{ n.path }}">{{ n.name }}</a>{% if n.exploration %}<span class="tree-mark" role="img" title="An Exploration's Collection" aria-label="Exploration"></span>{% endif %}<span class="tree-count" title="{{ plural(n.works, 'Work', 'Works') }}">{{ n.works }}</span>{{ mark(n.matches) }}</span>
   {%- if n.children %}
   <ul role="group"{% if not n.open %} hidden{% endif %}>
     {% for child in n.children %}{{ item(child) }}{% endfor %}

@@ -8,13 +8,12 @@ from fastapi import APIRouter, HTTPException
 from paperexplorer import catalog, resolution
 from paperexplorer.domain import ResolutionState, WorkId
 from paperexplorer.library import Library, LibraryWriteError, OutsidePaperExplorerError
-from paperexplorer.pipeline import STAGES
 from paperexplorer.store import Resolutions, StageState, StageStatuses, Works, WorkTexts
 from paperexplorer_api import schemas
 from paperexplorer_api.routes import Conn, Connections
 from paperexplorer_api.routes.checks import Checking
-from paperexplorer_api.routes.views import exploration_view, refile
-from paperexplorer_api.stage_run_thread import StageRunThread, Then
+from paperexplorer_api.routes.views import exploration_view, refile, stages_not_done
+from paperexplorer_api.stage_run_thread import StageRunThread
 
 logger = logging.getLogger(__name__)
 
@@ -50,13 +49,15 @@ def router(
                 raise HTTPException(409, str(e)) from e
             except (LibraryWriteError, OutsidePaperExplorerError) as e:
                 raise HTTPException(502, f"Zotero refused the PaperExplorer Collection: {e}") from e
-            stages = [s for s in STAGES if s not in ran or ran[s].state is not StageState.DONE]
+            stages = stages_not_done(ran)
             check = body is not None and body.check
+
+            def checked(conn: Conn) -> None:
+                _check_unchecked(conn, library, checking, seed)
+
             if stages or check:
-                then: Then | None = None
-                if check:
-                    then = lambda conn: _check_unchecked(conn, library, checking, seed)  # noqa: E731
-                thread.submit(seed, stages, then=then)
+                if not thread.submit(seed, stages, then=checked if check else None):
+                    raise HTTPException(409, f"Work {work_id} has a Stage Run; resume once it ends")
                 logger.info("Queued %s for the Exploration of Work %d", ", ".join(stages), seed)
             return explored(conn, seed)
 
@@ -81,7 +82,8 @@ def router(
 def _check_unchecked(conn: Conn, library: Library, checking: Checking, seed: WorkId) -> None:
     """A Registry Check of the Seed's Unchecked References, then their Filing.
 
-    What a spent budget or a failed registry left unchecked stays Unchecked, as the state says.
+    What a spent budget or a failed registry left unchecked stays Unchecked, as the state says;
+    what the Check landed before anything stopped it is filed all the same.
     """
     parsed = WorkTexts(conn).get(seed)
     unchecked = {
@@ -101,4 +103,7 @@ def _check_unchecked(conn: Conn, library: Library, checking: Checking, seed: Wor
             asyncio.run(run())
         except resolution.RegistryError as e:
             logger.warning("The Check of Work %d stopped: %s; what landed is kept", seed, e)
-    refile(conn, library, seed)
+        finally:
+            refile(conn, library, seed)
+    else:
+        refile(conn, library, seed)

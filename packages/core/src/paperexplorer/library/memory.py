@@ -7,9 +7,9 @@ from paperexplorer.domain import (
     COLLECTION_DEPTH,
     Attachment,
     Collection,
-    ItemDraft,
     LibraryChanges,
     LibraryItem,
+    NewItem,
 )
 from paperexplorer.library.port import (
     PAPEREXPLORER,
@@ -34,8 +34,8 @@ class InMemoryLibrary:
         self._pdfs = dict(pdfs)
         self.tags: dict[str, list[str]] = {}
         """Each item's tags; only `tag_seed` and `untag_seed` change them."""
-        self.drafts: dict[str, ItemDraft] = {}
-        """The draft each item PaperExplorer created was made from."""
+        self.created: dict[str, NewItem] = {}
+        """Each item PaperExplorer created, as it was asked for."""
         for item in items:
             self.put(item)
 
@@ -119,20 +119,20 @@ class InMemoryLibrary:
         if key not in self._collections:
             self.put_collection(Collection(key=key, name=name, parent_key=within))
 
-    def create_item(self, key: str, draft: ItemDraft, *, collection: str, within: str) -> None:
-        """A Library Item from the draft, filed in `collection`, unless this key exists already."""
+    def create_item(self, key: str, new: NewItem, *, collection: str, within: str) -> None:
+        """A Library Item as `new` has it, filed in `collection`, unless this key exists already."""
         self._check(collection, within)
         if key in self._items:
             return
-        year = draft.date[:4] if draft.date else ""
-        self.drafts[key] = draft
+        year = new.date[:4] if new.date else ""
+        self.created[key] = new
         self.put(
             LibraryItem(
                 key=key,
-                title=draft.title,
-                creators=draft.creators,
+                title=new.title,
+                creators=new.creators,
                 year=int(year) if year.isdigit() else None,
-                doi=draft.doi,
+                doi=new.doi,
                 collections=[collection],
             )
         )

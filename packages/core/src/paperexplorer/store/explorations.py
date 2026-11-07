@@ -1,6 +1,7 @@
 """Explorations, the PaperExplorer Collection, and the Filings PaperExplorer made in Zotero."""
 
-from collections.abc import Iterable
+from collections.abc import Generator, Iterable
+from contextlib import contextmanager
 
 import psycopg
 from psycopg.rows import TupleRow, class_row
@@ -12,6 +13,7 @@ _EXPLORATION = (
     "SELECT id, seed_id AS seed, collection_key, name, created, seed_tagged, started_at, ended_at"
     " FROM explorations"
 )
+_LOCK = 0x7045  # the advisory lock space of Explorations
 _FILING = "SELECT work_id AS work, item_key, state, error, updated_at FROM filings"
 
 
@@ -27,6 +29,19 @@ class Explorations:
 
     def __init__(self, conn: psycopg.Connection[TupleRow]) -> None:
         self._conn = conn
+
+    @contextmanager
+    def turn(self, seed: WorkId | None) -> Generator[None]:
+        """Hold the lock of one Seed's reconciles, or with `None` of starting: they take turns.
+
+        A session lock, so it holds across the commits made inside it; released on the way out.
+        """
+        key = 0 if seed is None else seed
+        self._conn.execute("SELECT pg_advisory_lock(%s, %s)", (_LOCK, key))
+        try:
+            yield
+        finally:
+            self._conn.execute("SELECT pg_advisory_unlock(%s, %s)", (_LOCK, key))
 
     def root(self) -> PaperExplorerCollection | None:
         """The PaperExplorer Collection adopted or made, if any."""
@@ -117,10 +132,11 @@ class Explorations:
     ) -> None:
         """Record where a Work's Filing stands, replacing what was recorded."""
         self._conn.execute(
-            "INSERT INTO filings (exploration_id, work_id, item_key, state, error)"
-            " VALUES (%s, %s, %s, %s, %s) ON CONFLICT (exploration_id, work_id) DO UPDATE"
+            "INSERT INTO filings (exploration_id, work_id, item_key, state, error, updated_at)"
+            " VALUES (%s, %s, %s, %s, %s, clock_timestamp())"
+            " ON CONFLICT (exploration_id, work_id) DO UPDATE"
             " SET item_key = EXCLUDED.item_key, state = EXCLUDED.state,"
-            " error = EXCLUDED.error, updated_at = now()",
+            " error = EXCLUDED.error, updated_at = clock_timestamp()",
             (exploration, work, item_key, state, error),
         )
 
@@ -131,11 +147,15 @@ class Explorations:
         )
 
     def note_items(self, items: Iterable[LibraryItem]) -> int:
-        """Mark as the reader's removal each Filing whose item left its Exploration Collection."""
+        """Mark as the reader's removal each Filing whose item left its Exploration Collection.
+
+        Its time stays the time it was filed: when the reader took it out is not known, and a
+        choice they made since the Filing must still count.
+        """
         removed = 0
         for item in items:
             removed += self._conn.execute(
-                "UPDATE filings f SET state = 'removed_by_reader', updated_at = now()"
+                "UPDATE filings f SET state = 'removed_by_reader'"
                 " FROM explorations e WHERE e.id = f.exploration_id AND e.ended_at IS NULL"
                 " AND f.item_key = %s AND f.state = 'filed' AND NOT e.collection_key = ANY(%s)",
                 (item.key, item.collections),

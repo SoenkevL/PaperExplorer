@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 import pytest
 
-from paperexplorer.domain import Collection, ItemDraft, LibraryItem
+from paperexplorer.domain import Collection, LibraryItem, NewItem
 from paperexplorer.library import InMemoryLibrary, OutsidePaperExplorerError
 
 ROOT, MINE, EXPL, ITEM = "ROOT2345", "MINE2345", "EXPL2345", "ITEM2345"
@@ -58,7 +58,7 @@ def test_filing_adds_one_collection_and_keeps_the_items_others() -> None:
 
 def test_a_new_item_is_created_filed_in_its_exploration_collection() -> None:
     library = _explored()
-    draft = ItemDraft(item_type="journalArticle", title="A Source", doi="10.1/x", date="2020")
+    draft = NewItem(item_type="journalArticle", title="A Source", doi="10.1/x", date="2020")
 
     library.create_item("NEWI2345", draft, collection=EXPL, within=ROOT)
     library.create_item("NEWI2345", draft, collection=EXPL, within=ROOT)
@@ -66,7 +66,7 @@ def test_a_new_item_is_created_filed_in_its_exploration_collection() -> None:
     created = library.item("NEWI2345")
     assert created.collections == [EXPL]
     assert created.doi == "10.1/x"
-    assert library.drafts["NEWI2345"] == draft
+    assert library.created["NEWI2345"] == draft
 
 
 def test_the_seed_tag_is_added_and_removed_and_no_other_tag_is_touched() -> None:
@@ -90,7 +90,7 @@ def test_the_seed_tag_is_added_and_removed_and_no_other_tag_is_touched() -> None
         lambda lib: lib.file(ITEM, EXPL, within=MINE),
         lambda lib: lib.file(ITEM, EXPL, within=EXPL),
         lambda lib: lib.create_collection("SUBX2345", "Elsewhere", within=MINE),
-        lambda lib: lib.create_item("NEWI2345", ItemDraft(), collection=MINE, within=ROOT),
+        lambda lib: lib.create_item("NEWI2345", NewItem(), collection=MINE, within=ROOT),
     ],
     ids=[
         "file-in-own",

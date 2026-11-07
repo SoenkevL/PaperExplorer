@@ -39,19 +39,19 @@ Resolving References matches a Seed's References to Works and verifies their DOI
 - **Creates run once.** Every Collection and item PaperExplorer creates gets its key made locally and stored before the request, then is posted with `"version": 0`: Zotero refuses a second create of that key (412), which counts as done, so a create whose answer was lost is never repeated as a duplicate. A Collection created is recorded in the store's Collections at once, so the next sync does not take it for one restored from the trash.
 - **The reconciler** (`catalog.reconcile(conn, library, seed)`) is not a Stage. Runs take turns on a Postgres advisory lock per Exploration, held for the run. It compares the firm Sources and the Seed with the Filings PaperExplorer recorded, creates what is missing, files and unfiles to close the gap, and commits each Filing as its write lands, on a connection of its own. A failed write is recorded with its error and left for the next run. It runs after `resolve` commits, after each Registry Check, after each Reader's Choice, and on *Resume*. A run with nothing to change writes nothing.
 - **Unfiling.** A Filing whose Source is no longer firm, or now names another Work, is unfiled. PaperExplorer unfiles only what it filed, and never deletes or trashes an item, created ones included.
-- **The reader's edits in Zotero.** The sync sees a filed item leave the Exploration Collection and records the Filing as removed by the reader. The reconciler files it again only after a Reader's Choice picks that Work. Items the reader files there stay and are never unfiled.
+- **The reader's edits in Zotero.** The sync sees a filed item leave the Exploration Collection and records the Filing as removed by the reader. The reconciler files it again only after a Reader's Choice picks that Work, made any time after it was filed (when the reader took it out is not known). Items the reader files there stay and are never unfiled.
 
 ## Ending
-- Deleting or trashing an Exploration Collection in Zotero ends its Exploration at the next sync: its Filings go, and `pe:seed` comes off the Seed unless it is the Seed of another Exploration. Created items stay. *Start Exploration* on that Seed makes a fresh one.
+- Deleting or trashing an Exploration Collection in Zotero ends its Exploration at the next sync: its Filings go, and the next start or reconcile takes `pe:seed` off the Seed unless it is the Seed of another Exploration (the sync itself writes nothing). Created items stay. *Start Exploration* on that Seed makes a fresh one.
 
 ## The write guard
 - The `Library` port gains only these writes, and `ZoteroLibrary` refuses anything else:
   - `create_paperexplorer_collection(key)`: the one top-level Collection, named `PaperExplorer`;
   - `create_collection(key, name, *, within)`: a Collection in the PaperExplorer Collection `within`;
   - `file(item, collection, *, within)` and `unfile(item, collection, *, within)`: the item's `collections` gains or loses that one key (`PATCH` replaces the whole array), read and written under `If-Unmodified-Since-Version`, a 412 re-read and retried once;
-  - `create_item(key, draft, *, collection, within)`: a new item filed in `collection`;
+  - `create_item(key, new, *, collection, within)`: a new item filed in `collection`;
   - `tag_seed(item)` and `untag_seed(item)`: only the `pe:seed` tag, the item's other tags kept.
-- Every write that names a Collection names the PaperExplorer Collection too (`within`), and the adapter asks Zotero: `within` must be a top-level Collection named `PaperExplorer`, outside the trash, and the target must have it as an ancestor (walked up to `COLLECTION_DEPTH`, cached per adapter). Otherwise `OutsidePaperExplorerError` is raised before any write. `merge` stays as it is: the reader confirms it.
+- Every write that names a Collection names the PaperExplorer Collection too (`within`), and the adapter asks Zotero: `within` must be a top-level Collection named `PaperExplorer`, outside the trash, and the target must have it as an ancestor (walked up to `COLLECTION_DEPTH`; what was read is trusted for a minute, so a rename, move or trash stops writes within one). A refusal is recorded on the Filing like any failed write. Otherwise `OutsidePaperExplorerError` is raised before any write. `merge` stays as it is: the reader confirms it.
 - `InMemoryLibrary` keeps the same guard, so the core tests prove it.
 
 ## Store

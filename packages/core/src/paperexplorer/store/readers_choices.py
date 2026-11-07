@@ -17,9 +17,9 @@ class ReadersChoices:
     def choose(self, work: WorkId, printed: str, chosen: WorkId | None) -> None:
         """Record that the Reference printed so names `chosen`, or no Work when `None`."""
         self._conn.execute(
-            "INSERT INTO readers_choices (work_id, printed, chosen_work_id) VALUES (%s, %s, %s)"
-            " ON CONFLICT (work_id, printed) DO UPDATE"
-            " SET chosen_work_id = EXCLUDED.chosen_work_id, chosen_at = now()",
+            "INSERT INTO readers_choices (work_id, printed, chosen_work_id, chosen_at)"
+            " VALUES (%s, %s, %s, clock_timestamp()) ON CONFLICT (work_id, printed) DO UPDATE"
+            " SET chosen_work_id = EXCLUDED.chosen_work_id, chosen_at = clock_timestamp()",
             (work, printed, chosen),
         )
 

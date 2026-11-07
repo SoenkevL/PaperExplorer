@@ -7,7 +7,7 @@ from typing import Any
 import httpx
 import pytest
 
-from paperexplorer.domain import ItemDraft
+from paperexplorer.domain import NewItem
 from paperexplorer.library import LibraryWriteError, OutsidePaperExplorerError, ZoteroLibrary
 
 ROOT, MINE, EXPL, ITEM = "ROOT2345", "MINE2345", "EXPL2345", "ITEM2345"
@@ -130,13 +130,13 @@ def test_a_create_zotero_refuses_raises_with_its_reason() -> None:
 
     with pytest.raises(LibraryWriteError, match=r"413 title too long"):
         zotero.library().create_item(
-            "NEWI2345", ItemDraft(title="Too long"), collection=EXPL, within=ROOT
+            "NEWI2345", NewItem(title="Too long"), collection=EXPL, within=ROOT
         )
 
 
 def test_a_new_item_is_posted_with_its_fields_filed_in_its_collection() -> None:
     zotero = WritingZotero()
-    draft = ItemDraft(
+    draft = NewItem(
         item_type="journalArticle",
         title="Brain entropy",
         creators=["Lee, Ann", "Consortium"],
@@ -176,7 +176,7 @@ def test_a_new_item_is_posted_with_its_fields_filed_in_its_collection() -> None:
 
 def test_a_preprint_names_its_server_as_its_repository_and_sends_no_journal_fields() -> None:
     zotero = WritingZotero()
-    draft = ItemDraft(item_type="preprint", title="P", publication="bioRxiv", volume="1")
+    draft = NewItem(item_type="preprint", title="P", publication="bioRxiv", volume="1")
 
     zotero.library().create_item("NEWI2345", draft, collection=EXPL, within=ROOT)
 
@@ -256,7 +256,7 @@ def test_a_write_outside_the_paperexplorer_collection_sends_nothing(
     with pytest.raises(OutsidePaperExplorerError):
         library.file(ITEM, collection, within=within)
     with pytest.raises(OutsidePaperExplorerError):
-        library.create_item("NEWI2345", ItemDraft(), collection=collection, within=within)
+        library.create_item("NEWI2345", NewItem(), collection=collection, within=within)
 
     assert zotero.writes() == []
 
@@ -267,5 +267,14 @@ def test_a_trashed_paperexplorer_collection_takes_no_writes() -> None:
 
     with pytest.raises(OutsidePaperExplorerError):
         zotero.library().create_collection("NEWC2345", "x", within=ROOT)
+
+    assert zotero.writes() == []
+
+
+def test_a_seed_tag_there_already_in_any_type_is_not_added_again() -> None:
+    zotero = WritingZotero()
+    zotero.items[ITEM]["tags"] = [{"tag": "pe:seed", "type": 1}]
+
+    zotero.library().tag_seed(ITEM)
 
     assert zotero.writes() == []

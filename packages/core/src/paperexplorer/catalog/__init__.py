@@ -5,20 +5,17 @@ and commits each Filing as its write lands (docs/design-explorations.md).
 """
 
 import logging
-from collections.abc import Generator
-from contextlib import contextmanager
 
 import psycopg
 from psycopg.rows import TupleRow
 from pydantic import BaseModel
 
-from paperexplorer.catalog.drafts import draft
+from paperexplorer.catalog.new_items import new_item
 from paperexplorer.domain import (
     Collection,
     Exploration,
     Filing,
     FilingState,
-    Level,
     ResolutionState,
     Work,
     WorkId,
@@ -29,6 +26,7 @@ from paperexplorer.library import (
     Library,
     LibraryUnavailableError,
     LibraryWriteError,
+    OutsidePaperExplorerError,
     new_key,
     sync,
 )
@@ -39,8 +37,8 @@ __all__ = [
     "ExplorationState",
     "NotASeedError",
     "ReconcileResult",
-    "draft",
     "exploration_name",
+    "new_item",
     "reconcile",
     "start",
     "state",
@@ -50,9 +48,15 @@ logger = logging.getLogger(__name__)
 
 Conn = psycopg.Connection[TupleRow]
 
-_LOCK = 0x7045  # the advisory lock space of reconciles, one lock per Seed
 _TITLE = 60  # the most of a Seed's title an Exploration Collection's name holds
-_WRITE_ERRORS = (LibraryWriteError, LibraryUnavailableError, ItemNotFoundError)
+# A write refused, unreachable, or outside the PaperExplorer Collection (the reader renamed or
+# moved it): recorded, and tried again by the next run.
+_WRITE_ERRORS = (
+    LibraryWriteError,
+    LibraryUnavailableError,
+    ItemNotFoundError,
+    OutsidePaperExplorerError,
+)
 
 
 class NotASeedError(ValueError):
@@ -79,7 +83,7 @@ class ExplorationState(BaseModel):
     filed: int
     failed: list[Filing]
     removed_by_reader: int
-    unfiled: int  # firm Sources not filed yet, and not removed by the reader
+    not_filed: int  # firm Sources waiting to be filed: a reconcile has not reached them yet
     awaiting_choice: int  # Sources matched only at low confidence
     unchecked: int  # References no Registry Check has looked up
 
@@ -102,11 +106,14 @@ def start(conn: Conn, library: Library, seed: WorkId) -> Exploration:
     if work is None or work.zotero_key is None or work.pdf is None:
         raise NotASeedError(f"Work {seed} has no Library Item with a PDF; a Seed needs its text")
     explorations = Explorations(conn)
-    if explorations.of_seed(seed) is None:
-        _root(conn, library)
-        with conn.transaction():
-            explorations.start(seed, new_key(), exploration_name(work))
-        logger.info("Exploration of %s started", work.zotero_key)
+    with explorations.turn(
+        None
+    ):  # starts take turns, so only one makes the PaperExplorer Collection
+        if explorations.of_seed(seed) is None:
+            _root(conn, library)
+            with conn.transaction():
+                explorations.start(seed, new_key(), exploration_name(work))
+            logger.info("Exploration of %s started", work.zotero_key)
     reconcile(conn, library, seed)
     started = explorations.of_seed(seed)
     assert started is not None
@@ -119,7 +126,7 @@ def reconcile(conn: Conn, library: Library, seed: WorkId) -> ReconcileResult | N
     `None` when the Seed has no Exploration under way. Each write commits as it lands; one that
     fails is recorded with its reason and tried again by the next run.
     """
-    with _turn(conn, seed):
+    with Explorations(conn).turn(seed):
         with conn.transaction():
             sync(conn, library)
         _untag_ended(conn, library)
@@ -147,7 +154,7 @@ def reconcile(conn: Conn, library: Library, seed: WorkId) -> ReconcileResult | N
                 and filing.state is FilingState.REMOVED_BY_READER
                 and ((picked := chosen.get(work)) is None or picked < filing.updated_at)
             ):
-                continue  # the reader took it out and has not chosen it since
+                continue  # the reader took it out and has not chosen it since it was filed
             _file(conn, library, exploration, root.key, work, filing, result)
         for work, filing in filings.items():
             if work not in wanted:
@@ -174,23 +181,10 @@ def state(conn: Conn, seed: WorkId) -> ExplorationState | None:
         filed=sum(f.state is FilingState.FILED for f in filings.values()),
         failed=[f for f in filings.values() if f.state is FilingState.FAILED],
         removed_by_reader=sum(f.state is FilingState.REMOVED_BY_READER for f in filings.values()),
-        unfiled=sum(w not in filings for w in _wanted(conn, seed)),
-        awaiting_choice=sum(
-            r.state is ResolutionState.RESOLVED and r.level is Level.LOW and not r.firm
-            for r in resolutions
-        ),
+        not_filed=sum(w not in filings for w in _wanted(conn, seed)),
+        awaiting_choice=sum(r.awaiting_choice for r in resolutions),
         unchecked=sum(r.state is ResolutionState.UNCHECKED for r in resolutions),
     )
-
-
-@contextmanager
-def _turn(conn: Conn, seed: WorkId) -> Generator[None]:
-    """Hold the Seed's reconcile lock, so reconciles of one Exploration take turns."""
-    conn.execute("SELECT pg_advisory_lock(%s, %s)", (_LOCK, seed))
-    try:
-        yield
-    finally:
-        conn.execute("SELECT pg_advisory_unlock(%s, %s)", (_LOCK, seed))
 
 
 def _root(conn: Conn, library: Library) -> str:
@@ -257,13 +251,26 @@ def _file(
     work = works.get(work_id)
     if work is None:
         return
+    if (
+        work.zotero_key is None
+        and filing is not None
+        and filing.state in (FilingState.PENDING, FilingState.FAILED)
+        and (held := works.find(filing.item_key)) is not None
+    ):
+        # Created, but its answer was lost: the sync has since made the item its own Work, which
+        # the References and choices now name.
+        with conn.transaction():
+            Resolutions(conn).repoint(work_id, held.id)
+            ReadersChoices(conn).repoint(work_id, held.id)
+            explorations.forget_filing(exploration.id, work_id)
+        work_id, work, filing = held.id, held, None
     key, create = _item_of(conn, work, filing)
     try:
         if create:
             with conn.transaction():  # the key is kept before the create, so a retry reuses it
                 explorations.record_filing(exploration.id, work_id, key, FilingState.PENDING)
             library.create_item(
-                key, draft(conn, work), collection=exploration.collection_key, within=root
+                key, new_item(conn, work), collection=exploration.collection_key, within=root
             )
             with conn.transaction():
                 works.assign_library_item(work_id, key)

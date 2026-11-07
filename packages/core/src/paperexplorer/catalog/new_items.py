@@ -1,10 +1,10 @@
-"""A new Library Item's draft: the cached Crossref record, else OpenAlex's, else the row."""
+"""A new Library Item's fields: the cached Crossref record, else OpenAlex's, else the row."""
 
 import psycopg
 from psycopg.rows import TupleRow
 from pydantic import BaseModel, Field, JsonValue
 
-from paperexplorer.domain import ItemDraft, RegistrySource, Work, normalize_doi
+from paperexplorer.domain import NewItem, RegistrySource, Work, normalize_doi
 from paperexplorer.store import RegistryResponses
 
 # Crossref's `type` and OpenAlex's as Zotero item types; any other is a `document`.
@@ -84,7 +84,7 @@ class _OpenAlexWork(BaseModel):
     biblio: _OpenAlexBiblio | None = None
 
 
-def draft(conn: psycopg.Connection[TupleRow], work: Work) -> ItemDraft:
+def new_item(conn: psycopg.Connection[TupleRow], work: Work) -> NewItem:
     """The new Library Item for a Work no Library Item holds, from what the registries said."""
     if work.doi:
         doi = normalize_doi(work.doi)
@@ -95,7 +95,7 @@ def draft(conn: psycopg.Connection[TupleRow], work: Work) -> ItemDraft:
         openalex = responses.get(RegistrySource.OPENALEX_DOI, [doi]).get(doi)
         if openalex is not None and openalex.hit:
             return from_openalex(openalex.response)
-    return ItemDraft(
+    return NewItem(
         title=work.title,
         creators=work.creators,
         date=str(work.year) if work.year else None,
@@ -104,8 +104,8 @@ def draft(conn: psycopg.Connection[TupleRow], work: Work) -> ItemDraft:
     )
 
 
-def from_crossref(item: JsonValue) -> ItemDraft:
-    """A Crossref `/works` item as a draft."""
+def from_crossref(item: JsonValue) -> NewItem:
+    """A Crossref `/works` item as a new Library Item."""
     it = _CrossrefItem.model_validate(item)
     parts = [p for p in (it.issued.date_parts[0] if it.issued and it.issued.date_parts else [])]
     date = "-".join(f"{p:02d}" if i else str(p) for i, p in enumerate(parts) if p is not None)
@@ -118,7 +118,7 @@ def from_crossref(item: JsonValue) -> ItemDraft:
     if publication is None and it.institution:
         name = it.institution[0].get("name")
         publication = name if isinstance(name, str) else None  # a preprint's server
-    return ItemDraft(
+    return NewItem(
         item_type=_CROSSREF_TYPES.get(it.type or "", "document"),
         title=it.title[0] if it.title else None,
         creators=[c for c in creators if c],
@@ -132,15 +132,15 @@ def from_crossref(item: JsonValue) -> ItemDraft:
     )
 
 
-def from_openalex(work: JsonValue) -> ItemDraft:
-    """An OpenAlex Work as a draft."""
+def from_openalex(work: JsonValue) -> NewItem:
+    """An OpenAlex Work as a new Library Item."""
     w = _OpenAlexWork.model_validate(work)
     names = [a.author.display_name for a in w.authorships if a.author and a.author.display_name]
     source = w.primary_location.source if w.primary_location else None
     biblio = w.biblio or _OpenAlexBiblio()
     pages = "-".join(p for p in (biblio.first_page, biblio.last_page) if p) or None
     doi = normalize_doi(w.doi) if w.doi else None
-    return ItemDraft(
+    return NewItem(
         item_type=_OPENALEX_TYPES.get(w.type or "", "document"),
         title=w.title or w.display_name,
         creators=[_last_first(n) for n in names],

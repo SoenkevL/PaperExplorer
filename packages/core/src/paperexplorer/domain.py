@@ -61,13 +61,13 @@ class LibraryItem(BaseModel):
     collections: list[str] = []  # keys of the Collections it is filed in
 
 
-class ItemDraft(BaseModel):
+class NewItem(BaseModel):
     """A Library Item PaperExplorer will create for a Source: its type and Zotero fields.
 
     Creators are `Last, First`, as Zotero writes them; `date` is as the registry gives it.
     """
 
-    item_type: str = "journalArticle"
+    item_type: str = "document"  # Zotero's type for a Work no registry typed
     title: str | None = None
     creators: list[str] = []
     date: str | None = None
@@ -208,6 +208,11 @@ class Resolution(BaseModel):
         if self.layer is Layer.READER:
             return True
         return self.state is ResolutionState.RESOLVED and self.level is not Level.LOW
+
+    @property
+    def awaiting_choice(self) -> bool:
+        """Matched only at low confidence, and the reader has not chosen: it waits for them."""
+        return self.state is ResolutionState.RESOLVED and self.level is Level.LOW and not self.firm
 
     @property
     def library_match(self) -> bool:

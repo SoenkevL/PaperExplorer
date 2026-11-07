@@ -2,6 +2,7 @@
 
 import logging
 import re
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Self
@@ -13,9 +14,9 @@ from paperexplorer.domain import (
     COLLECTION_DEPTH,
     Attachment,
     Collection,
-    ItemDraft,
     LibraryChanges,
     LibraryItem,
+    NewItem,
 )
 from paperexplorer.library.port import (
     PAPEREXPLORER,
@@ -34,8 +35,9 @@ _STORED = frozenset({"imported_file", "imported_url"})
 # Children of a Library Item, not Library Items themselves.
 _CHILD_TYPES = frozenset({"attachment", "note", "annotation"})
 _PAGE = 100  # the Web API's largest page
+_GUARD_TTL = 60.0  # seconds the guard trusts what it read of a Collection
 ADDED_BY = "Added by PaperExplorer"  # in `extra`, so the reader can find what PaperExplorer made
-# The fields a draft fills, by item type; Zotero refuses a field its type lacks. Every type has
+# The fields a new item fills, by item type; Zotero refuses a field its type lacks. Every type has
 # `DOI`, `url` and `extra` (docs/research/2026-11-zotero-writes.md).
 _PUBLICATION = {
     "journalArticle": "publicationTitle",
@@ -58,8 +60,10 @@ class ZoteroLibrary:
         self._files = files
         self._storage = storage_dir
         self._cache = cache_dir / "pdfs"
-        self._parents: dict[str, str | None] = {}  # Collections the guard has read, by key
-        self._roots: set[str] = set()  # PaperExplorer Collections the guard has read
+        # What the guard last read of each Collection, and when: read again after `_GUARD_TTL`,
+        # so a rename, move or trash in Zotero stops writes within a minute.
+        self._parents: dict[str, tuple[float, str | None]] = {}
+        self._roots: dict[str, float] = {}
 
     @classmethod
     def from_settings(cls, settings: Settings) -> Self:
@@ -169,19 +173,19 @@ class ZoteroLibrary:
     def create_paperexplorer_collection(self, key: str) -> None:
         """Post the top-level PaperExplorer Collection with this key, once."""
         self._create("/collections", {"name": PAPEREXPLORER, "parentCollection": False}, key)
-        self._parents[key] = None
-        self._roots.add(key)
+        self._parents[key] = (time.monotonic(), None)
+        self._roots[key] = time.monotonic()
 
     def create_collection(self, key: str, name: str, *, within: str) -> None:
         """Post a Collection in the PaperExplorer Collection, once."""
         self._check_root(within)
         self._create("/collections", {"name": name, "parentCollection": within}, key)
-        self._parents[key] = within
+        self._parents[key] = (time.monotonic(), within)
 
-    def create_item(self, key: str, draft: ItemDraft, *, collection: str, within: str) -> None:
-        """Post a Library Item made from the draft, filed in `collection`, once."""
+    def create_item(self, key: str, new: NewItem, *, collection: str, within: str) -> None:
+        """Post a Library Item made as `new` has it, filed in `collection`, once."""
         self._check(collection, within)
-        self._create("/items", _item_fields(draft) | {"collections": [collection]}, key)
+        self._create("/items", _item_fields(new) | {"collections": [collection]}, key)
 
     def file(self, item: str, collection: str, *, within: str) -> None:
         """Patch the item's Collections to include `collection`."""
@@ -195,8 +199,13 @@ class ZoteroLibrary:
 
     def tag_seed(self, item: str) -> None:
         """Patch the item's tags to include `pe:seed`."""
-        seed = {"tag": SEED_TAG}
-        self._update(item, "tags", lambda held: held if seed in held else [*held, seed])
+        self._update(
+            item,
+            "tags",
+            lambda held: (
+                held if any(t.get("tag") == SEED_TAG for t in held) else [*held, {"tag": SEED_TAG}]
+            ),
+        )
 
     def untag_seed(self, item: str) -> None:
         """Patch the item's tags to leave out `pe:seed`."""
@@ -204,12 +213,13 @@ class ZoteroLibrary:
 
     def _check_root(self, within: str) -> None:
         """Raise unless `within` is a top-level Collection named PaperExplorer, not trashed."""
-        if within in self._roots:
+        if time.monotonic() - self._roots.get(within, -_GUARD_TTL) < _GUARD_TTL:
             return
         data = self._collection_data(within)
         if data is None or data["parentCollection"] or data["name"] != PAPEREXPLORER:
+            self._roots.pop(within, None)
             raise OutsidePaperExplorerError(f"{within} is not the top-level {PAPEREXPLORER}")
-        self._roots.add(within)
+        self._roots[within] = time.monotonic()
 
     def _check(self, collection: str, within: str) -> None:
         """Raise unless `collection` sits under the PaperExplorer Collection `within`."""
@@ -218,12 +228,15 @@ class ZoteroLibrary:
         for _ in range(COLLECTION_DEPTH):
             if key is None:
                 break
-            if key not in self._parents:
+            read = self._parents.get(key)
+            if read is None or time.monotonic() - read[0] >= _GUARD_TTL:
                 data = self._collection_data(key)
                 if data is None:
+                    self._parents.pop(key, None)
                     break
-                self._parents[key] = data["parentCollection"] or None
-            key = self._parents[key]
+                read = (time.monotonic(), data["parentCollection"] or None)
+                self._parents[key] = read
+            key = read[1]
             if key == within:
                 return
         raise OutsidePaperExplorerError(f"{collection} is not in the {PAPEREXPLORER} Collection")
@@ -353,26 +366,26 @@ def _raise_for(response: httpx.Response) -> None:
     raise LibraryWriteError(f"Zotero answered {response.status_code}: {reason}")
 
 
-def _item_fields(draft: ItemDraft) -> dict[str, Any]:
-    """The Web API fields of a new item made from the draft, only those its type has."""
-    kind = draft.item_type
+def _item_fields(new: NewItem) -> dict[str, Any]:
+    """The Web API fields of a new item as `new` has it, only those its type has."""
+    kind = new.item_type
     fields: dict[str, Any] = {"itemType": kind}
-    if draft.title:
-        fields["title"] = draft.title
-    if draft.creators:
-        fields["creators"] = [_creator(c) for c in draft.creators]
-    if draft.date:
-        fields["date"] = draft.date
-    if draft.doi:
-        fields["DOI"] = draft.doi
-    if draft.publication and kind in _PUBLICATION:
-        fields[_PUBLICATION[kind]] = draft.publication
+    if new.title:
+        fields["title"] = new.title
+    if new.creators:
+        fields["creators"] = [_creator(c) for c in new.creators]
+    if new.date:
+        fields["date"] = new.date
+    if new.doi:
+        fields["DOI"] = new.doi
+    if new.publication and kind in _PUBLICATION:
+        fields[_PUBLICATION[kind]] = new.publication
     if kind in _VOLUME_ISSUE:
-        fields |= {k: v for k, v in (("volume", draft.volume), ("issue", draft.issue)) if v}
-    if draft.pages and kind in _PAGES:
-        fields["pages"] = draft.pages
-    if draft.url:
-        fields["url"] = draft.url
+        fields |= {k: v for k, v in (("volume", new.volume), ("issue", new.issue)) if v}
+    if new.pages and kind in _PAGES:
+        fields["pages"] = new.pages
+    if new.url:
+        fields["url"] = new.url
     return fields | {"extra": ADDED_BY}
 
 

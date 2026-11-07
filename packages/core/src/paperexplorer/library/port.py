@@ -4,7 +4,7 @@ import secrets
 from pathlib import Path
 from typing import Protocol
 
-from paperexplorer.domain import Attachment, ItemDraft, LibraryChanges, LibraryItem
+from paperexplorer.domain import Attachment, LibraryChanges, LibraryItem, NewItem
 
 
 class ItemNotFoundError(LookupError):
@@ -63,8 +63,8 @@ class Library(Protocol):
         """Create a Collection with this key and name in the PaperExplorer Collection."""
         ...
 
-    def create_item(self, key: str, draft: ItemDraft, *, collection: str, within: str) -> None:
-        """Create a Library Item with this key from the draft, filed in `collection` alone."""
+    def create_item(self, key: str, new: NewItem, *, collection: str, within: str) -> None:
+        """Create a Library Item with this key as `new` has it, filed in `collection` alone."""
         ...
 
     def file(self, item: str, collection: str, *, within: str) -> None:

@@ -30,7 +30,14 @@ from paperexplorer import (
 from paperexplorer.citations import ConfidenceLevel, confidence_level
 from paperexplorer.config import Settings
 from paperexplorer.domain import Answer, Level, Resolution, ResolutionState, Scope, Work, WorkId
-from paperexplorer.library import NotDuplicateItemsError, ZoteroLibrary, check_duplicates, sync
+from paperexplorer.library import (
+    LibraryWriteError,
+    NotDuplicateItemsError,
+    OutsidePaperExplorerError,
+    ZoteroLibrary,
+    check_duplicates,
+    sync,
+)
 from paperexplorer.library import merge as library_merge
 from paperexplorer.logs import configure_logging
 from paperexplorer.tracing import configure_tracing, trace_release
@@ -336,17 +343,12 @@ def check_command(
         with conn.transaction():
             if sync(conn, ZoteroLibrary.from_settings(settings)).stale:
                 typer.echo("Zotero could not be reached; checking against the last copy", err=True)
-        last, seconds = _registry_check(conn, settings, found.id, refs, refresh=refresh)
+        checked = _registry_check(conn, settings, found.id, refs, refresh=refresh)
         filed = catalog.reconcile(conn, ZoteroLibrary.from_settings(settings), found.id)
-    if isinstance(last, resolution.BudgetSpent):
-        typer.echo(last.message, err=True)
-        raise typer.Exit(1)
-    if isinstance(last, resolution.RegistryCheckFinished):
-        summary = ", ".join(f"{n} {k}" for k, n in last.counts.items() if k != "references")
-        typer.echo(f"Checked {last.counts['references']} References in "
-                   f"{seconds:.1f} s: {summary}")  # fmt: skip
     if filed is not None:
         typer.echo(_filed(filed))
+    if not checked:
+        raise typer.Exit(1)
 
 
 def _registry_check(
@@ -356,8 +358,11 @@ def _registry_check(
     refs: list[parsing.Reference],
     *,
     refresh: bool = False,
-) -> tuple[resolution.RegistryCheckEvent | None, float]:
-    """Run a Registry Check, printing each Reference as it lands; its last event and seconds."""
+) -> bool:
+    """Run a Registry Check, printing each Reference as it lands; whether it ran to its end.
+
+    What landed before a stop is kept, so the caller files it either way.
+    """
     registries = resolution.Registries(settings)
 
     async def run() -> resolution.RegistryCheckEvent | None:
@@ -376,8 +381,15 @@ def _registry_check(
         last = asyncio.run(run())
     except resolution.RegistryError as e:
         typer.echo(f"Check stopped: {e}; what landed is kept", err=True)
-        raise typer.Exit(1) from e
-    return last, time.monotonic() - started
+        return False
+    if isinstance(last, resolution.BudgetSpent):
+        typer.echo(last.message, err=True)
+        return False
+    if isinstance(last, resolution.RegistryCheckFinished):
+        summary = ", ".join(f"{n} {k}" for k, n in last.counts.items() if k != "references")
+        typer.echo(f"Checked {last.counts['references']} References in "
+                   f"{time.monotonic() - started:.1f} s: {summary}")  # fmt: skip
+    return True
 
 
 def _filed(result: catalog.ReconcileResult) -> str:
@@ -390,8 +402,10 @@ def _filed(result: catalog.ReconcileResult) -> str:
 def _print_exploration(state: catalog.ExplorationState) -> None:
     e = state.exploration
     typer.echo(f"Exploration Collection: {e.name} ({e.collection_key})")
+    if not e.created:
+        typer.echo("Not in Zotero yet: its create failed; run `explore` again", err=True)
     typer.echo(
-        f"{state.filed} filed, {state.unfiled} firm Sources not filed,"
+        f"{state.filed} filed, {state.not_filed} firm Sources not filed,"
         f" {state.removed_by_reader} removed in Zotero, {state.awaiting_choice} awaiting a choice,"
         f" {state.unchecked} Unchecked"
     )
@@ -420,7 +434,12 @@ def explore_command(
             raise typer.Exit(1)
         try:
             catalog.start(conn, library, found.id)
-        except (catalog.NotASeedError, catalog.AmbiguousPaperExplorerError) as e:
+        except (
+            catalog.NotASeedError,
+            catalog.AmbiguousPaperExplorerError,
+            LibraryWriteError,
+            OutsidePaperExplorerError,
+        ) as e:
             typer.echo(str(e), err=True)
             raise typer.Exit(1) from e
         ran = store.StageStatuses(conn).for_work(found.id)
@@ -458,13 +477,13 @@ def explore_command(
                 if r.state is ResolutionState.UNCHECKED
             }
             refs = [r for r in parsed.references if r.id in unchecked]
-            if refs:
-                _registry_check(conn, settings, found.id, refs)
+            if refs and not _registry_check(conn, settings, found.id, refs):
+                failed = True
         catalog.reconcile(conn, library, found.id)
         state = catalog.state(conn, found.id)
     assert state is not None
     _print_exploration(state)
-    if failed or state.failed:
+    if failed or state.failed or not state.exploration.created:
         raise typer.Exit(1)
 
 

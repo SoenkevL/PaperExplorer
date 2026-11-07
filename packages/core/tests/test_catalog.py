@@ -5,14 +5,14 @@ import pytest
 from psycopg.rows import TupleRow
 
 from paperexplorer import catalog
-from paperexplorer.catalog import drafts
+from paperexplorer.catalog import new_items
 from paperexplorer.domain import (
     Attachment,
     Collection,
-    ItemDraft,
     Layer,
     Level,
     LibraryItem,
+    NewItem,
     RegistrySource,
     Resolution,
     ResolutionState,
@@ -197,7 +197,7 @@ def test_a_source_found_by_a_check_gets_one_new_item_made_from_its_registry_reco
     catalog.reconcile(store_db, library, seed)
 
     (created,) = [k for k in _filed_in(library, exploration.collection_key) if k != SEED.key]
-    assert library.drafts[created] == ItemDraft(
+    assert library.created[created] == NewItem(
         item_type="journalArticle",
         title="Found by a Check",
         creators=["Lee, Ann"],
@@ -210,7 +210,7 @@ def test_a_source_found_by_a_check_gets_one_new_item_made_from_its_registry_reco
         url="https://doi.org/10.1/found",
     )
     assert library.item(created).collections == [exploration.collection_key]
-    assert len(library.drafts) == 1
+    assert len(library.created) == 1
     work = Works(store_db).get(found)
     assert work is not None and work.zotero_key == created
 
@@ -228,7 +228,7 @@ def test_a_source_whose_doi_the_library_holds_is_filed_not_created(
     exploration = catalog.start(store_db, library, seed)
 
     assert "LATE2345" in _filed_in(library, exploration.collection_key)
-    assert library.drafts == {}
+    assert library.created == {}
 
 
 def test_a_source_no_longer_firm_is_unfiled_and_what_the_reader_filed_stays(
@@ -334,7 +334,7 @@ def test_a_posted_content_record_drafts_a_preprint_on_its_server() -> None:
         "institution": [{"name": "bioRxiv"}],
     }
 
-    assert drafts.from_crossref(record) == ItemDraft(
+    assert new_items.from_crossref(record) == NewItem(
         item_type="preprint",
         title="A preprint",
         creators=["The Consortium"],
@@ -343,3 +343,109 @@ def test_a_posted_content_record_drafts_a_preprint_on_its_server() -> None:
         publication="bioRxiv",
         url="https://doi.org/10.1101/2020.01.01.123",
     )
+
+
+def test_a_choice_made_before_the_sync_saw_the_readers_removal_files_it_again(
+    store_db: Conn, library: InMemoryLibrary
+) -> None:
+    """Regression: the removal was stamped when the sync noticed it, after the reader's choice."""
+    seed = _seed(store_db, library, "b0")
+    held = _work(store_db, HELD.key)
+    Resolutions(store_db).replace(seed, [_resolved("b0", held)])
+    key = catalog.start(store_db, library, seed).collection_key
+    library.put(library.item(HELD.key).model_copy(update={"collections": [MINE.key]}))
+
+    ReadersChoices(store_db).choose(seed, "Printed b0", held)
+    catalog.reconcile(store_db, library, seed)
+
+    assert HELD.key in _filed_in(library, key)
+
+
+class _LosingAnswers(InMemoryLibrary):
+    """A Library that creates the item but whose answer never arrives, once."""
+
+    lose = True
+
+    def create_item(self, key: str, new: NewItem, *, collection: str, within: str) -> None:
+        super().create_item(key, new, collection=collection, within=within)
+        if self.lose:
+            self.lose = False
+            raise LibraryWriteError("Zotero could not be reached: ReadTimeout")
+
+
+def test_an_item_whose_create_answer_was_lost_is_filed_once_and_not_created_again(
+    store_db: Conn,
+) -> None:
+    """Regression: the next run made a second Work for the item and then failed on its key."""
+    library = _LosingAnswers([SEED], {})
+    seed = _seed(store_db, library, "b0")
+    found = Works(store_db).ensure_registry_work(from_crossref({"title": ["No DOI printed"]}))
+    Resolutions(store_db).replace(seed, [_resolved("b0", found)])
+    key = catalog.start(store_db, library, seed).collection_key
+
+    result = catalog.reconcile(store_db, library, seed)
+    again = catalog.reconcile(store_db, library, seed)
+
+    assert result is not None and result.failed == 0
+    assert again is not None and again.filed == 0 and again.unfiled == 0
+    assert len(library.created) == 1
+    (created,) = library.created
+    assert sorted(_filed_in(library, key)) == sorted([created, SEED.key])
+    state = catalog.state(store_db, seed)
+    assert state is not None and state.filed == 2 and state.failed == []
+
+
+def test_a_renamed_paperexplorer_collection_stops_the_writes_and_says_why(
+    store_db: Conn, library: InMemoryLibrary
+) -> None:
+    seed = _seed(store_db, library, "b0")
+    exploration = catalog.start(store_db, library, seed)
+    root = {c.key: c for c in library.changes(None).collections}[exploration.collection_key]
+    assert root.parent_key is not None
+    library.put_collection(Collection(key=root.parent_key, name="Renamed by the reader"))
+    Resolutions(store_db).replace(seed, [_resolved("b0", _work(store_db, HELD.key))])
+
+    result = catalog.reconcile(store_db, library, seed)
+
+    assert result is not None and result.failed == 1
+    assert library.item(HELD.key).collections == [MINE.key]
+    state = catalog.state(store_db, seed)
+    assert state is not None
+    assert "not the top-level PaperExplorer" in (state.failed[0].error or "")
+
+
+def test_deleting_the_paperexplorer_collection_ends_every_exploration_in_it(
+    store_db: Conn, library: InMemoryLibrary
+) -> None:
+    seed = _seed(store_db, library)
+    exploration = catalog.start(store_db, library, seed)
+    root = Explorations(store_db).root()
+    assert root is not None
+
+    library.remove_collection(root.key)
+    with store_db.transaction():
+        sync(store_db, library)
+
+    assert Explorations(store_db).of_seed(seed) is None
+    again = catalog.start(store_db, library, seed)
+    assert again.collection_key != exploration.collection_key
+    new_root = Explorations(store_db).root()
+    assert new_root is not None and new_root.key != root.key
+
+
+def test_a_choice_of_another_work_unfiles_the_first_and_files_the_second(
+    store_db: Conn, library: InMemoryLibrary
+) -> None:
+    seed = _seed(store_db, library, "b0")
+    held, other = _work(store_db, HELD.key), _work(store_db, OTHER.key)
+    Resolutions(store_db).replace(seed, [_resolved("b0", held)])
+    key = catalog.start(store_db, library, seed).collection_key
+
+    ReadersChoices(store_db).choose(seed, "Printed b0", other)
+    Resolutions(store_db).save(
+        seed, _resolved("b0", other).model_copy(update={"layer": Layer.READER})
+    )
+    result = catalog.reconcile(store_db, library, seed)
+
+    assert result is not None and (result.filed, result.unfiled) == (1, 1)
+    assert sorted(_filed_in(library, key)) == [OTHER.key, SEED.key]

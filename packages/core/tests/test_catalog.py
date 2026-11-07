@@ -465,3 +465,9 @@ def test_a_crossref_record_with_html_entities_drafts_plain_text() -> None:
     assert made.publication == "Neuroscience & Biobehavioral Reviews"
     assert made.date == "2022-07"
     assert made.creators[0] == "McCulloch, Drummond E-Wen"
+
+
+def test_jats_markup_in_a_crossref_title_is_dropped() -> None:
+    made = new_items.from_crossref({"title": ["Imaging <i>in vivo</i> &lt;fast&gt;"]})
+
+    assert made.title == "Imaging in vivo <fast>"

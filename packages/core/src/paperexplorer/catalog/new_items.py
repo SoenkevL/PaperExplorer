@@ -1,5 +1,8 @@
 """A new Library Item's fields: the cached Crossref record, else OpenAlex's, else the row."""
 
+import html
+import re
+
 import psycopg
 from psycopg.rows import TupleRow
 from pydantic import BaseModel, Field, JsonValue
@@ -120,11 +123,11 @@ def from_crossref(item: JsonValue) -> NewItem:
         publication = name if isinstance(name, str) else None  # a preprint's server
     return NewItem(
         item_type=_CROSSREF_TYPES.get(it.type or "", "document"),
-        title=it.title[0] if it.title else None,
-        creators=[c for c in creators if c],
+        title=_text(it.title[0]) if it.title else None,
+        creators=[t for c in creators if (t := _text(c))],
         date=date or None,
         doi=it.DOI,
-        publication=publication,
+        publication=_text(publication),
         volume=it.volume,
         issue=it.issue,
         pages=it.page,
@@ -142,16 +145,28 @@ def from_openalex(work: JsonValue) -> NewItem:
     doi = normalize_doi(w.doi) if w.doi else None
     return NewItem(
         item_type=_OPENALEX_TYPES.get(w.type or "", "document"),
-        title=w.title or w.display_name,
-        creators=[_last_first(n) for n in names],
+        title=_text(w.title or w.display_name),
+        creators=[_last_first(t) for n in names if (t := _text(n))],
         date=w.publication_date or (str(w.publication_year) if w.publication_year else None),
         doi=doi,
-        publication=source.display_name if source else None,
+        publication=_text(source.display_name) if source else None,
         volume=biblio.volume,
         issue=biblio.issue,
         pages=pages,
         url=_doi_url(doi),
     )
+
+
+# Crossref's titles may hold JATS markup (`<i>in vivo</i>`) and HTML entities (`&amp;`).
+_MARKUP = re.compile(r"</?[a-zA-Z][^<>]*>")
+
+
+def _text(value: str | None) -> str | None:
+    """A registry's string as plain text: markup dropped, entities read, spaces collapsed."""
+    if value is None:
+        return None
+    plain = " ".join(html.unescape(_MARKUP.sub("", value)).split())
+    return plain or None
 
 
 def _doi_url(doi: str | None) -> str | None:

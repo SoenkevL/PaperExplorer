@@ -336,3 +336,14 @@ From source ([DS model/Items.inc.php L2131-L2168](https://github.com/zotero/data
 - Nothing here was observed against api.zotero.org. The inferred points worth a probe on a test library: the write token being stored after a `200` with failures; `"version": 0` creates; the write report's exact `successful` object; whether a collection-only PATCH leaves `dateModified` alone.
 - Whether Zotero desktop moves `DOI:` lines from `extra` into the new `DOI` field of non-article types after schema 42 was not checked.
 - Production rate-limit numbers are not public.
+
+## Confirmed live (2026-11-07)
+
+The first Exploration on the tower (`paperexplorer explore YAAC9XCX`, user library, Web API v3) settled three of the open questions above. The Seed and its 15 held Sources were read before and after.
+
+- A Collection and an item posted with a key made locally and `"version": 0` were created under that key (`F8KK3IE4`, `F28D9EC4`, `CPZ5PSC3`).
+- A `PATCH` of `collections` alone left `dateModified` as it was on all 15 Sources; every other field was unchanged, and none lost a Collection.
+- A `PATCH` of `tags` set the Seed's `dateModified` to the time of the write.
+- Crossref's `container-title` can hold HTML entities (`Neuroscience &amp; Biobehavioral Reviews`), which Zotero stores as sent; PaperExplorer now unescapes them and drops JATS markup.
+
+Still not observed: a reused `Zotero-Write-Token` (PaperExplorer sends none) and the exact shape of `successful`.

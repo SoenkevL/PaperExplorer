@@ -6,9 +6,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.sse import EventSourceResponse, ServerSentEvent
+from pydantic import TypeAdapter
 
 from paperexplorer import asking
-from paperexplorer.domain import Answer, WorkId
+from paperexplorer.domain import WorkId
 from paperexplorer.store import Chunks, Works
 from paperexplorer_api import schemas
 from paperexplorer_api.asking_thread import AskingContexts, AskingThread, still_answering
@@ -16,6 +17,8 @@ from paperexplorer_api.conversations import Conversations
 from paperexplorer_api.routes import Connections
 
 logger = logging.getLogger(__name__)
+
+_ANSWER_EVENT: TypeAdapter[schemas.AnswerEvent] = TypeAdapter(schemas.AnswerEvent)
 
 
 def router(
@@ -72,57 +75,5 @@ def router(
 
 
 def _event(event: asking.AnswerEvent) -> schemas.AnswerEvent:
-    match event:
-        case asking.StepEvent(tool=tool, args=args):
-            return schemas.StepEvent(tool=tool, args=args)
-        case asking.DeltaEvent(pieces=pieces):
-            return schemas.DeltaEvent(pieces=[_piece(p) for p in pieces])
-        case asking.RedraftEvent():
-            return schemas.RedraftEvent()
-        case asking.AnsweredEvent(answer=answer):
-            return schemas.AnsweredEvent(answer=_answer(answer))
-        case asking.ErrorEvent(message=message):
-            return schemas.ErrorEvent(message=message)
-
-
-def _piece(piece: asking.DraftPiece) -> schemas.DraftPiece:
-    match piece:
-        case asking.TextPiece(text=text):
-            return schemas.TextPiece(text=text)
-        case asking.HandlePiece(handle=handle):
-            return schemas.HandlePiece(handle=handle)
-
-
-def _answer(answer: Answer) -> schemas.Answer:
-    return schemas.Answer(
-        text=answer.text,
-        sentences=[
-            schemas.AnswerSentence(
-                start=s.start,
-                end=s.end,
-                pointers=[
-                    schemas.Pointer(
-                        block_id=p.block_id,
-                        start=p.start,
-                        end=p.end,
-                        support=p.support.value,
-                        chunk_start=p.chunk_start,
-                        chunk_end=p.chunk_end,
-                    )
-                    for p in s.pointers
-                ],
-            )
-            for s in answer.sentences
-        ],
-        quotes=[
-            schemas.Quote(
-                start=q.start,
-                end=q.end,
-                exact=q.exact,
-                block_id=q.block_id,
-                block_start=q.block_start,
-                block_end=q.block_end,
-            )
-            for q in answer.quotes
-        ],
-    )
+    """The contract's view of a core event, field by field; `test_answer_contract` pins them."""
+    return _ANSWER_EVENT.validate_python(event, from_attributes=True)

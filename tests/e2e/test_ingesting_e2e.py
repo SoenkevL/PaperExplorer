@@ -102,7 +102,7 @@ def test_a_reader_finds_ingests_resolves_reads_and_asks_in_the_interface(web: Te
     resolved = _settled_row(web, work_id)
     assert ingested.count(": done") + 2 == resolved.count(": done")
 
-    page = web.get(f"/works/{work_id}")
+    page = web.get(f"/works/{work_id}/reader")
     assert page.status_code == 200
     assert 'class="citation' in page.text
 

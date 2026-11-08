@@ -40,6 +40,11 @@ def _held_works(conn: Conn, work: WorkId) -> dict[str, Work]:
     return held
 
 
+def _newest_first(work: Work) -> tuple[bool, int, str]:
+    """Newest year first, no year last, then by the name a row shows."""
+    return (work.year is None, -(work.year or 0), (work.title or work.zotero_key or "").casefold())
+
+
 def router(connections: Connections) -> APIRouter:
     """Routes under `/works`."""
     routes = APIRouter(prefix="/works", tags=["works"])
@@ -105,26 +110,27 @@ def router(connections: Connections) -> APIRouter:
             if cited is None:
                 raise HTTPException(404, f"No Work {work_id}")
             citations = CitationGraphs(conn)
-            found: list[tuple[Work, list[schemas.CitingSentence]]] = []
-            for citer, references in Resolutions(conn).citing(cited.id).items():
-                work = works.get(citer)
+            found: list[tuple[Work, list[schemas.CitingCitation]]] = []
+            for citing, references in Resolutions(conn).citing(cited.id).items():
+                work = works.get(citing)
                 if work is None or work.zotero_key is None:
                     continue
-                sentences = [
-                    schemas.CitingSentence(
+                linked = [
+                    schemas.CitingCitation(
                         id=s.id,
+                        block=s.citation.block,
                         citing_sentence=s.citation.citing_sentence,
                         confidence_level=confidence_level(s.citation.link).value,
                     )
-                    for s in citations.linked_to(citer, references)
+                    for s in citations.linked_to(citing, references)
                 ]
-                found.append((work, sentences))
-        found.sort(key=lambda f: (f[0].year is None, -(f[0].year or 0), f[0].title or ""))
+                found.append((work, linked))
+        found.sort(key=lambda f: _newest_first(f[0]))
         return [
             schemas.CitingWork(
-                work=brief(work), ocr=work.text_origin is TextOrigin.OCR, citations=sentences
+                work=brief(work), ocr=work.text_origin is TextOrigin.OCR, citations=linked
             )
-            for work, sentences in found
+            for work, linked in found
         ]
 
     return routes

@@ -1,19 +1,21 @@
 """Cited by over a mocked API: the section on a Work's page and the address a Jump to it uses."""
 
+import re
+
 import httpx
 from fastapi.testclient import TestClient
 
 from paperexplorer_api.client import ApiClient
 from paperexplorer_api.schemas import (
     Block,
-    CitingSentence,
+    CitingCitation,
     CitingWork,
     WorkBrief,
     WorkText,
 )
 from paperexplorer_web.app import create_app
 
-_CITER = WorkBrief(
+_CITING = WorkBrief(
     id=30, zotero_key="KIMM2021", title="Kim's study", creators=["Kim, Jo"], year=2021, doi=None,
     has_text=True, has_pdf=True,
 )  # fmt: skip
@@ -26,8 +28,8 @@ _WORK = WorkText(
 )  # fmt: skip
 
 
-def _sentence(id_: int, text: str, level: str = "certain") -> CitingSentence:
-    return CitingSentence(id=id_, citing_sentence=text, confidence_level=level)  # pyright: ignore[reportArgumentType]
+def _sentence(id_: int, text: str, level: str = "certain", block: int = 0) -> CitingCitation:
+    return CitingCitation(id=id_, block=block, citing_sentence=text, confidence_level=level)  # pyright: ignore[reportArgumentType]
 
 
 def _client(*citing: CitingWork, failing: bool = False) -> TestClient:
@@ -64,7 +66,7 @@ def test_nothing_is_shown_when_no_held_work_cites_this_one() -> None:
 
 def test_a_citing_work_folds_its_sentences_each_a_jump_to_its_citation() -> None:
     html = _section(
-        CitingWork(work=_CITER, ocr=False, citations=[_sentence(5, "One."), _sentence(6, "Two.")])
+        CitingWork(work=_CITING, ocr=False, citations=[_sentence(5, "One."), _sentence(6, "Two.")])
     )
 
     assert "Kim&#39;s study" in html
@@ -79,7 +81,7 @@ def test_a_citing_work_folds_its_sentences_each_a_jump_to_its_citation() -> None
 
 
 def test_a_citing_work_with_no_linked_citation_says_so_and_jumps_to_its_top() -> None:
-    html = _section(CitingWork(work=_CITER, ocr=False, citations=[]))
+    html = _section(CitingWork(work=_CITING, ocr=False, citations=[]))
 
     assert "not linked" in html
     assert 'href="/works/30"' in html
@@ -87,31 +89,77 @@ def test_a_citing_work_with_no_linked_citation_says_so_and_jumps_to_its_top() ->
 
 
 def test_a_low_citation_link_is_marked() -> None:
-    html = _section(CitingWork(work=_CITER, ocr=False, citations=[_sentence(5, "One.", "low")]))
+    html = _section(CitingWork(work=_CITING, ocr=False, citations=[_sentence(5, "One.", "low")]))
 
     assert '<span class="level low">low</span>' in html
 
 
 def test_only_a_low_link_is_marked() -> None:
     assert 'class="level' not in _section(
-        CitingWork(work=_CITER, ocr=False, citations=[_sentence(5, "One.")])
+        CitingWork(work=_CITING, ocr=False, citations=[_sentence(5, "One.")])
     )
 
 
 def test_sentences_of_ocr_text_say_they_may_misread_the_authors() -> None:
-    html = _section(CitingWork(work=_CITER, ocr=True, citations=[_sentence(5, "One.")]))
+    html = _section(CitingWork(work=_CITING, ocr=True, citations=[_sentence(5, "One.")]))
 
     assert "OCR Text" in html
 
 
 def test_a_sentence_with_two_citations_is_one_row_landing_on_the_first() -> None:
     html = _section(
-        CitingWork(work=_CITER, ocr=False, citations=[_sentence(5, "Same."), _sentence(6, "Same.")])
+        CitingWork(
+            work=_CITING, ocr=False, citations=[_sentence(5, "Same."), _sentence(6, "Same.")]
+        )
     )
 
     assert "2 Citations" in html
     assert 'href="/works/30?at=5"' in html
     assert "at=6" not in html
+
+
+def test_rows_keep_the_reading_order_of_their_first_citation() -> None:
+    html = _section(
+        CitingWork(
+            work=_CITING,
+            ocr=False,
+            citations=[_sentence(1, "A."), _sentence(2, "B."), _sentence(3, "A.")],
+        )
+    )
+
+    assert html.index("at=1") < html.index("at=2")
+    assert "at=3" not in html
+
+
+def test_the_same_words_in_another_block_are_another_place() -> None:
+    html = _section(
+        CitingWork(
+            work=_CITING,
+            ocr=False,
+            citations=[_sentence(5, "See.", block=2), _sentence(6, "See.", block=9)],
+        )
+    )
+
+    assert 'href="/works/30?at=5"' in html
+    assert 'href="/works/30?at=6"' in html
+
+
+def test_a_row_of_two_citations_is_marked_low_if_either_link_is() -> None:
+    html = _section(
+        CitingWork(
+            work=_CITING,
+            ocr=False,
+            citations=[_sentence(5, "Same."), _sentence(6, "Same.", "low")],
+        )
+    )
+
+    assert '<span class="level low">low</span>' in html
+
+
+def test_a_citation_with_no_words_around_it_can_still_be_jumped_to() -> None:
+    html = _section(CitingWork(work=_CITING, ocr=False, citations=[_sentence(5, "")]))
+
+    assert re.search(r'href="/works/30\?at=5"[^>]*>A Citation with no sentence around it</a>', html)
 
 
 def test_a_failed_read_says_so_in_place() -> None:

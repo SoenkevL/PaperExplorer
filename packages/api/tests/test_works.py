@@ -238,7 +238,7 @@ def test_cited_by_gives_each_citing_sentence_in_reading_order_with_its_level(
     api: TestClient, store_db: Conn
 ) -> None:
     cited = _library_work(store_db, "CITED111", "The cited Work")
-    _citing_work(store_db, "CITER111", cited, links=[1.0, 0.1])
+    _citing_work(store_db, "CITING11", cited, links=[1.0, 0.1])
 
     [citing] = api.get(f"/works/{cited}/cited-by").json()
 
@@ -247,6 +247,7 @@ def test_cited_by_gives_each_citing_sentence_in_reading_order_with_its_level(
         ("Sentence 1.", "low"),
     ]
     assert all(isinstance(c["id"], int) for c in citing["citations"])
+    assert [c["block"] for c in citing["citations"]] == [0, 0]
     assert citing["ocr"] is False
 
 
@@ -254,11 +255,11 @@ def test_a_citing_work_with_no_linked_citation_is_listed_without_sentences(
     api: TestClient, store_db: Conn
 ) -> None:
     cited = _library_work(store_db, "CITED111", "The cited Work")
-    _citing_work(store_db, "CITER111", cited)
+    _citing_work(store_db, "CITING11", cited)
 
     [citing] = api.get(f"/works/{cited}/cited-by").json()
 
-    assert citing["work"]["zotero_key"] == "CITER111"
+    assert citing["work"]["zotero_key"] == "CITING11"
     assert citing["citations"] == []
 
 

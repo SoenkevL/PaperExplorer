@@ -13,14 +13,15 @@ A Jump goes forward from a Citation, and the Trail goes back the way the reader 
 
 ## The list
 - **Who:** a held Work (`zotero_key` set) with a firm Resolution (`Resolution.firm`, Readers' Choices included) naming exactly this Work.
-- **Sentences:** every Citation linked to those References, in reading order, low-confidence links marked and OCR Text said to be. Two markers in one sentence are one row landing on the first, and both count.
+- **Sentences:** every Citation linked to those References, in reading order, low-confidence links marked and OCR Text said to be. Two markers in one sentence (same Block, same words) are one row landing on the first, low if either link is, and both count.
 - **Where:** a section below Library Matches in the Citation pane, newest year first (no year last, then title), each Citing Work's sentences folded. The sentence is the Jump.
-- **When:** read as the page loads and each time its frame is shown (`trail:shown`), so a change in another frame appears on return; rows stay folded as the reader left them. Hidden when no Work cites this one; a failed read says so in place. On a narrow window a non-empty list brings up the sheet's button.
+- **When:** read as the page loads and each time its frame is shown (`trail:shown`), so a change in another frame appears on return; rows stay folded as the reader left them. Hidden when no Work cites this one; a failed read says so in place. On a narrow window a non-empty section brings up the sheet's button.
 
 ## The Jump to a Citing Work
 - **Address:** `/works/{id}?at={citation}`. `?citation=` keeps its meaning: a Citation in another Work to search for here.
-- **Landing:** scroll to the pill, mark it and open its Reference, as a click does, and clear any strip. There is no search or Embedder, so no strip of its own.
+- **Landing:** scroll to the pill, mark it and open its Reference, as a click does, and clear any strip, cancelling a search still under way. There is no search or Embedder, so no strip of its own.
 - **Nothing to land on:** with the pill gone (Citations extracted again, an old link) a strip says so, at the top.
+- **No Citation to land on:** a click goes to the Work's top, even in a frame already open.
 - **Trail:** a click lands even if the frame is already there; Back or Forward lands only if the entry's landing is not the frame's. A→B→A reuses A's frame, and going Back to the first A shows it as last left.
 
 ## The API

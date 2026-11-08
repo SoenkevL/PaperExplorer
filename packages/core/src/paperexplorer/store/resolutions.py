@@ -69,10 +69,10 @@ class Resolutions:
             ).fetchall()
         citing: dict[WorkId, list[str]] = {}
         for row in rows:
-            citer = row.pop("work_id")
+            citing_work = row.pop("work_id")
             resolution = Resolution.model_validate(row)
             if resolution.firm:
-                citing.setdefault(citer, []).append(resolution.reference)
+                citing.setdefault(citing_work, []).append(resolution.reference)
         return citing
 
     def repoint(self, old: WorkId, new: WorkId) -> int:

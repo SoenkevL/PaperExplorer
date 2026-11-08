@@ -6,6 +6,7 @@
 
   const MAX_FRAMES = 8; // each holds a whole Work's page
   const LONGEST_TRAIL = 4; // beyond this, the middle collapses
+  const TOP = 0; // no Citation has this id
 
   const host = document.getElementById("frames");
   const frames = new Map();
@@ -53,7 +54,7 @@
       held.pending = null;
       ask(held, citation);
     }
-    if (held?.pendingAt) {
+    if (held?.pendingAt != null) {
       const at = held.pendingAt;
       held.pendingAt = null;
       land(held, at);
@@ -104,7 +105,7 @@
     });
   }
 
-  // A frame open elsewhere goes to this Citation of its own, or does once it has loaded.
+  // A frame open elsewhere goes to this Citation of its own (0: to its top), or does once loaded.
   function land(held, at) {
     held.at = at;
     held.citation = null;
@@ -124,6 +125,7 @@
     held.shown = ++shownAt;
     if (entry.citation && held.citation !== entry.citation) ask(held, entry.citation);
     else if (open && entry.at && (clicked || held.at !== entry.at)) land(held, entry.at);
+    else if (open && clicked && !entry.citation && !entry.at) land(held, TOP);
     current = held.frame;
     for (const { frame } of frames.values()) {
       frame.classList.toggle("on", frame === current);

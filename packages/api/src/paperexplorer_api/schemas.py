@@ -233,10 +233,11 @@ class LibraryMatch(BaseModel):
     citations: list[int]
 
 
-class CitingSentence(BaseModel):
+class CitingCitation(BaseModel):
     """A Citation in a Citing Work that names the Work asked about, as a Jump goes to it."""
 
     id: int
+    block: int
     citing_sentence: str
     confidence_level: ConfidenceLevel
 
@@ -246,7 +247,7 @@ class CitingWork(BaseModel):
 
     work: WorkBrief
     ocr: bool  # its Citing Sentences are OCR Text, so they may misread the authors' words
-    citations: list[CitingSentence]
+    citations: list[CitingCitation]
 
 
 class WorkText(WorkSummary):

@@ -125,7 +125,13 @@
   // link kept from before the Citations were extracted again has nothing to land on.
   function landOn(citation) {
     const arrival = document.getElementById("arrival");
+    // A search still under way must not paint its strip over this landing.
+    if (arrival) window.htmx?.trigger(arrival, "htmx:abort");
     arrival?.replaceChildren();
+    if (!citation) {
+      document.getElementById("work")?.scrollTo(0, 0);
+      return;
+    }
     const pill = pillOf(citation);
     if (pill) {
       pill.scrollIntoView({ block: "center" });
@@ -197,8 +203,10 @@
   let citedBy = null;
   document.addEventListener("htmx:beforeSwap", (event) => {
     const section = event.detail.target;
-    if (section?.id !== "cited-by") return;
+    const list = section?.id === "cited-by" && section.querySelector(":scope > details.cited-by");
+    if (!list) return; // a failed read has no folds to remember, so the last ones stand
     citedBy = {
+      scroll: list.querySelector("ul")?.scrollTop ?? 0,
       closed: section.querySelector(":scope > details.cited-by:not([open])") !== null,
       open: Array.from(section.querySelectorAll("details.citing-work[open]"), (d) => d.dataset.work),
     };
@@ -212,6 +220,8 @@
     for (const row of section.querySelectorAll("details.citing-work")) {
       row.open = citedBy.open.includes(row.dataset.work);
     }
+    const rows = section.querySelector(":scope > details.cited-by ul");
+    if (rows) rows.scrollTop = citedBy.scroll;
   });
 
   // A frame already open is told where to land (trail.js); one just opened reads it from its page.

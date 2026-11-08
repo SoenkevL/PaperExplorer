@@ -19,7 +19,7 @@ from paperexplorer_api.schemas import (
     Block,
     CheckCost,
     CitationDetail,
-    CitingSentence,
+    CitingCitation,
     CollectionTree,
     DuplicateItems,
     LibraryPage,
@@ -87,9 +87,15 @@ def _view(block: Block) -> BlockView:
     return BlockView(block=block, tag=tag, segments=segments(block.text, block.citations))
 
 
-def _distinct_sentences(citations: list[CitingSentence]) -> list[CitingSentence]:
-    """One row per sentence: two markers in it citing one Work land on the first."""
-    return list({c.citing_sentence: c for c in reversed(citations)}.values())[::-1]
+def _distinct_sentences(citations: list[CitingCitation]) -> list[CitingCitation]:
+    """One row per sentence, landing on its first Citation, low if any of its links is."""
+    rows: dict[tuple[int, str], CitingCitation] = {}
+    for c in citations:
+        key = (c.block, c.citing_sentence)
+        first = rows.setdefault(key, c)
+        if c.confidence_level == "low" and first.confidence_level != "low":
+            rows[key] = first.model_copy(update={"confidence_level": "low"})
+    return list(rows.values())
 
 
 def _panel_url(work_id: int, citations: list[int]) -> str:
@@ -477,11 +483,7 @@ def create_app(api: ApiClient) -> FastAPI:
     def work(  # pyright: ignore[reportUnusedFunction]
         request: Request, work_id: int, citation: int | None = None, at: int | None = None
     ) -> HTMLResponse:
-        """The shell around a Work's frame (ADR 0015).
-
-        `citation` is the Citation in another Work a Jump came from; `at`, one in this Work a Jump
-        lands on.
-        """
+        """The shell around a Work's frame (ADR 0015); `at`: a Citation of this Work to land on."""
         try:
             text = api.work(work_id)
         except NotFoundError as e:

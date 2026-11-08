@@ -182,6 +182,10 @@ _Avoid_: Response, summary
 The Answer as the model writes it, shown while it streams, before its Pointers and Quotes are resolved; the Answer replaces it.
 _Avoid_: Partial answer, preview
 
+**Redraft**:
+The model asked once more for an Answer that gave no handle, word for word with its handles; if it gives one, its Draft replaces the first.
+_Avoid_: Retry, regenerate
+
 **Pointer**:
 A mark that ties one sentence of an Answer to the place in a Chunk the model read that best bears it out, with its Support.
 _Avoid_: Citation, reference, source, link

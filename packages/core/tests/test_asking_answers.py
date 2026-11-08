@@ -14,8 +14,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from paperexplorer.asking import resolve_answer
-from paperexplorer.domain import AnswerCounts, Chunk, ChunkId, Quote, Support, WorkId
+from paperexplorer.asking import has_words, resolve_answer, says_not_covered, wants_handles
+from paperexplorer.domain import Answer, AnswerCounts, Chunk, ChunkId, Quote, Support, WorkId
 from paperexplorer.embedding import FakeEmbedder
 from paperexplorer.parsing import Span, TextOrigin
 from paperexplorer.store import StoredChunk
@@ -534,3 +534,88 @@ def test_a_bare_handle_points_like_any_other() -> None:
     [sentence] = answer.sentences
     [pointer] = sentence.pointers
     assert (pointer.chunk_id, pointer.support) == (7, Support.CLOSE)
+
+
+@pytest.mark.parametrize(
+    ("text", "said"),
+    [
+        ("The Seed does not say how psilocybin is regulated in the European Union.", True),
+        ("The Seed doesn\u2019t mention heart rate or blood pressure.", True),
+        ("The Seed does not recommend a dose of psilocybin for depression.", True),
+        ("The Seed does not directly address dosing.", True),
+        ("This is not covered by the Seed.", True),
+        ("Dosing is not discussed anywhere in the Seed.", True),
+        ("The Seed gives no information on software.", True),
+        ("The Seed says nothing about software.", True),
+        ("Entropy was computed from each EEG recording.", False),
+        ("Entropy did not increase under methamphetamine (Murray et al., 2024).", False),
+        ("Murray et al. did not report a correlation with intensity.", False),
+        # Claims about the Seed, which a Pointer should bear out.
+        ("The review does not directly address dosing. It covers entropy.", False),
+        ("The authors do not provide a single proposed test.", False),
+    ],
+)
+def test_an_answer_says_the_seed_does_not_cover_a_question(text: str, said: bool) -> None:
+    assert says_not_covered(text) is said
+
+
+def _resolved(draft: str) -> Answer:
+    return resolve_answer(draft, {1: METHODS}, [METHODS], FakeEmbedder(), THRESHOLD)
+
+
+@pytest.mark.parametrize(
+    ("draft", "wanted"),
+    [
+        ("Psychedelics raise brain entropy, as the authors say.", True),
+        ("Entropy was computed from each EEG recording. [#1]", False),
+        ("Entropy was computed from each EEG recording. [#42]", False),
+        ("Yes, it was.", False),
+        ("The Seed doesn\u2019t say how caffeine affects sleep.", False),
+        ("The Seed does not recommend a dose of psilocybin for depression.", False),
+        ("The authors do not provide a single proposed test.", True),
+        (
+            "The Seed does not say how caffeine affects sleep. It covers entropy. The sessions"
+            " took place in the afternoon.",
+            True,
+        ),
+    ],
+    ids=[
+        "no-handle",
+        "a-handle",
+        "only-an-unknown-handle",
+        "nothing-to-point",
+        "says-not-said",
+        "says-not-said-in-kin-words",
+        "a-claim-about-the-authors",
+        "a-claim-after-the-nearby-sentence",
+    ],
+)
+def test_an_answer_wants_handles_only_with_something_to_point_and_no_handle(
+    draft: str, wanted: bool
+) -> None:
+    assert wants_handles(_resolved(draft)) is wanted
+
+
+@pytest.mark.parametrize(
+    "draft",
+    [
+        "The Seed does not say how caffeine affects sleep or dreaming. It covers how brain"
+        " entropy changed in ten volunteers after psilocybin."
+    ],
+)
+def test_regression_eval_35e1371558966e774f2a2d9466d2bb4f_a_not_covered_answer_is_not_redrafted(
+    draft: str,
+) -> None:
+    """Eval run 20261031T140751Z-a758bbc, trace 35e1371558966e774f2a2d9466d2bb4f (live).
+
+    The Answer said what the Seed leaves out, and next which nearby topics it treats, as the
+    prompt asks, and carried no handle: rightly so.
+    """
+    assert wants_handles(_resolved(draft)) is False
+
+
+@pytest.mark.parametrize(
+    ("draft", "words"), [("Yes.", True), ("Entropy rose. [#1]", True), ("[#1] …", False)]
+)
+def test_an_answer_has_words_once_its_handles_are_out(draft: str, words: bool) -> None:
+    assert has_words(_resolved(draft)) is words

@@ -21,6 +21,21 @@ _WORD = re.compile(r"[^\W_]+")
 # A substantive sentence has at least this many words; shorter ones ("Yes, it does.") count
 # towards no Pointer coverage.
 _MIN_WORDS = 4
+# "The Seed does not say …", as the prompt asks the model to put it, and its near variants, all
+# with the Seed for subject: "The authors do not provide …" is a claim a Pointer should bear out.
+_SEED = r"the\s+seed"
+_VERB = (
+    r"(?:say|state|cover|address|discuss|mention|report|describe|give|provide|include|contain"
+    r"|answer|specify|examine|investigate|tell|recommend|list|name|offer|consider|deal)"
+)
+_NOT_COVERED = re.compile(
+    rf"\b{_SEED}\s+(?:does|do|did)(?:\s+not|n't)\s+(?:\w+\s+)?{_VERB}\b"
+    r"|\bnot\s+(?:covered|addressed|discussed|mentioned|stated|specified)\s+(?:\w+\s+){0,3}?"
+    rf"(?:by|in)\s+{_SEED}\b"
+    rf"|\b{_SEED}\s+(?:\w+\s+)?no\s+(?:information|mention)\b"
+    rf"|\b{_SEED}\s+says?\s+nothing\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +104,34 @@ def resolve_answer(
         quotes=find_quotes(text, sentences, read),
         unknown_handles=unknown,
     )
+
+
+def says_not_covered(text: str) -> bool:
+    """Whether a text says the Seed does not cover something: a heuristic on its words."""
+    return _NOT_COVERED.search(text.replace("\u2019", "'")) is not None
+
+
+def wants_handles(answer: Answer) -> bool:
+    """Whether an Answer gives no handle, yet has a sentence a Pointer should bear out.
+
+    A sentence saying what the Seed does not say needs none, nor the one after it on what the
+    Seed covers nearby, as the prompt asks: an Answer saying the Seed does not cover the
+    Question is not asked again.
+    """
+    if answer.unknown_handles or any(s.pointers for s in answer.sentences):
+        return False
+    after_gap = False
+    for sentence in answer.sentences:
+        gap = says_not_covered(answer.text[sentence.start : sentence.end])
+        if sentence.substantive and not gap and not after_gap:
+            return True
+        after_gap = gap
+    return False
+
+
+def has_words(answer: Answer) -> bool:
+    """Whether an Answer holds any words once cut at its control tokens and without its handles."""
+    return any(c.isalnum() for c in answer.text)
 
 
 def _without_handles(draft: str, bare: bool) -> tuple[str, list[_Handle]]:

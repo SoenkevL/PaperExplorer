@@ -490,19 +490,23 @@ def test_a_stage_whose_connection_was_lost_is_recorded_failed_and_the_work_can_r
 ) -> None:
     work = harness.synced()["VILL2024"]
 
-    def lose_every_other_connection() -> None:
+    def lose_the_stages_connection() -> None:
         harness.embedder.on_embed = None
         with connect() as conn:
+            # Only the Stage holds a transaction open; a request's poll must not die with it.
             conn.execute(
                 "SELECT pg_terminate_backend(pid) FROM pg_stat_activity"
-                " WHERE datname = current_database() AND pid <> pg_backend_pid()"
+                " WHERE datname = current_database() AND state = 'idle in transaction'"
             )
 
-    harness.embedder.on_embed = lose_every_other_connection
-    harness.client.ingest(work.id)
+    harness.embedder.on_embed = lose_the_stages_connection
+    # Pins the scope of the kill every run; a poll in flight would only catch it now and then.
+    with connect() as bystander:
+        harness.client.ingest(work.id)
 
-    lost = harness.settled(work.id)
+        lost = harness.settled(work.id)
 
+        assert bystander.execute("SELECT 1").fetchone() == (1,)
     assert lost.stages["embed"] == "failed"
     assert lost.stage_statuses["embed"].error
     harness.client.ingest(work.id)

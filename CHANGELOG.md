@@ -5,6 +5,8 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 ## [Unreleased]
 
 ### Added
+- Jumps: *Jump to Source* in the Citation pane and the Library Matches list opens a firm Source with text, lands on its best Evidence for the Citing Sentence, and steps through the top 5 from a strip that says they are a search's candidates. With no Evidence it stays at the top and says why. A Source with no text yet says why in the pane, and offers Ingest when it has a PDF.
+- The Trail: Back, or a Work in the top bar, returns to a Work with its scroll, Citation and Conversation, and an Answer under way goes on while you are away. `/works/{id}` is now a shell of one frame per Work (ADR 0015), the page itself at `/works/{id}/reader`.
 - Retrieval Runs: `retrieval.find_evidence` searches a Source with a Citation's Citing Sentence and records the ranking (migration 0011), reusing it until the Source's Chunks or the model change. `POST /citations/{id}/retrieval-runs` answers the Evidence or why there is none, and `ApiClient.find_evidence` mirrors it. `Resolution` gains `firm`, `WorkBrief` gains `has_text` and `has_pdf`. The groundwork for Jumps (docs/design-jumping.md, ADR 0015); CONTEXT.md gains Jump and Trail.
 
 ### Fixed

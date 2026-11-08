@@ -4,14 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}PaperExplorer{% endblock %}</title>
-  {# The theme the reader chose (panes.js stores it), set before the stylesheet paints so the
-     page never flashes the other one. Without a choice the system's light or dark decides. #}
-  <script>
-    try {
-      const theme = localStorage.getItem("pe.theme");
-      if (theme === "paper" || theme === "night") document.documentElement.dataset.theme = theme;
-    } catch {}
-  </script>
+  {% block head %}{% endblock %}
+  {% include "theme.html" %}
   <link rel="stylesheet" href="{{ static_url('style.css') }}">
   {# htmx 2.0.11, vendored from the npm tarball (sha512 checked against the registry) #}
   <script src="{{ static_url('htmx.min.js') }}" defer></script>

@@ -1,0 +1,17 @@
+{#- Whether a firm Source can be jumped to from this Citation, and if not, why and what to do. -#}
+{%- from "works.html" import jump_link -%}
+{%- set url = "/works/" ~ source_id ~ "/source" -%}
+<div class="source" id="source-{{ key }}"
+  {%- if running %} hx-get="{{ url }}?c={{ citation_id }}&amp;key={{ key }}" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
+  {% if has_text %}
+  {{ jump_link(source_id, label, citation_id) }}
+  {% elif running %}
+  <p class="note">Ingesting this Source. You can jump to it once it is parsed.</p>
+  {% elif has_pdf %}
+  <p class="note">This Source has not been read yet.</p>
+  <button type="button" hx-post="{{ url }}" hx-vals='{{ {"c": citation_id, "key": key} | tojson }}' hx-target="closest .source" hx-swap="outerHTML" hx-disabled-elt="this">Ingest</button>
+  {% else %}
+  <p class="note">This Source has no PDF in your Library, so there is no text to jump to.</p>
+  {% endif %}
+  {% if message %}<p class="failed">{{ message }}</p>{% endif %}
+</div>

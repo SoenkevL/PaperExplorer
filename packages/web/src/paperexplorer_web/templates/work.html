@@ -1,7 +1,10 @@
 {% extends "base.html" %}
+{% from "works.html" import jump_link %}
 {% block title %}{{ work.title or work.zotero_key }} · PaperExplorer{% endblock %}
+{# This page is a frame of the shell (ADR 0015); its links leave the frame. #}
+{% block head %}<base target="_top">{% endblock %}
 {% block scripts %}<script src="{{ static_url('conversation.js') }}" defer></script>{% endblock %}
-{% block trail %}<span class="sep">/</span><span class="here">{{ work.title or work.zotero_key }}</span>{% endblock %}
+{% block trail %}<span id="trail-path" class="trail-path"><span class="sep">/</span><span class="here">{{ work.title or work.zotero_key }}</span></span>{% endblock %}
 {% block toggles %}
 <div class="segmented" role="group" aria-label="Panes">
   <button type="button" class="pane-toggle" data-pane="conversation" aria-controls="conversation" aria-pressed="true">Conversation</button>
@@ -14,6 +17,10 @@
 <div class="reader">
 {% include "conversation/sidebar.html" %}
 <main id="work" class="sheet">
+<section id="arrival" class="arrival" aria-label="Where this Jump landed" aria-live="polite"
+  {%- if citation %} hx-post="/works/{{ work.id }}/arrival" hx-vals='{{ {"citation": citation} | tojson }}' hx-trigger="load"{% endif %}>
+  {%- if citation %}<p class="note">Searching this Work for the sentence that cited it…</p>{% endif -%}
+</section>
 <header class="work">
   <h1>{{ work.title or work.zotero_key }}</h1>
   <p class="byline">{{ work.creators | join("; ") }}{% if work.year %} ({{ work.year }}){% endif %}
@@ -65,7 +72,7 @@
       <li><button type="button" class="library-match-step" data-citations="{{ m.citations | join(' ') }}">
         <span class="title">{{ m.work.title or m.work.zotero_key }}</span>{% if m.work.year %} <span class="year">({{ m.work.year }})</span>{% endif %}
         <span class="count">{{ plural(m.citations | length, "Citation", "Citations") }}</span>
-      </button></li>
+      </button>{% if m.work.has_text %}{{ jump_link(m.work.id, work_label(m.work), m.citations[0]) }}{% endif %}</li>
       {% endfor %}
     </ul>
   </details>

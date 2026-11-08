@@ -574,3 +574,39 @@ a.quote.exact { text-decoration: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+
+/* The shell: one frame per Work on the Trail, the hidden ones still laid out (ADR 0015). */
+body.shell { margin: 0; background: var(--ground); }
+.frames { position: fixed; inset: 0; }
+.frames iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; visibility: hidden; }
+.frames iframe.on { visibility: visible; }
+
+/* The Trail in a frame's top bar. */
+.trail-path { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.trail-path .sep { flex: none; }
+.trail-path .step, .trail-path .here { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.trail-path .here { color: var(--ink); }
+/* A narrow bar keeps where the reader is and the step back. */
+@media (max-width: 48rem) {
+  .trail:has(.trail-path .step) .brand { display: none; }
+  .trail-path > :not(:nth-last-child(-n+4)) { display: none; }
+}
+
+/* A Jump, and where it landed. */
+.jump { display: inline-block; margin: 2px 0 6px; padding: 3px 9px; border: 1px solid var(--library); border-radius: 6px; color: var(--library); font-size: 12px; text-decoration: none; white-space: nowrap; }
+.jump:hover { background: var(--library-soft); }
+.library-matches .jump { margin: 0 0 4px 6px; padding: 1px 7px; font-size: 11px; }
+.source .note { margin: 0 0 6px; }
+.arrival { position: sticky; top: 0; z-index: 2; padding: 0.6rem 2rem; background: var(--sheet); border-bottom: 1px solid var(--rule); font-size: 13px; }
+.arrival:empty { display: none; }
+.arrival .note, .arrival p { margin: 0 0 4px; max-width: 40rem; }
+.arrival .from .label { color: var(--muted); }
+.arrival .from { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; padding-right: 1.5rem; }
+.arrival .from q { font-family: var(--serif); }
+.arrival .places { color: var(--muted); font-size: 12px; }
+.arrival .place { display: inline-block; min-width: 1.4em; margin-left: 2px; border-radius: 4px; background: var(--track); color: var(--ink); font: 11px/1.6 var(--mono); text-align: center; text-decoration: none; }
+.arrival .place:hover { background: var(--library-soft); }
+.arrival .place.on { background: var(--library); color: var(--sheet); }
+.arrival .to-top { margin-left: 8px; color: var(--accent); }
+.arrival-close { float: right; border: 0; background: none; color: var(--muted); font-size: 16px; line-height: 1; cursor: pointer; }
+

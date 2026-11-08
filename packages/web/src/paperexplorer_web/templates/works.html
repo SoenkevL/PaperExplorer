@@ -5,3 +5,7 @@
   {%- if w.doi %} · <a href="https://doi.org/{{ w.doi }}">{{ w.doi }}</a>{% endif %}
   {%- if not w.zotero_key %} <span class="note">not in your Library</span>{% endif %}</p>
 {%- endmacro -%}
+{#- A Jump: trail.js takes the click in a frame; alone, it is a link that lands the same way. -#}
+{%- macro jump_link(id, label, citation) -%}
+<a class="jump" href="/works/{{ id }}?citation={{ citation }}" data-work="{{ id }}" data-citation="{{ citation }}" data-label="{{ label }}">Jump to Source</a>
+{%- endmacro -%}

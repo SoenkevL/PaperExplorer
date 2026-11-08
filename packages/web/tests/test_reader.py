@@ -114,7 +114,7 @@ def _text(fragment: str) -> str:
 
 
 def test_the_page_shows_the_works_snapshot_and_its_blocks_in_order() -> None:
-    page = _reader().get("/works/7").text
+    page = _reader().get("/works/7/reader").text
 
     assert "Personal psychedelic experience of psychedelic therapists" in page
     assert "Villiger, Daniel" in page
@@ -124,7 +124,7 @@ def test_the_page_shows_the_works_snapshot_and_its_blocks_in_order() -> None:
 
 
 def test_each_block_shows_exactly_the_authors_text() -> None:
-    page = _reader().get("/works/7").text
+    page = _reader().get("/works/7/reader").text
 
     for block in WORK.blocks:
         assert _text(_block_html(page, block.position)) == block.text
@@ -132,7 +132,7 @@ def test_each_block_shows_exactly_the_authors_text() -> None:
 
 
 def test_every_citation_opens_the_panel_and_shows_its_confidence() -> None:
-    page = _reader().get("/works/7").text
+    page = _reader().get("/works/7/reader").text
 
     links = re.findall(r'<a class="citation ([a-z]+)"[^>]*hx-get="([^"]+)"[^>]*>(.*?)</a>', page)
     assert [(level, html.unescape(text)) for level, _, text in links] == [
@@ -185,7 +185,7 @@ def test_ocr_text_is_marked_as_possibly_misread() -> None:
         }
     )
 
-    page = _reader(scan).get("/works/7").text
+    page = _reader(scan).get("/works/7/reader").text
 
     assert "OCR" in page
     assert "may misread" in page
@@ -222,13 +222,13 @@ def test_the_fonts_are_served_by_the_web_app_itself() -> None:
         font = reader.get(f"/static/fonts/{name}")
         assert font.status_code == 200
         assert font.content[:4] == b"wOF2"
-    assert "googleapis" not in css + reader.get("/works/7").text
+    assert "googleapis" not in css + reader.get("/works/7/reader").text
 
 
 def test_every_page_sets_its_stored_theme_before_the_stylesheet_and_offers_a_toggle() -> None:
     reader = _reader()
 
-    for url in ("/", "/works/7", "/works/999"):
+    for url in ("/", "/works/7/reader", "/works/999"):
         page = reader.get(url).text
         head = page.split("</head>")[0]
         # The stored choice is applied before the stylesheet paints, so the page never flashes.
@@ -240,7 +240,7 @@ def test_every_page_sets_its_stored_theme_before_the_stylesheet_and_offers_a_tog
 
 
 def test_the_work_page_has_three_panes_and_a_toggle_for_each_side_pane() -> None:
-    page = _reader().get("/works/7").text
+    page = _reader().get("/works/7/reader").text
 
     order = [m[1] for m in re.finditer(r'<(?:aside|main) id="([a-z-]+)"', page)]
     assert order == ["conversation", "work", "citation"]
@@ -254,7 +254,7 @@ def test_the_work_page_has_three_panes_and_a_toggle_for_each_side_pane() -> None
 
 def test_the_citation_pane_hints_until_a_citation_is_opened_and_is_a_sheet_below_80rem() -> None:
     reader = _reader()
-    page = reader.get("/works/7").text
+    page = reader.get("/works/7/reader").text
     css = reader.get("/static/style.css").text
 
     pane = re.search(r'<aside id="citation"[^>]*>(.*?)</aside>', page, re.S)
@@ -272,7 +272,7 @@ def test_the_citation_pane_hints_until_a_citation_is_opened_and_is_a_sheet_below
 def test_every_script_and_stylesheet_url_carries_its_contents_version() -> None:
     # Seen after the three-pane reader: a cached old conversation.js shut the drawer it opened.
     client = _reader()
-    page = client.get("/works/7").text
+    page = client.get("/works/7/reader").text
 
     urls = re.findall(r'(?:src|href)="(?:https?://[^/"]+)?(/static/[^"]+)"', page)
     names = {re.sub(r"\?.*", "", u).removeprefix("/static/") for u in urls}
@@ -312,7 +312,7 @@ def _held(id_: int, title: str, year: int | None, citations: list[int]) -> Libra
 def test_a_firmly_linked_citation_to_a_library_match_is_drawn_apart() -> None:
     # 11 certain, 12 low, 14 high sharing the dash with the Unlinked 15, 16 high
     work = _with_library_matches({11, 12, 14, 16}, [])
-    page = _reader(work).get("/works/7").text
+    page = _reader(work).get("/works/7/reader").text
 
     links = re.findall(r'<a class="citation ([a-z -]+)"[^>]*>(.*?)</a>', page)
     assert [(c, html.unescape(t)) for c, t in links] == [
@@ -335,7 +335,7 @@ def test_the_citation_pane_lists_the_library_matches_to_step_through() -> None:
             _held(2, "Untitled", None, [13]),
         ],
     )
-    page = _reader(work).get("/works/7").text
+    page = _reader(work).get("/works/7/reader").text
 
     pane = re.search(r'<aside id="citation"[^>]*>(.*?)</aside>', page, re.S)
     assert pane
@@ -353,4 +353,4 @@ def test_the_citation_pane_lists_the_library_matches_to_step_through() -> None:
 
 
 def test_a_work_without_library_matches_shows_no_list() -> None:
-    assert "library-matches" not in _reader().get("/works/7").text
+    assert "library-matches" not in _reader().get("/works/7/reader").text

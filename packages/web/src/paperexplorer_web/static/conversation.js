@@ -62,10 +62,49 @@
     return true;
   }
 
+  function mark(place) {
+    for (const old of document.querySelectorAll(".arrival .place.on")) old.classList.remove("on");
+    place?.classList.add("on");
+  }
+
+  function clearHighlight() {
+    window.CSS?.highlights?.delete("pointer-place");
+    window.CSS?.highlights?.delete("pointer-chunk");
+    for (const old of document.querySelectorAll(".pointed")) old.classList.remove("pointed");
+  }
+
   document.addEventListener("click", (event) => {
     if (!(event.target instanceof Element)) return;
     const link = event.target.closest("a[data-block]");
-    if (link && show(link)) event.preventDefault();
+    if (link && show(link)) {
+      event.preventDefault();
+      if (link.classList.contains("place")) mark(link);
+    }
+    if (event.target.closest(".to-top")) {
+      event.preventDefault();
+      mark(null);
+      clearHighlight();
+      document.querySelector(".sheet")?.scrollTo({ top: 0 });
+    }
+    if (event.target.closest(".arrival-close")) {
+      document.getElementById("arrival")?.replaceChildren();
+    }
+  });
+
+  // A Jump lands on its first candidate, unless the reader has moved on while the search ran.
+  let scrolledFrom = 0;
+  document.addEventListener("htmx:beforeRequest", (event) => {
+    if (event.detail.target?.id === "arrival") {
+      scrolledFrom = document.querySelector(".sheet")?.scrollTop ?? 0;
+    }
+  });
+  document.addEventListener("htmx:afterSwap", (event) => {
+    const strip = event.detail.target;
+    if (strip?.id !== "arrival") return;
+    const first = strip.querySelector("a.place");
+    if (first && (document.querySelector(".sheet")?.scrollTop ?? 0) === scrolledFrom && show(first)) {
+      mark(first);
+    }
   });
 
   // Enter asks; Shift+Enter starts a new line.

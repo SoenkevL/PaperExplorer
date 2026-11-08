@@ -2,6 +2,7 @@
 
 import hashlib
 import logging
+from html import escape
 from pathlib import Path
 from typing import Annotated, Literal
 from urllib.parse import urlencode
@@ -43,6 +44,7 @@ from paperexplorer_web.browsing import (
 )
 from paperexplorer_web.checks import PendingCheck, relay_check
 from paperexplorer_web.explorations import ExplorationView, exploration_view
+from paperexplorer_web.jumping import NO_EVIDENCE, work_label
 from paperexplorer_web.library import LibraryList, library_list, row
 from paperexplorer_web.relay import Pending, PendingQuestion, Views, not_embedded, relay
 from paperexplorer_web.segments import Segment, segments
@@ -116,6 +118,7 @@ def templates() -> Jinja2Templates:
     loaded.env.globals["static_url"] = _static_url  # pyright: ignore[reportUnknownMemberType]
     loaded.env.globals["plural"] = _plural  # pyright: ignore[reportUnknownMemberType]
     loaded.env.globals["usd"] = _usd  # pyright: ignore[reportUnknownMemberType]
+    loaded.env.globals["work_label"] = work_label  # pyright: ignore[reportUnknownMemberType]
     return loaded
 
 
@@ -466,14 +469,91 @@ def create_app(api: ApiClient) -> FastAPI:
         return duplicates_view(request, duplicate_items(), message, failed=False)
 
     @app.get("/works/{work_id}", response_class=HTMLResponse)
-    def work(request: Request, work_id: int) -> HTMLResponse:  # pyright: ignore[reportUnusedFunction]
+    def work(request: Request, work_id: int, citation: int | None = None) -> HTMLResponse:  # pyright: ignore[reportUnusedFunction]
+        """The shell around a Work's frame (ADR 0015); `citation` is the one a Jump came from."""
         try:
             text = api.work(work_id)
         except NotFoundError as e:
             return not_found(request, str(e))
-        return pages.TemplateResponse(
-            request, "work.html", {"work": text, "blocks": [_view(b) for b in text.blocks]}
-        )
+        return pages.TemplateResponse(request, "shell.html", {"work": text, "citation": citation})
+
+    @app.get("/works/{work_id}/reader", response_class=HTMLResponse)
+    def reader(request: Request, work_id: int, citation: int | None = None) -> HTMLResponse:  # pyright: ignore[reportUnusedFunction]
+        """A Work's page, as a frame of the shell shows it."""
+        try:
+            text = api.work(work_id)
+        except NotFoundError as e:
+            return not_found(request, str(e))
+        context = {"work": text, "blocks": [_view(b) for b in text.blocks], "citation": citation}
+        return pages.TemplateResponse(request, "work.html", context)
+
+    @app.post("/works/{work_id}/arrival", response_class=HTMLResponse)
+    def arrival(  # pyright: ignore[reportUnusedFunction]
+        request: Request, work_id: int, citation: Annotated[int, Form()]
+    ) -> HTMLResponse:
+        """Where a Jump from this Citation lands in this Work, or why at the top."""
+        context: dict[str, object] = {"sentence": None, "evidence": [], "why": None}
+        try:
+            landing = api.find_evidence(citation)
+        except (httpx.HTTPError, NotFoundError, ConflictError) as e:
+            logger.warning("No landing for Citation %d", citation, exc_info=True)
+            context["why"] = f"No place could be looked for: {_why(e)}"
+        else:
+            context["sentence"] = landing.citing_sentence
+            if landing.work.id != work_id:
+                context["why"] = "This Citation no longer names this Work."
+            elif landing.reason:
+                context["why"] = NO_EVIDENCE[landing.reason]
+            else:
+                context["evidence"] = landing.evidence
+        return pages.TemplateResponse(request, "arrival.html", context)
+
+    def source_view(
+        request: Request,
+        source_id: int,
+        citation_id: int,
+        key: str,
+        work: LibraryWork | None = None,
+        message: str | None = None,
+    ) -> HTMLResponse:
+        """Whether a Source can be jumped to as it now stands, read again unless given."""
+        try:
+            found = work or api.work_stages(source_id)
+        except (httpx.HTTPError, NotFoundError) as e:
+            logger.warning("Work %d's Stages could not be read", source_id, exc_info=True)
+            return HTMLResponse(f'<p class="failed">{escape(message or _why(e))}</p>')
+        failed = [s.error for s in found.stage_statuses.values() if s.state == "failed" and s.error]
+        context = {
+            "source_id": source_id,
+            "label": work_label(found),
+            "has_text": found.text_origin is not None,
+            "has_pdf": found.has_pdf,
+            "running": found.text_origin is None and found.run is not None,
+            "citation_id": citation_id,
+            "key": key,
+            "message": message or (f"Ingesting failed: {failed[0]}" if failed else None),
+        }
+        return pages.TemplateResponse(request, "source.html", context)
+
+    @app.get("/works/{source_id}/source", response_class=HTMLResponse)
+    def source(request: Request, source_id: int, c: int, key: str) -> HTMLResponse:  # pyright: ignore[reportUnusedFunction]
+        """A Source as the Citation pane polls it while it is Ingested."""
+        return source_view(request, source_id, c, key)
+
+    @app.post("/works/{source_id}/source", response_class=HTMLResponse)
+    def ingest_source(  # pyright: ignore[reportUnusedFunction]
+        request: Request,
+        source_id: int,
+        c: Annotated[int, Form()],
+        key: Annotated[str, Form()],
+    ) -> HTMLResponse:
+        """Start Ingesting a Source from the Citation pane."""
+        try:
+            work = api.ingest(source_id)
+        except (httpx.HTTPError, ConflictError, NotFoundError) as e:
+            logger.warning("Source %d not started", source_id, exc_info=True)
+            return source_view(request, source_id, c, key, message=f"Not started: {_why(e)}")
+        return source_view(request, source_id, c, key, work)
 
     @app.get("/works/{work_id}/panel", response_class=HTMLResponse)
     def panel(  # pyright: ignore[reportUnusedFunction]

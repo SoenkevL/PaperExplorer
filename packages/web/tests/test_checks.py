@@ -259,7 +259,7 @@ def _stream(*events: dict[str, object]) -> httpx.Response:
 def test_the_work_page_loads_the_checks_cost_after_the_text() -> None:
     web, sent = _web({COST: _cost()})
 
-    page = web.get("/works/7").text
+    page = web.get("/works/7/reader").text
 
     assert re.search(r'hx-get="/works/7/check"[^>]*hx-trigger="load"', page)
     assert not any(r.url.path == COST[1] for r in sent)  # OpenAlex is asked only once it loads

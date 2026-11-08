@@ -75,7 +75,7 @@
     // The floating Citation button brings back a closed sheet, once there is a Citation to show.
     const sheet = pane("citation");
     const shown = Boolean(sheet?.classList.contains("open"));
-    const filled = Boolean(document.getElementById("panel")?.childElementCount);
+    const filled = ["panel", "cited-by"].some((id) => document.getElementById(id)?.childElementCount);
     for (const button of document.querySelectorAll(".sheet-toggle")) {
       button.hidden = !OVERLAY.citation.matches || shown || !filled;
       button.setAttribute("aria-expanded", String(shown));
@@ -205,7 +205,9 @@
   });
   document.addEventListener("htmx:afterSwap", (event) => {
     const section = event.detail.target;
-    if (section?.id !== "cited-by" || !citedBy) return;
+    if (section?.id !== "cited-by") return;
+    render(); // on a narrow window, the sheet's button is the way to this list
+    if (!citedBy) return;
     if (citedBy.closed) section.querySelector(":scope > details.cited-by")?.removeAttribute("open");
     for (const row of section.querySelectorAll("details.citing-work")) {
       row.open = citedBy.open.includes(row.dataset.work);

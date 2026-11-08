@@ -56,6 +56,10 @@ _Avoid_: Root paper, main paper, original paper
 A Work in the role of being cited by another Work. A role, not a kind of Work: a Source in one Exploration can be the Seed of another.
 _Avoid_: Reference (see below), cited paper
 
+**Citing Work**:
+A Work in the role of citing another: the Work a Reference is printed in, once that Reference's firm Resolution names the other Work. A role, the opposite of Source.
+_Avoid_: Citer, citing paper, backlink
+
 **Text Availability**:
 How much of a Work's own text PaperExplorer holds: full text, abstract only, or none.
 _Avoid_: Access level, OA status
@@ -167,7 +171,7 @@ _Avoid_: Query, search
 ## Reading across Works
 
 **Jump**:
-Going from a Citation to its Source, landing on the Evidence for its Citing Sentence, or at the Source's top when there is none. The Reference's Resolution must be firm and the Source must have text.
+Going from a Citation to the Work at its other end. To its Source: landing on the Evidence for its Citing Sentence, or at the Source's top when there is none; the Reference's Resolution must be firm and the Source must have text. To its Citing Work: landing on the Citation itself, or at the Citing Work's top when no Citation links to the Source.
 _Avoid_: Hop, follow, open source
 
 **Trail**:

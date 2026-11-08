@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 
 from paperexplorer.citations import confidence_level
 from paperexplorer.domain import Work, WorkId
+from paperexplorer.parsing import TextOrigin
 from paperexplorer.pipeline import STAGES
 from paperexplorer.store import CitationGraphs, Resolutions, StageStatuses, Works, WorkTexts
 from paperexplorer_api import schemas
@@ -37,6 +38,11 @@ def _held_works(conn: Conn, work: WorkId) -> dict[str, Work]:
         if found is not None and found.zotero_key is not None:
             held[r.reference] = found
     return held
+
+
+def _newest_first(work: Work) -> tuple[bool, int, str]:
+    """Newest year first, no year last, then by the name a row shows."""
+    return (work.year is None, -(work.year or 0), (work.title or work.zotero_key or "").casefold())
 
 
 def router(connections: Connections) -> APIRouter:
@@ -95,5 +101,36 @@ def router(connections: Connections) -> APIRouter:
         return schemas.WorkText(
             **summary.model_dump(), blocks=blocks, library_matches=list(matches.values())
         )
+
+    @routes.get("/{work_id}/cited-by")
+    def cited_by(work_id: int) -> list[schemas.CitingWork]:  # pyright: ignore[reportUnusedFunction]
+        with connections() as conn:
+            works = Works(conn)
+            cited = works.get(WorkId(work_id))
+            if cited is None:
+                raise HTTPException(404, f"No Work {work_id}")
+            citations = CitationGraphs(conn)
+            found: list[tuple[Work, list[schemas.CitingCitation]]] = []
+            for citing, references in Resolutions(conn).citing(cited.id).items():
+                work = works.get(citing)
+                if work is None or work.zotero_key is None:
+                    continue
+                linked = [
+                    schemas.CitingCitation(
+                        id=s.id,
+                        block=s.citation.block,
+                        citing_sentence=s.citation.citing_sentence,
+                        confidence_level=confidence_level(s.citation.link).value,
+                    )
+                    for s in citations.linked_to(citing, references)
+                ]
+                found.append((work, linked))
+        found.sort(key=lambda f: _newest_first(f[0]))
+        return [
+            schemas.CitingWork(
+                work=brief(work), ocr=work.text_origin is TextOrigin.OCR, citations=linked
+            )
+            for work, linked in found
+        ]
 
     return routes

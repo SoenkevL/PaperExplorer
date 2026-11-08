@@ -1,14 +1,15 @@
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import psycopg
 from fastapi.testclient import TestClient
 from psycopg.rows import TupleRow
 
+from paperexplorer.citations import Citation, CitationGraph, CitationLink, Evidence
 from paperexplorer.domain import Layer, Level, LibraryItem, Resolution, ResolutionState, WorkId
-from paperexplorer.parsing import ParsedWork
-from paperexplorer.store import Resolutions, StageStatuses, Works
+from paperexplorer.parsing import Block, BlockKind, ParsedWork, Reference, Span, TextOrigin
+from paperexplorer.store import CitationGraphs, Resolutions, StageStatuses, Works, WorkTexts
 
 from .conftest import Stored
 
@@ -178,3 +179,106 @@ def test_a_library_match_whose_library_item_is_gone_is_not_shown(
 
     assert text["library_matches"] == []
     assert not any(c["library_match"] for b in text["blocks"] for c in b["citations"])
+
+
+def _citing_work(
+    conn: Conn,
+    key: str,
+    cited: WorkId,
+    *,
+    year: int | None = 2020,
+    title: str | None = None,
+    links: Sequence[float] = (),
+    origin: TextOrigin = TextOrigin.PRINTED,
+) -> WorkId:
+    """A held Work with a firm Resolution naming `cited`, with a Citation per link's confidence."""
+    work = Works(conn).ensure(key)
+    Works(conn).record_library_item(work, LibraryItem(key=key, title=title or key, year=year))
+    reference = Reference(id="b0", text="Printed", page=1)
+    block = Block(kind=BlockKind.PARAGRAPH, heading_path=[], page=1, boxes=[], text="Some text.")
+    WorkTexts(conn).replace(
+        work, ParsedWork(text_origin=origin, blocks=[block], references=[reference])
+    )
+    Resolutions(conn).save(
+        work,
+        Resolution(
+            reference="b0", state=ResolutionState.RESOLVED, work=cited, level=Level.CERTAIN,
+            layer=Layer.LIBRARY,
+        ),
+    )  # fmt: skip
+    citations = [
+        Citation(
+            block=0, span=Span(start=i, end=i + 1), text="[1]", citing_sentence=f"Sentence {i}.",
+            link=CitationLink(reference_id="b0", confidence=c, evidence=[Evidence.LABEL]),
+        )
+        for i, c in enumerate(links)
+    ]  # fmt: skip
+    CitationGraphs(conn).replace(work, CitationGraph(references=[reference], citations=citations))
+    return work
+
+
+def test_a_work_is_cited_by_the_held_works_naming_it_newest_first(
+    api: TestClient, store_db: Conn
+) -> None:
+    cited = _library_work(store_db, "CITED111", "The cited Work")
+    _citing_work(store_db, "OLD11111", cited, year=2001, links=[1.0])
+    _citing_work(store_db, "NOYEAR11", cited, year=None, links=[1.0])
+    _citing_work(store_db, "NEWB1111", cited, year=2022, title="B", links=[1.0])
+    _citing_work(store_db, "NEWA1111", cited, year=2022, title="A", links=[1.0])
+
+    response = api.get(f"/works/{cited}/cited-by")
+
+    assert response.status_code == 200
+    assert [c["work"]["zotero_key"] for c in response.json()] == [
+        "NEWA1111", "NEWB1111", "OLD11111", "NOYEAR11",
+    ]  # fmt: skip
+
+
+def test_cited_by_gives_each_citing_sentence_in_reading_order_with_its_level(
+    api: TestClient, store_db: Conn
+) -> None:
+    cited = _library_work(store_db, "CITED111", "The cited Work")
+    _citing_work(store_db, "CITING11", cited, links=[1.0, 0.1])
+
+    [citing] = api.get(f"/works/{cited}/cited-by").json()
+
+    assert [(c["citing_sentence"], c["confidence_level"]) for c in citing["citations"]] == [
+        ("Sentence 0.", "certain"),
+        ("Sentence 1.", "low"),
+    ]
+    assert all(isinstance(c["id"], int) for c in citing["citations"])
+    assert [c["block"] for c in citing["citations"]] == [0, 0]
+    assert citing["ocr"] is False
+
+
+def test_a_citing_work_with_no_linked_citation_is_listed_without_sentences(
+    api: TestClient, store_db: Conn
+) -> None:
+    cited = _library_work(store_db, "CITED111", "The cited Work")
+    _citing_work(store_db, "CITING11", cited)
+
+    [citing] = api.get(f"/works/{cited}/cited-by").json()
+
+    assert citing["work"]["zotero_key"] == "CITING11"
+    assert citing["citations"] == []
+
+
+def test_a_citing_work_of_ocr_text_says_so(api: TestClient, store_db: Conn) -> None:
+    cited = _library_work(store_db, "CITED111", "The cited Work")
+    _citing_work(store_db, "SCAN1111", cited, links=[1.0], origin=TextOrigin.OCR)
+
+    [citing] = api.get(f"/works/{cited}/cited-by").json()
+
+    assert citing["ocr"] is True
+
+
+def test_a_citing_work_no_longer_held_is_not_listed(api: TestClient, store_db: Conn) -> None:
+    cited = _library_work(store_db, "CITED111", "The cited Work")
+    _citing_work(store_db, "GONE1111", cited, links=[1.0])
+    Works(store_db).remove_library_item("GONE1111")
+
+    assert api.get(f"/works/{cited}/cited-by").json() == []
+
+
+def test_cited_by_of_an_unknown_work_is_not_found(api: TestClient) -> None:
+    assert api.get("/works/999999/cited-by").status_code == 404

@@ -1,0 +1,32 @@
+{#- The held Works citing this one. Nothing at all when none does, so the section stays hidden. -#}
+{%- if failed -%}
+<p class="note cited-by-failed">Cited by could not be read just now.</p>
+{%- elif citing -%}
+<details class="cited-by" open>
+  <summary>Cited by <span class="count">{{ citing | length }}</span></summary>
+  <p class="legend">Works in your Library that cite this one. Click a sentence to go to it.</p>
+  <ul>
+    {% for c, sentences in citing %}
+    <li>
+      {% if c.citations %}
+      <details class="citing-work" data-work="{{ c.work.id }}">
+        <summary><span class="title">{{ c.work.title or c.work.zotero_key }}</span>{% if c.work.year %} <span class="year">({{ c.work.year }})</span>{% endif %}
+          <span class="count">{{ plural(c.citations | length, "Citation", "Citations") }}</span></summary>
+        {% if c.ocr %}<p class="note">OCR Text: it may misread the authors' words.</p>{% endif %}
+        <ol>
+          {% for s in sentences %}
+          <li><a class="jump to-citation" href="/works/{{ c.work.id }}?at={{ s.id }}" data-work="{{ c.work.id }}" data-at="{{ s.id }}" data-label="{{ work_label(c.work) }}">{{ s.citing_sentence or "A Citation with no sentence around it" }}</a>
+            {%- if s.confidence_level == "low" %} <span class="level low">low</span>{% endif %}</li>
+          {% endfor %}
+        </ol>
+      </details>
+      {% else %}
+      <p class="citing-work unlinked"><span class="title">{{ c.work.title or c.work.zotero_key }}</span>{% if c.work.year %} <span class="year">({{ c.work.year }})</span>{% endif %}
+        <a class="jump" href="/works/{{ c.work.id }}" data-work="{{ c.work.id }}" data-label="{{ work_label(c.work) }}">Jump to its top</a>
+        <span class="note">Its Citations are not linked yet, or none links here.</span></p>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</details>
+{%- endif -%}

@@ -5,7 +5,7 @@ A reader on a Work can see which Sources they hold but cannot go to them from th
 
 ## Scope and definition of done
 - In scope: *Jump to Source* in the Citation pane and the Library Matches list, recorded Retrieval Runs, the arrival strip, the Trail, Ingesting a Source from the pane.
-- Out of scope: "Cited by" (the next feature), a words-only search, a Scope wider than one Work, fetching PDFs.
+- Out of scope: "Cited by" (`docs/design-cited-by.md`), a words-only search, a Scope wider than one Work, fetching PDFs.
 - Done when:
   1. A firm Source with text can be jumped to from a Citation, landing on its best Evidence, highlighted, with the top 5 to step through.
   2. Back, or a Work on the Trail, returns to the Work with its scroll, Citation and Conversation, and an Answer under way has gone on.

@@ -365,6 +365,21 @@ a.citation.low.on { box-shadow: inset 0 0 0 1px var(--low), 0 0 0 3px var(--low-
 .library-matches summary .count { color: var(--muted); }
 .library-matches .legend { margin: 6px 0; color: var(--muted); font-size: 12px; }
 .library-matches ul { list-style: none; margin: 0; padding: 0; max-height: 12rem; overflow-y: auto; }
+.cited-by { margin: 0 16px 10px; padding-bottom: 10px; border-bottom: 1px solid var(--rule); font-size: 13px; }
+.cited-by > summary { cursor: pointer; font: 11px var(--mono); color: var(--library); text-transform: uppercase; letter-spacing: 0.03em; }
+.cited-by > summary .count { color: var(--muted); }
+.cited-by .legend { margin: 6px 0; color: var(--muted); font-size: 12px; }
+.cited-by ul { list-style: none; margin: 0; padding: 0; max-height: 16rem; overflow-y: auto; }
+.citing-work { margin: 0; padding: 4px 6px; }
+.citing-work .title { font-family: var(--serif); }
+.citing-work .year, .citing-work .count { color: var(--muted); font-size: 11px; }
+.citing-work > summary { cursor: pointer; }
+.citing-work ol { list-style: none; margin: 4px 0 2px; padding: 0 0 0 10px; }
+.citing-work ol li { margin: 4px 0; }
+.citing-work .note { margin: 2px 0; color: var(--muted); font-size: 12px; }
+.citing-work.unlinked .jump { margin: 0 0 0 6px; padding: 1px 7px; font-size: 11px; }
+.citing-work.unlinked .note { display: block; }
+.cited-by-failed { margin: 0 16px 10px; color: var(--muted); font-size: 12px; }
 .library-match-step { display: flex; align-items: baseline; gap: 6px; width: 100%; padding: 4px 6px; border: 0; border-radius: 6px; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
 .library-match-step:hover { background: var(--library-soft); color: var(--library); }
 .library-match-step .title { flex: 1 1 auto; font-family: var(--serif); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -595,6 +610,8 @@ body.shell { margin: 0; background: var(--ground); }
 /* A Jump, and where it landed. */
 .jump { display: inline-block; margin: 2px 0 6px; padding: 3px 9px; border: 1px solid var(--library); border-radius: 6px; color: var(--library); font-size: 12px; text-decoration: none; white-space: nowrap; }
 .jump:hover { background: var(--library-soft); }
+.jump.to-citation { display: inline; margin: 0; padding: 0; border: 0; border-radius: 0; font-family: var(--serif); font-size: 13px; text-decoration: underline; text-decoration-color: var(--rule); white-space: normal; }
+.jump.to-citation:hover { background: var(--library-soft); text-decoration-color: currentColor; }
 .library-matches .jump { margin: 0 0 4px 6px; padding: 1px 7px; font-size: 11px; }
 .source .note { margin: 0 0 6px; }
 .arrival { position: sticky; top: 0; z-index: 2; padding: 0.6rem 2rem; background: var(--sheet); border-bottom: 1px solid var(--rule); font-size: 13px; }

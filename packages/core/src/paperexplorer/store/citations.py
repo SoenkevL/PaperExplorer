@@ -113,6 +113,15 @@ class CitationGraphs:
             rows = cur.execute(_CITATIONS + " WHERE c.work_id = %s ORDER BY c.position", (work,))
             return [StoredCitation(id=row["id"], citation=_citation(row)) for row in rows]
 
+    def linked_to(self, work: WorkId, references: list[str]) -> list[StoredCitation]:
+        """The Work's Citations linked to these References, by key, in the order they were found."""
+        with self._conn.cursor(row_factory=dict_row) as cur:
+            rows = cur.execute(
+                _CITATIONS + " WHERE c.work_id = %s AND r.key = ANY(%s) ORDER BY c.position",
+                (work, references),
+            )
+            return [StoredCitation(id=row["id"], citation=_citation(row)) for row in rows]
+
     def get(self, citation: CitationId) -> CitationDetail | None:
         """One Citation with its linked Reference, if the Citation exists."""
         with self._conn.cursor(row_factory=dict_row) as cur:

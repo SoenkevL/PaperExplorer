@@ -13,7 +13,7 @@ A Jump must leave the citing Work exactly as it was: the sheet's scroll, the ope
 ## Consequences
 
 - The Work page's templates and scripts stay nearly as they are, each frame being a whole page with its own htmx.
-- Links in a frame open at the top (`<base target="_top">`), and a Jump is a message to the shell.
+- Links in a frame open at the top (`<base target="_top">`), and the shell takes a Jump's click from the frame's document, so a frame needs no script of its own for it.
 - The frames share `localStorage`, so the theme follows through a `storage` listener.
 - Each frame holds a whole Work's DOM, which is why the shell keeps only eight.
 - A reload starts the current Work fresh; if Conversations move to Postgres, a frame could be rebuilt from them and this limit eased.

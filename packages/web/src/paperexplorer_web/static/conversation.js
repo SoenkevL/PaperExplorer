@@ -1,5 +1,6 @@
 // The Conversation pane: its Question box, and the Pointers and exact Quotes of its Answers,
-// which lead to their place in the Work. Opening and closing the pane is panes.js's.
+// which lead to their place in the Work; and the places a Jump's strip offers, which do the same.
+// Opening and closing the pane is panes.js's.
 //
 // Every offset counts code points of the block's text, as the API's do. JavaScript strings count
 // UTF-16 units, so a block's text nodes are walked code point by code point.
@@ -67,6 +68,12 @@
     place?.classList.add("on");
   }
 
+  function toTop() {
+    mark(null);
+    clearHighlight();
+    document.querySelector(".sheet")?.scrollTo({ top: 0 });
+  }
+
   function clearHighlight() {
     window.CSS?.highlights?.delete("pointer-place");
     window.CSS?.highlights?.delete("pointer-chunk");
@@ -76,15 +83,14 @@
   document.addEventListener("click", (event) => {
     if (!(event.target instanceof Element)) return;
     const link = event.target.closest("a[data-block]");
-    if (link && show(link)) {
+    if (link) {
+      // Always: a frame's links open at the top, and a block gone since would leave the shell.
       event.preventDefault();
-      if (link.classList.contains("place")) mark(link);
+      if (show(link) && link.classList.contains("place")) mark(link);
     }
     if (event.target.closest(".to-top")) {
       event.preventDefault();
-      mark(null);
-      clearHighlight();
-      document.querySelector(".sheet")?.scrollTo({ top: 0 });
+      toTop();
     }
     if (event.target.closest(".arrival-close")) {
       document.getElementById("arrival")?.replaceChildren();
@@ -102,9 +108,9 @@
     const strip = event.detail.target;
     if (strip?.id !== "arrival") return;
     const first = strip.querySelector("a.place");
-    if (first && (document.querySelector(".sheet")?.scrollTop ?? 0) === scrolledFrom && show(first)) {
-      mark(first);
-    }
+    if (Math.abs((document.querySelector(".sheet")?.scrollTop ?? 0) - scrolledFrom) > 2) return;
+    if (!first) toTop();
+    else if (show(first)) mark(first);
   });
 
   // Enter asks; Shift+Enter starts a new line.

@@ -1,7 +1,8 @@
 """Jumps over a mocked API: the offer in the Citation pane, the frames, and where one lands."""
 
 import re
-from typing import Any
+from datetime import UTC, datetime
+from typing import Any, Literal
 
 import httpx
 from fastapi.testclient import TestClient
@@ -15,8 +16,10 @@ from paperexplorer_api.schemas import (
     Evidence,
     Landing,
     LibraryMatch,
+    LibraryWork,
     Reference,
     Resolution,
+    StageStatus,
     WorkBrief,
     WorkText,
 )
@@ -95,7 +98,9 @@ class FakeApi:
         landing: httpx.Response | None = None,
         stages: list[dict[str, Any]] | None = None,
         ingest: httpx.Response | None = None,
+        unreachable: bool = False,
     ) -> None:
+        self.unreachable = unreachable
         self.work = work or _work()
         self.citation = citation
         self.landing = landing
@@ -105,6 +110,8 @@ class FakeApi:
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         path = request.url.path
+        if path == "/works/21/stages" and self.unreachable:
+            raise httpx.ConnectError("refused", request=request)
         if path == "/works/7":
             return httpx.Response(200, json=self.work.model_dump(mode="json"))
         if path == "/citations/11" and self.citation:
@@ -123,12 +130,24 @@ class FakeApi:
         return TestClient(create_app(ApiClient(http)))
 
 
-def _stages(*, text: bool, pdf: bool = True, run: str | None = None) -> dict[str, Any]:
-    return {
-        "id": 21, "zotero_key": "SMIT2020", "title": SOURCE.title, "creators": SOURCE.creators,
-        "year": 2020, "doi": SOURCE.doi, "text_origin": "printed" if text else None, "stages": {},
-        "has_pdf": pdf, "run": run, "stage_statuses": {}, "collections": [], "in_branch": True,
-    }  # fmt: skip
+def _stages(
+    *,
+    text: bool,
+    pdf: bool = True,
+    run: Literal["queued", "running"] | None = None,
+    failed: str | None = None,
+) -> dict[str, Any]:
+    started = datetime(2026, 11, 8, tzinfo=UTC)
+    status = StageStatus(
+        state="failed", error=failed, counts={}, started_at=started, finished_at=None
+    )
+    statuses = {"parse": status} if failed else {}
+    work = LibraryWork(
+        id=21, zotero_key="SMIT2020", title=SOURCE.title, creators=SOURCE.creators, year=2020,
+        doi=SOURCE.doi, text_origin="printed" if text else None, stages={}, has_pdf=pdf, run=run,
+        stage_statuses=statuses, collections=[], in_branch=True,
+    )  # fmt: skip
+    return work.model_dump(mode="json")
 
 
 def _panel(citation: CitationDetail) -> str:
@@ -158,7 +177,7 @@ def test_a_source_with_a_pdf_and_no_text_says_so_and_offers_ingest() -> None:
     panel = _panel(_citation(UNREAD))
 
     assert 'class="jump"' not in panel
-    assert "not been read yet" in panel
+    assert "not been Ingested yet" in panel
     assert 'hx-post="/works/21/source"' in panel
 
 
@@ -324,3 +343,77 @@ def test_arrival_for_a_source_the_citation_no_longer_names_shows_no_places() -> 
 
     assert "data-block" not in strip
     assert "no longer" in strip
+
+
+def test_opening_a_source_with_no_text_asks_whether_it_is_being_ingested() -> None:
+    panel = _panel(_citation(UNREAD))
+
+    found = re.search(r'<div class="source"[^>]*>', panel)
+    assert found
+    assert 'hx-get="/works/21/source?c=11&amp;key=b1"' in found[0]
+    assert 'hx-trigger="load"' in found[0]
+
+
+def test_a_poll_the_api_cannot_answer_keeps_asking() -> None:
+    client = FakeApi(unreachable=True).client()
+
+    fragment = client.get("/works/21/source", params={"c": 11, "key": "b1"}).text
+
+    assert 'hx-trigger="every 2s"' in fragment
+    assert 'class="failed"' in fragment
+
+
+def test_a_source_the_api_cannot_serve_still_says_why_and_keeps_its_offer() -> None:
+    client = FakeApi().client()  # no /stages, as with no Zotero keys
+
+    fragment = client.get("/works/21/source", params={"c": 11, "key": "b1"}).text
+
+    assert 'class="source"' in fragment
+    assert 'class="failed"' in fragment
+    assert "every 2s" not in fragment
+
+
+def test_a_failed_stage_shows_only_when_nothing_is_running_and_there_is_no_text() -> None:
+    def fragment(**stages: Any) -> str:
+        client = FakeApi(stages=[_stages(**stages)]).client()
+        return client.get("/works/21/source", params={"c": 11, "key": "b1"}).text
+
+    assert "GROBID refused" in fragment(text=False, failed="GROBID refused")
+    assert "GROBID refused" not in fragment(text=False, run="running", failed="GROBID refused")
+    assert "GROBID refused" not in fragment(text=True, failed="GROBID refused")
+
+
+def test_a_readers_choice_of_none_offers_no_jump() -> None:
+    citation = _citation(SOURCE)
+    assert citation.reference is not None
+    citation.reference.resolution = Resolution(
+        reference="b1", state="unresolved", work=None, level=None, confidence=None, evidence=[],
+        layer="reader", doi_conflict=None, chosen=True, firm=True,
+    )  # fmt: skip
+
+    panel = _panel(citation)
+
+    assert "names no Work" in panel
+    assert 'class="source"' not in panel
+
+
+def test_a_reason_the_web_app_does_not_know_still_lands_at_the_top() -> None:
+    landing = _landing([]).model_dump(mode="json") | {"reason": "no_match"}
+    strip = _arrival(httpx.Response(200, json=landing))
+
+    assert "This is the top of the Source" in strip
+
+
+def test_a_doi_opens_apart_from_the_trail() -> None:
+    panel = _panel(_citation(NO_PDF))
+
+    link = re.search(r'<a [^>]*href="https://doi.org/10.1000/xyz"[^>]*>', panel)
+    assert link
+    assert 'target="_blank"' in link[0]
+    assert "noopener" in link[0]
+
+
+def test_a_missing_work_in_a_frame_leaves_the_frame_by_its_links() -> None:
+    page = FakeApi().client().get("/works/999/reader").text
+
+    assert '<base target="_top">' in page.split("</head>")[0]

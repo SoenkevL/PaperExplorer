@@ -2,7 +2,6 @@
 
 import hashlib
 import logging
-from html import escape
 from pathlib import Path
 from typing import Annotated, Literal
 from urllib.parse import urlencode
@@ -503,7 +502,7 @@ def create_app(api: ApiClient) -> FastAPI:
             if landing.work.id != work_id:
                 context["why"] = "This Citation no longer names this Work."
             elif landing.reason:
-                context["why"] = NO_EVIDENCE[landing.reason]
+                context["why"] = NO_EVIDENCE.get(landing.reason, "No place was found.")
             else:
                 context["evidence"] = landing.evidence
         return pages.TemplateResponse(request, "arrival.html", context)
@@ -517,22 +516,40 @@ def create_app(api: ApiClient) -> FastAPI:
         message: str | None = None,
     ) -> HTMLResponse:
         """Whether a Source can be jumped to as it now stands, read again unless given."""
-        try:
-            found = work or api.work_stages(source_id)
-        except (httpx.HTTPError, NotFoundError) as e:
-            logger.warning("Work %d's Stages could not be read", source_id, exc_info=True)
-            return HTMLResponse(f'<p class="failed">{escape(message or _why(e))}</p>')
-        failed = [s.error for s in found.stage_statuses.values() if s.state == "failed" and s.error]
-        context = {
+        context: dict[str, object] = {
             "source_id": source_id,
-            "label": work_label(found),
-            "has_text": found.text_origin is not None,
-            "has_pdf": found.has_pdf,
-            "running": found.text_origin is None and found.run is not None,
             "citation_id": citation_id,
             "key": key,
-            "message": message or (f"Ingesting failed: {failed[0]}" if failed else None),
+            "label": "",
+            "has_text": False,
+            "has_pdf": True,
+            "running": False,
+            "message": message,
         }
+        try:
+            found = work or api.work_stages(source_id)
+        except NotFoundError as e:
+            logger.warning("Work %d's Stages are not served", source_id, exc_info=True)
+            context["message"] = message or _why(e)
+        except httpx.HTTPError:
+            # Like a row's poll, it keeps asking: the API may only be restarting.
+            logger.warning("Work %d's Stages could not be read", source_id, exc_info=True)
+            context["running"] = True
+            context["message"] = message or "The API could not be reached; still asking."
+        else:
+            has_text = found.text_origin is not None
+            running = not has_text and found.run is not None
+            failed = [
+                s.error for s in found.stage_statuses.values() if s.state == "failed" and s.error
+            ]
+            if not message and failed and not has_text and not running:
+                context["message"] = f"Ingesting failed: {failed[0]}"
+            context |= {
+                "label": work_label(found),
+                "has_text": has_text,
+                "has_pdf": found.has_pdf,
+                "running": running,
+            }
         return pages.TemplateResponse(request, "source.html", context)
 
     @app.get("/works/{source_id}/source", response_class=HTMLResponse)

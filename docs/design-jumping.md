@@ -28,7 +28,7 @@ A reader on a Work can see which Sources they hold but cannot go to them from th
 ## The web app
 - **Frames:** `/works/{id}` is the shell, one iframe per Work on the Trail, and `/works/{id}/reader` today's page (ADR 0015). The address is `/works/{id}?citation={c}`, so a reload or shared link lands the same way through the recorded Run.
 - **Trail:** in each frame's top bar. Each entry returns with `history.go(-n)`, so Back and Forward stay coherent, and the middle collapses when long. A Jump from an earlier point cuts what followed, as browser history does. A→B→A shows all three and reuses A's frame.
-- **Arrival:** the frame shows at once and says it is searching, then scrolls unless the reader has already scrolled. The strip's links are `a[data-block]`, painted as a Pointer is.
+- **Arrival:** the frame shows at once and says it is searching, then scrolls unless the reader has already scrolled. The strip's links are `a[data-block]`, painted as a Pointer is. With no Evidence it goes to the top. A frame already open says it is searching and asks again; going Back to an entry whose Citation is not the frame's asks too, so the address and the strip agree. The reader can close the strip.
 - **No text yet:** with a PDF, the pane says so and offers Ingest, and shows *Jump to Source* once parsed, without leaving the page. With no PDF, it says so and links the DOI.
 
 ## Testing

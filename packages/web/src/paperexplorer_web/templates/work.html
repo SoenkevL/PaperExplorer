@@ -4,7 +4,7 @@
 {# This page is a frame of the shell (ADR 0015); its links leave the frame. #}
 {% block head %}<base target="_top">{% endblock %}
 {% block scripts %}<script src="{{ static_url('conversation.js') }}" defer></script>{% endblock %}
-{% block trail %}<span id="trail-path" class="trail-path"><span class="sep">/</span><span class="here">{{ work.title or work.zotero_key }}</span></span>{% endblock %}
+{% block trail %}<span id="trail-steps" class="trail-steps"><span class="sep">/</span><span class="here">{{ work.title or work.zotero_key }}</span></span>{% endblock %}
 {% block toggles %}
 <div class="segmented" role="group" aria-label="Panes">
   <button type="button" class="pane-toggle" data-pane="conversation" aria-controls="conversation" aria-pressed="true">Conversation</button>
@@ -24,7 +24,7 @@
 <header class="work">
   <h1>{{ work.title or work.zotero_key }}</h1>
   <p class="byline">{{ work.creators | join("; ") }}{% if work.year %} ({{ work.year }}){% endif %}
-    {% if work.doi %}· <a href="https://doi.org/{{ work.doi }}">{{ work.doi }}</a>{% endif %}</p>
+    {% if work.doi %}· <a href="https://doi.org/{{ work.doi }}" target="_blank" rel="noopener">{{ work.doi }}</a>{% endif %}</p>
   <details class="key">
     <summary>Key</summary>
     <p class="legend">A Citation is drawn as a pill around its printed text; click one for its Reference.</p>

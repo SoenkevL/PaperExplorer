@@ -582,14 +582,14 @@ body.shell { margin: 0; background: var(--ground); }
 .frames iframe.on { visibility: visible; }
 
 /* The Trail in a frame's top bar. */
-.trail-path { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
-.trail-path .sep { flex: none; }
-.trail-path .step, .trail-path .here { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.trail-path .here { color: var(--ink); }
+.trail-steps { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.trail-steps .sep { flex: none; }
+.trail-steps .step, .trail-steps .here { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.trail-steps .here { color: var(--ink); }
 /* A narrow bar keeps where the reader is and the step back. */
 @media (max-width: 48rem) {
-  .trail:has(.trail-path .step) .brand { display: none; }
-  .trail-path > :not(:nth-last-child(-n+4)) { display: none; }
+  .trail:has(.trail-steps .step) .brand { display: none; }
+  .trail-steps > :not(:nth-last-child(-n+4)) { display: none; }
 }
 
 /* A Jump, and where it landed. */

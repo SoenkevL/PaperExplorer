@@ -32,7 +32,7 @@
     frame.src = reader(entry);
     frame.addEventListener("load", () => wire(frame));
     host.append(frame);
-    frames.set(entry.work, { frame, shown: 0 });
+    frames.set(entry.work, { frame, shown: 0, citation: entry.citation });
     return frames.get(entry.work);
   }
 
@@ -43,6 +43,12 @@
     wired.add(page);
     page.addEventListener("click", onClick);
     if (frame === current) render();
+    const held = [...frames.values()].find((h) => h.frame === frame);
+    if (held?.pending) {
+      const citation = held.pending;
+      held.pending = null;
+      ask(held, citation);
+    }
   }
 
   function onClick(event) {
@@ -62,20 +68,34 @@
   }
 
   function jump(entry) {
-    const open = frames.get(entry.work);
     trail = [...trail, entry];
     history.pushState({ trail }, "", address(entry));
     show(entry);
-    // A frame already open has its own arrival behind it: ask again for this Citation.
-    open?.frame.contentWindow?.htmx?.ajax("POST", `/works/${entry.work}/arrival`, {
+  }
+
+  // A frame open on another Citation asks where this one lands, or asks once it has loaded.
+  function ask(held, citation) {
+    held.citation = citation;
+    const inFrame = held.frame.contentWindow;
+    const strip = held.frame.contentDocument?.getElementById("arrival");
+    if (!inFrame?.htmx || !strip) {
+      held.pending = citation;
+      return;
+    }
+    const searching = strip.ownerDocument.createElement("p");
+    searching.className = "note";
+    searching.textContent = "Searching this Work for the sentence that cited it…";
+    strip.replaceChildren(searching);
+    inFrame.htmx.ajax("POST", inFrame.location.pathname.replace(/\/reader$/, "/arrival"), {
       target: "#arrival",
-      values: { citation: entry.citation },
+      values: { citation },
     });
   }
 
   function show(entry) {
     const held = frames.get(entry.work) ?? create(entry);
     held.shown = ++shownAt;
+    if (entry.citation && held.citation !== entry.citation) ask(held, entry.citation);
     current = held.frame;
     for (const { frame } of frames.values()) {
       frame.classList.toggle("on", frame === current);
@@ -103,12 +123,12 @@
     const page = current?.contentDocument;
     if (!page) return;
     if (page.title) document.title = page.title;
-    const path = page.getElementById("trail-path");
-    if (!path) return;
+    const steps = page.getElementById("trail-steps");
+    if (!steps) return;
     // Alone on the Trail, a Work shows its title as the server drew it.
-    path.dataset.alone ??= path.innerHTML;
+    steps.dataset.alone ??= steps.innerHTML;
     if (trail.length < 2) {
-      path.innerHTML = path.dataset.alone;
+      steps.innerHTML = steps.dataset.alone;
       return;
     }
     const nodes = [];
@@ -144,7 +164,7 @@
       step.textContent = entry.label;
       add(step);
     });
-    path.replaceChildren(...nodes);
+    steps.replaceChildren(...nodes);
   }
 
   function separator(page, text) {
@@ -160,7 +180,7 @@
     show(trail.at(-1));
   });
 
-  frames.set(opened.work, { frame: first, shown: ++shownAt });
+  frames.set(opened.work, { frame: first, shown: ++shownAt, citation: opened.citation });
   current = first;
   first.addEventListener("load", () => wire(first));
   // The frame may have loaded before this script ran.

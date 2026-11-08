@@ -38,7 +38,7 @@ from paperexplorer.evals.summaries import (
     RepeatSummary,
     summarize,
 )
-from paperexplorer.evals.turns import HIT_K, AskingMetrics, ask_turn, metrics, says_not_covered
+from paperexplorer.evals.turns import HIT_K, AskingMetrics, ask_turn, metrics
 from paperexplorer.evals.verdicts import (
     Aptness,
     PointerReading,
@@ -84,7 +84,6 @@ __all__ = [
     "render_summary",
     "run_eval",
     "run_info",
-    "says_not_covered",
     "summarize",
     "unjudged",
     "unknown_places",

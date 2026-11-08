@@ -67,7 +67,10 @@ class OpenAICompatibleEmbedder:
         return vectors
 
     def _post(self, texts: list[str]) -> tuple[list[Vector], _Usage | None]:
-        response = self._http.post("/embeddings", json={"model": self._model, "input": texts})
+        try:
+            response = self._http.post("/embeddings", json={"model": self._model, "input": texts})
+        except httpx.HTTPError as e:
+            raise EmbeddingError(f"The Embedder could not be reached: {e}") from e
         if response.is_error:
             raise EmbeddingError(
                 f"{response.request.url} answered {response.status_code}: {_message(response)}"

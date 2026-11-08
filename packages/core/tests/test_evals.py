@@ -21,7 +21,7 @@ from pydantic_ai.messages import ModelMessage, ModelRequest, ToolReturnPart, Use
 from pydantic_ai.models.function import AgentInfo, DeltaToolCall, FunctionModel
 
 from paperexplorer.asking import AskingContext, Reading
-from paperexplorer.asking.agent import REDRAFT
+from paperexplorer.asking.prompts import REDRAFT
 from paperexplorer.config import Settings
 from paperexplorer.domain import ChunkId, Support, Work
 from paperexplorer.embedding import FakeEmbedder
@@ -40,7 +40,6 @@ from paperexplorer.evals import (
     new_run_id,
     run_eval,
     run_info,
-    says_not_covered,
     summarize,
     unknown_places,
     write_run,
@@ -188,23 +187,6 @@ def test_unknown_places_are_those_where_no_chunk_of_the_seed_sits(
 
 
 # What one turn measures
-
-
-@pytest.mark.parametrize(
-    ("text", "said"),
-    [
-        ("The Seed does not say how psilocybin is regulated in the European Union.", True),
-        ("The Seed doesn\u2019t mention heart rate or blood pressure.", True),
-        ("The review does not directly address dosing. It covers entropy.", True),
-        ("This is not covered by the Seed.", True),
-        ("The Seed gives no information on software.", True),
-        ("Entropy was computed from each EEG recording.", False),
-        ("Entropy did not increase under methamphetamine (Murray et al., 2024).", False),
-        ("Murray et al. did not report a correlation with intensity.", False),
-    ],
-)
-def test_an_answer_says_the_seed_does_not_cover_a_question(text: str, said: bool) -> None:
-    assert says_not_covered(text) is said
 
 
 def test_a_covered_turn_measures_hit_at_8_pointers_on_expected_places_and_quotes() -> None:

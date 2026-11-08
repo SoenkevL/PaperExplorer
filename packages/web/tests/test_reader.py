@@ -297,7 +297,14 @@ def _with_library_matches(matched: set[int], matches: list[LibraryMatch]) -> Wor
 
 def _held(id_: int, title: str, year: int | None, citations: list[int]) -> LibraryMatch:
     work = WorkBrief(
-        id=id_, zotero_key=f"HELD{id_:04d}", title=title, creators=[], year=year, doi=None
+        id=id_,
+        zotero_key=f"HELD{id_:04d}",
+        title=title,
+        creators=[],
+        year=year,
+        doi=None,
+        has_text=True,
+        has_pdf=True,
     )
     return LibraryMatch(work=work, citations=citations)
 

@@ -1,8 +1,8 @@
 """Hand-built eval turns over the small Seed's places, for tests that need no run."""
 
-from paperexplorer.asking import Reading
+from paperexplorer.asking import Reading, says_not_covered
 from paperexplorer.domain import Answer, AnswerSentence, ChunkId, Pointer, Support
-from paperexplorer.evals import Hit, Mode, Place, PointerCheck, QuoteCheck, Turn, says_not_covered
+from paperexplorer.evals import Hit, Mode, Place, PointerCheck, QuoteCheck, Turn
 
 RECORDING_PLACE = Place(heading_path=("2 Methods", "2.1 Recording"), page=2)
 DISCUSSION_PLACE = Place(heading_path=("3 Discussion",), page=3)

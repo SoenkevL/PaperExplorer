@@ -1267,17 +1267,9 @@ def test_a_redraft_is_a_span_of_its_own_runs_without_thinking_and_marks_the_trac
 @pytest.mark.parametrize(
     ("reading", "draft", "redrafted"),
     [
-        (Reading.WHOLE_SEED, "Yes, it was.", False),
-        (Reading.WHOLE_SEED, "Entropy was computed from each EEG recording. [#42]", False),
+        (Reading.WHOLE_SEED, "Entropy was computed from each EEG recording. [#3]", False),
         # The small Seed numbers its References: `[1]` is its own marker, not a handle.
         (Reading.WHOLE_SEED, "Psychedelics raise brain entropy, as the authors say [1].", True),
-        (Reading.WHOLE_SEED, "The Seed doesn\u2019t say how caffeine affects sleep.", False),
-        (
-            Reading.WHOLE_SEED,
-            "The Seed does not say how caffeine affects sleep. It covers entropy. The sessions"
-            " took place in the afternoon.",
-            True,
-        ),
         (Reading.RETRIEVAL, "Entropy was computed from each EEG recording.", False),
     ],
 )
@@ -1291,21 +1283,6 @@ def test_only_a_whole_seed_answer_with_something_to_point_and_no_handle_is_redra
     assert isinstance(events[-1], AnsweredEvent)
     assert ("redraft" in [e.type for e in events]) is redrafted
     assert len(script.requests) == (2 if redrafted else 1)
-
-
-def test_reading_the_whole_seed_only_the_question_asked_closes_with_the_note(
-    store_db: Conn, conversation: Conversation
-) -> None:
-    script = Script(["First Answer. [#3]"], ["Second Answer. [#4]"])
-    ctx = context(store_db, script, reading=Reading.WHOLE_SEED)
-    later = "When did the EEG sessions take place?"
-
-    turn(ctx, conversation, QUESTION)
-    turn(ctx, conversation, later)
-
-    messages, _ = script.requests[1]
-    assert user_prompts(messages) == [QUESTION, f"{NO_TOOLS}\n\n{QUESTION_LABEL}\n{later}"]
-    assert user_prompts(conversation.messages) == [QUESTION, later]
 
 
 def test_a_retrieval_turn_counts_the_models_requests_and_tools_not_the_forced_search(

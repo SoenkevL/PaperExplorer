@@ -17,7 +17,7 @@ from dataclasses import dataclass, replace
 
 import psycopg
 from psycopg.rows import TupleRow
-from pydantic_ai import Agent, AgentRunResult, RunContext, Tool
+from pydantic_ai import Agent, AgentRunResult, RunContext
 from pydantic_ai.capabilities import AbstractCapability, Instrumentation, PrepareTools
 from pydantic_ai.exceptions import UsageLimitExceeded
 from pydantic_ai.messages import (
@@ -25,16 +25,11 @@ from pydantic_ai.messages import (
     FunctionToolCallEvent,
     ModelMessage,
     ModelRequest,
-    ModelResponse,
     PartDeltaEvent,
     PartStartEvent,
     SystemPromptPart,
     TextPart,
     TextPartDelta,
-    ThinkingPart,
-    ToolCallPart,
-    ToolReturnPart,
-    UserPromptPart,
 )
 from pydantic_ai.models import Model, ModelRequestContext
 from pydantic_ai.models.instrumented import InstrumentationSettings
@@ -54,17 +49,15 @@ from paperexplorer.asking.events import (
     RedraftEvent,
     StepEvent,
 )
+from paperexplorer.asking.history import QuestionHistory
 from paperexplorer.asking.prompts import (
     LAST_REQUEST,
-    NO_TOOLS,
     PROMPT_VERSION,
-    QUESTION_LABEL,
-    REDRAFT,
     SYSTEM_PROMPT,
     WHOLE_SEED,
 )
 from paperexplorer.asking.reading import Reading
-from paperexplorer.asking.tools import SeedTools
+from paperexplorer.asking.tools import SEED_TOOLS, SeedTools
 from paperexplorer.config import Settings
 from paperexplorer.domain import Answer
 from paperexplorer.embedding import Embedder
@@ -194,7 +187,7 @@ async def _answer_turn(
         "question", tags=tags, session_id=conversation.id, metadata=metadata
     ) as trace_id:
         try:
-            answer, messages, redrafted = await _answer(
+            answer, redrafted = await _answer(
                 ctx, tools, reading, conversation, question, tally, emit
             )
         except _NoAnswerError:
@@ -209,8 +202,6 @@ async def _answer_turn(
             logger.exception("Question %d of Conversation %s failed", position, conversation.id)
             emit(failed(f"The model could not answer: {error}", trace_id))
             return
-        conversation.messages = _without_thinking(messages)
-        conversation.questions = position
         if redrafted:
             ctx.tracing.add_metadata({"redrafted": "true"})
         _score(ctx.tracing, answer, tally, time.monotonic() - started)
@@ -244,31 +235,27 @@ async def _answer(
     question: str,
     tally: _Tally,
     emit: Callable[[AnswerEvent | None], None],
-) -> tuple[Answer, list[ModelMessage], bool]:
+) -> tuple[Answer, bool]:
     """Run the agent on the Question and resolve its draft into the Answer; whether redrafted.
 
     Reading the whole Seed, an Answer with sentences to point at the Seed and no handle at all
-    is asked for its handles once more (`_redraft`); if that fails, the first Answer stands.
+    is asked for its handles once more (`_redraft`); if that fails, the first Answer stands. An
+    answered Question joins the Conversation here.
     """
     whole = reading is Reading.WHOLE_SEED
-    asked = len(conversation.messages)  # where the Question's request is in the run's messages
     if whole:
         instructions = f"{SYSTEM_PROMPT.strip()}\n\n{WHOLE_SEED}\n\n{tools.whole_seed()}"
-        closing = f"{NO_TOOLS}\n\n{QUESTION_LABEL}\n{question}"
-        history: list[ModelMessage] = [
-            *conversation.messages,
-            ModelRequest(parts=[UserPromptPart(closing)]),
-        ]
+        history = QuestionHistory.whole_seed(conversation, question)
     else:
         instructions = f"{SYSTEM_PROMPT.strip()}\n\n{tools.seed_map()}"
-        forced = _forced_search(ctx, tools, conversation, question, tally, emit)
-        history = [*conversation.messages, *forced]
+        found = _forced_search(ctx, tools, question, tally, emit)
+        history = QuestionHistory.retrieval(conversation, question, found)
     agent = Agent(
         ctx.model,
         deps_type=SeedTools,
         name="asking",
         instructions=instructions,
-        tools=[] if whole else _TOOLS,
+        tools=[] if whole else SEED_TOOLS,
         model_settings=ModelSettings(temperature=ctx.settings.chat_temperature),
         capabilities=[
             PrepareTools(_no_tools_on_the_last_request),
@@ -279,20 +266,21 @@ async def _answer(
             ),
         ],
     )
-    result = await _run(agent, tools, conversation.handles, history, REQUEST_LIMIT, tally, emit)
+    result = await _run(
+        agent, tools, conversation.handles, history.request, REQUEST_LIMIT, tally, emit
+    )
     draft = answer_draft(result.output)
     answer = _resolve(ctx, tools, conversation, draft)
     if not has_words(answer):
         raise _NoAnswerError
-    messages, redrafted = _with_draft(result.all_messages(), draft), False
+    history.answered(result.all_messages(), draft)
+    redrafted = False
     if whole and wants_handles(answer):
-        again = await _redraft(ctx, agent, tools, conversation, messages, draft, tally, emit)
+        again = await _redraft(ctx, agent, tools, conversation, history, draft, tally, emit)
         if again is not None:
-            answer, response = again
-            messages, redrafted = [*messages[:-1], response], True
-    if whole:
-        messages = _with_question(messages, asked, question)
-    return answer, messages, redrafted
+            answer, redrafted = again, True
+    history.commit()
+    return answer, redrafted
 
 
 async def _run(
@@ -358,22 +346,21 @@ async def _redraft(
     agent: Agent[SeedTools, str],
     tools: SeedTools,
     conversation: Conversation,
-    messages: list[ModelMessage],
+    history: QuestionHistory,
     first: str,
     tally: _Tally,
     emit: Callable[[AnswerEvent | None], None],
-) -> tuple[Answer, ModelResponse] | None:
-    """Ask once more for the Answer, word for word with its handles: the Answer and its response.
+) -> Answer | None:
+    """Ask once more for the Answer, word for word with its handles: the new Answer, kept.
 
-    One request, without tools: the run's `messages`, which end with the `first` draft as the
-    model's response, then `REDRAFT`, for this request only. None when it fails or leaves no
-    words.
+    One request, without tools, after the `first` draft. None when it fails or leaves no words,
+    and `history` keeps the first draft.
     """
     emit(RedraftEvent())
-    history = [*_without_thinking(messages), ModelRequest(parts=[UserPromptPart(REDRAFT)])]
+    request = history.redraft_request()
     with ctx.tracing.span("redraft", input=first) as span:
         try:
-            result = await _run(agent, tools, conversation.handles, history, 1, tally, emit)
+            result = await _run(agent, tools, conversation.handles, request, 1, tally, emit)
         except Exception as error:
             logger.warning("Asked again for its handles, the model failed", exc_info=True)
             span.update(output=f"failed: {error}")
@@ -384,9 +371,8 @@ async def _redraft(
     if not has_words(answer):
         logger.warning("Asked again for its handles, the model gave no Answer")
         return None
-    response = _with_draft(result.all_messages(), draft)[-1]
-    assert isinstance(response, ModelResponse), "the redraft ended without a response"
-    return answer, response
+    history.redrafted(result.all_messages(), draft)
+    return answer
 
 
 class _NoAnswerError(Exception):
@@ -396,24 +382,16 @@ class _NoAnswerError(Exception):
 def _forced_search(
     ctx: AskingContext,
     tools: SeedTools,
-    conversation: Conversation,
     question: str,
     tally: _Tally,
     emit: Callable[[AnswerEvent | None], None],
-) -> list[ModelMessage]:
-    """Search the Seed for the Question: the Question, then the search as the model's own call."""
+) -> str:
+    """Search the Seed for the Question, as a step of the turn: what the search shows."""
     emit(StepEvent(tool="search", args={"query": question}))
     with ctx.tracing.span("forced search", as_type="tool", input={"query": question}) as span:
         tally.forced_search, found = tools.ranked_search(question)
         span.update(output=found)
-    call = ToolCallPart(
-        "search", {"query": question}, tool_call_id=f"forced-{conversation.questions + 1}"
-    )
-    return [
-        ModelRequest(parts=[UserPromptPart(question)]),
-        ModelResponse(parts=[call]),
-        ModelRequest(parts=[ToolReturnPart("search", found, tool_call_id=call.tool_call_id)]),
-    ]
+    return found
 
 
 def _draft(event: AgentStreamEvent) -> str | None:
@@ -478,35 +456,6 @@ async def _no_tools_on_the_last_request(
     return [] if ctx.run_step >= REQUEST_LIMIT else tool_defs
 
 
-def _with_draft(messages: list[ModelMessage], draft: str) -> list[ModelMessage]:
-    """The messages with the last response's text the Answer's draft, as cut, for later turns."""
-    *earlier, last = messages
-    if not isinstance(last, ModelResponse):
-        return messages
-    kept = [p for p in last.parts if not isinstance(p, TextPart)]
-    return [*earlier, replace(last, parts=[*kept, TextPart(draft)])]
-
-
-def _with_question(messages: list[ModelMessage], at: int, question: str) -> list[ModelMessage]:
-    """The messages with the bare Question at `at`: the closing turn was for the request only."""
-    request = messages[at]
-    assert isinstance(request, ModelRequest), "the Question's request is not where it was put"
-    parts = [
-        replace(p, content=question) if isinstance(p, UserPromptPart) else p for p in request.parts
-    ]
-    return [*messages[:at], replace(request, parts=parts), *messages[at + 1 :]]
-
-
-def _without_thinking(messages: list[ModelMessage]) -> list[ModelMessage]:
-    """The messages with the model's thinking left out: it is traced, never kept or shown."""
-    return [
-        replace(m, parts=[p for p in m.parts if not isinstance(p, ThinkingPart)])
-        if isinstance(m, ModelResponse)
-        else m
-        for m in messages
-    ]
-
-
 def _score(tracing: Tracing, answer: Answer, tally: _Tally, latency_s: float) -> None:
     """Score the `question` trace with the Answer's counts, the turn's tally and its latency."""
     for name, value in answer.counts().model_dump().items():
@@ -515,67 +464,3 @@ def _score(tracing: Tracing, answer: Answer, tally: _Tally, latency_s: float) ->
     tracing.score("tool_calls", tally.tool_calls)
     tracing.score("model_requests", tally.model_requests)
     tracing.score("latency_s", round(latency_s, 3))
-
-
-async def _search(ctx: RunContext[SeedTools], query: str, k: int = 8) -> str:
-    """Search the Seed's Chunks by words and meaning, best first.
-
-    Args:
-        ctx: The turn's tools.
-        query: What to look for, in your words or the Seed's.
-        k: How many Chunks to show, at most 20.
-    """
-    return ctx.deps.search(query, k)
-
-
-async def _read_section(ctx: RunContext[SeedTools], heading: str, part: int = 1) -> str:
-    """Read the Chunks under one heading of the map, in reading order, in parts of about 3k tokens.
-
-    Args:
-        ctx: The turn's tools.
-        heading: The section's § number from the map, such as §4, or its heading.
-        part: Which part to read; the output says when the section goes on.
-    """
-    return ctx.deps.read_section(heading, part)
-
-
-async def _read_around(ctx: RunContext[SeedTools], handle: int | str, n: int = 1) -> str:
-    """Read the Chunks just before and after one you have been shown, in reading order.
-
-    Args:
-        ctx: The turn's tools.
-        handle: The Chunk's handle, such as 7 for [#7].
-        n: How many Chunks on either side, at most 3.
-    """
-    return ctx.deps.read_around(handle, n)
-
-
-async def _reference(ctx: RunContext[SeedTools], handle: int | str, marker: str) -> str:
-    """Show the Reference, as printed, behind a Citation marker in a Chunk.
-
-    Args:
-        ctx: The turn's tools.
-        handle: The handle of the Chunk that prints the marker, such as 7 for [#7].
-        marker: The marker as the Chunk prints it, such as [12] or (Smith, 2019).
-    """
-    return ctx.deps.reference(handle, marker)
-
-
-async def _citing_sentences(ctx: RunContext[SeedTools], reference: str) -> str:
-    """Show every sentence of the Seed that cites one Reference.
-
-    Args:
-        ctx: The turn's tools.
-        reference: The Reference's key as `reference` shows it (such as b12), its printed label,
-            or words of its text.
-    """
-    return ctx.deps.citing_sentences(reference)
-
-
-_TOOLS = [
-    Tool(_search, name="search"),
-    Tool(_read_section, name="read_section"),
-    Tool(_read_around, name="read_around"),
-    Tool(_reference, name="reference"),
-    Tool(_citing_sentences, name="citing_sentences"),
-]

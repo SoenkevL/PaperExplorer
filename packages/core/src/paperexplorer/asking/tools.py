@@ -13,6 +13,7 @@ from functools import cached_property
 
 import psycopg
 from psycopg.rows import TupleRow
+from pydantic_ai import RunContext, Tool
 
 from paperexplorer import retrieval
 from paperexplorer.asking.conversation import Conversation
@@ -392,3 +393,68 @@ def _unknown_handle(handle: int | str) -> str:
 def _marker(text: str) -> str:
     """A Citation marker for comparison: case-folded, without spaces, brackets and end commas."""
     return _MARKER_NOISE.sub("", text.casefold()).strip(";,.")
+
+
+async def _search(ctx: RunContext[SeedTools], query: str, k: int = 8) -> str:
+    """Search the Seed's Chunks by words and meaning, best first.
+
+    Args:
+        ctx: The turn's tools.
+        query: What to look for, in your words or the Seed's.
+        k: How many Chunks to show, at most 20.
+    """
+    return ctx.deps.search(query, k)
+
+
+async def _read_section(ctx: RunContext[SeedTools], heading: str, part: int = 1) -> str:
+    """Read the Chunks under one heading of the map, in reading order, in parts of about 3k tokens.
+
+    Args:
+        ctx: The turn's tools.
+        heading: The section's § number from the map, such as §4, or its heading.
+        part: Which part to read; the output says when the section goes on.
+    """
+    return ctx.deps.read_section(heading, part)
+
+
+async def _read_around(ctx: RunContext[SeedTools], handle: int | str, n: int = 1) -> str:
+    """Read the Chunks just before and after one you have been shown, in reading order.
+
+    Args:
+        ctx: The turn's tools.
+        handle: The Chunk's handle, such as 7 for [#7].
+        n: How many Chunks on either side, at most 3.
+    """
+    return ctx.deps.read_around(handle, n)
+
+
+async def _reference(ctx: RunContext[SeedTools], handle: int | str, marker: str) -> str:
+    """Show the Reference, as printed, behind a Citation marker in a Chunk.
+
+    Args:
+        ctx: The turn's tools.
+        handle: The handle of the Chunk that prints the marker, such as 7 for [#7].
+        marker: The marker as the Chunk prints it, such as [12] or (Smith, 2019).
+    """
+    return ctx.deps.reference(handle, marker)
+
+
+async def _citing_sentences(ctx: RunContext[SeedTools], reference: str) -> str:
+    """Show every sentence of the Seed that cites one Reference.
+
+    Args:
+        ctx: The turn's tools.
+        reference: The Reference's key as `reference` shows it (such as b12), its printed label,
+            or words of its text.
+    """
+    return ctx.deps.citing_sentences(reference)
+
+
+# The model's view of the tools: their names, and in these docstrings all it reads about them.
+SEED_TOOLS = [
+    Tool(_search, name="search"),
+    Tool(_read_section, name="read_section"),
+    Tool(_read_around, name="read_around"),
+    Tool(_reference, name="reference"),
+    Tool(_citing_sentences, name="citing_sentences"),
+]

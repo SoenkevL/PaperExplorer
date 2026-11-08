@@ -12,7 +12,7 @@
 </head>
 <body class="shell">
   <div id="frames" class="frames">
-    <iframe class="on" title="{{ work.title or work.zotero_key }}" src="/works/{{ work.id }}/reader{% if citation %}?citation={{ citation }}{% endif %}" data-work="{{ work.id }}" data-citation="{{ citation or '' }}" data-label="{{ work_label(work) }}"></iframe>
+    <iframe class="on" title="{{ work.title or work.zotero_key }}" src="/works/{{ work.id }}/reader{% if citation %}?citation={{ citation }}{% elif at %}?at={{ at }}{% endif %}" data-work="{{ work.id }}" data-citation="{{ citation or '' }}" data-at="{{ at or '' }}" data-label="{{ work_label(work) }}"></iframe>
   </div>
 </body>
 </html>

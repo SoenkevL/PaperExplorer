@@ -207,3 +207,36 @@ def test_a_jump_goes_from_a_citation_to_the_evidence_in_its_source(
     page = asking_reader.get(f"/works/{source}/reader", params={"citation": citation}).text
     assert f'id="b{places[0]}"' in page
     assert detail.citation.citing_sentence in html.unescape(strip)
+
+
+def test_a_source_lists_the_work_citing_it_and_a_jump_lands_on_its_citation(
+    store_db: Conn, explored: dict[str, WorkId], asking_reader: TestClient
+) -> None:
+    work, source = explored["villiger2024-tandf"], explored["scan-villiger2024"]
+    first = _panel_targets(asking_reader.get(f"/works/{work}/reader").text)[0]
+    citation = int(re.findall(r"c=(\d+)", first)[0])
+    detail = CitationGraphs(store_db).get(CitationId(citation))
+    assert detail is not None and detail.reference is not None
+    Resolutions(store_db).replace(
+        work,
+        [
+            Resolution(
+                reference=detail.reference.id,
+                state=ResolutionState.RESOLVED,
+                work=source,
+                level=Level.CERTAIN,
+                confidence=1.0,
+                layer=Layer.LIBRARY,
+            )
+        ],
+    )
+
+    assert f'hx-get="/works/{source}/cited-by"' in asking_reader.get(f"/works/{source}/reader").text
+    section = html.unescape(asking_reader.get(f"/works/{source}/cited-by").text)
+    assert f'href="/works/{work}?at={citation}"' in section
+    assert detail.citation.citing_sentence in section
+
+    shell = html.unescape(asking_reader.get(f"/works/{work}?at={citation}").text)
+    assert f'src="/works/{work}/reader?at={citation}"' in shell
+    page = asking_reader.get(f"/works/{work}/reader", params={"at": citation}).text
+    assert f'data-at="{citation}"' in page

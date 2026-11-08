@@ -19,6 +19,7 @@ from paperexplorer_api.schemas import (
     Block,
     CheckCost,
     CitationDetail,
+    CitingSentence,
     CollectionTree,
     DuplicateItems,
     LibraryPage,
@@ -84,6 +85,11 @@ def _view(block: Block) -> BlockView:
     # h1 is the Work's title; a heading sits one level below the headings on its path
     tag = f"h{min(len(block.heading_path) + 2, 6)}" if block.kind == "heading" else "p"
     return BlockView(block=block, tag=tag, segments=segments(block.text, block.citations))
+
+
+def _distinct_sentences(citations: list[CitingSentence]) -> list[CitingSentence]:
+    """One row per sentence: two markers in it citing one Work land on the first."""
+    return list({c.citing_sentence: c for c in reversed(citations)}.values())[::-1]
 
 
 def _panel_url(work_id: int, citations: list[int]) -> str:
@@ -468,23 +474,50 @@ def create_app(api: ApiClient) -> FastAPI:
         return duplicates_view(request, duplicate_items(), message, failed=False)
 
     @app.get("/works/{work_id}", response_class=HTMLResponse)
-    def work(request: Request, work_id: int, citation: int | None = None) -> HTMLResponse:  # pyright: ignore[reportUnusedFunction]
-        """The shell around a Work's frame (ADR 0015); `citation` is the one a Jump came from."""
+    def work(  # pyright: ignore[reportUnusedFunction]
+        request: Request, work_id: int, citation: int | None = None, at: int | None = None
+    ) -> HTMLResponse:
+        """The shell around a Work's frame (ADR 0015).
+
+        `citation` is the Citation in another Work a Jump came from; `at`, one in this Work a Jump
+        lands on.
+        """
         try:
             text = api.work(work_id)
         except NotFoundError as e:
             return not_found(request, str(e))
-        return pages.TemplateResponse(request, "shell.html", {"work": text, "citation": citation})
+        context = {"work": text, "citation": citation, "at": at}
+        return pages.TemplateResponse(request, "shell.html", context)
 
     @app.get("/works/{work_id}/reader", response_class=HTMLResponse)
-    def reader(request: Request, work_id: int, citation: int | None = None) -> HTMLResponse:  # pyright: ignore[reportUnusedFunction]
+    def reader(  # pyright: ignore[reportUnusedFunction]
+        request: Request, work_id: int, citation: int | None = None, at: int | None = None
+    ) -> HTMLResponse:
         """A Work's page, as a frame of the shell shows it."""
         try:
             text = api.work(work_id)
         except NotFoundError as e:
             return not_found(request, str(e))
-        context = {"work": text, "blocks": [_view(b) for b in text.blocks], "citation": citation}
+        context = {
+            "work": text,
+            "blocks": [_view(b) for b in text.blocks],
+            "citation": citation,
+            "at": at,
+        }
         return pages.TemplateResponse(request, "work.html", context)
+
+    @app.get("/works/{work_id}/cited-by", response_class=HTMLResponse)
+    def cited_by(request: Request, work_id: int) -> HTMLResponse:  # pyright: ignore[reportUnusedFunction]
+        """The Works citing this one, or nothing when none does, or that they could not be read."""
+        context: dict[str, object] = {"citing": [], "failed": False}
+        try:
+            context["citing"] = [
+                (c, _distinct_sentences(c.citations)) for c in api.cited_by(work_id)
+            ]
+        except httpx.HTTPError, NotFoundError:
+            logger.warning("Work %d's Citing Works could not be read", work_id, exc_info=True)
+            context["failed"] = True
+        return pages.TemplateResponse(request, "cited_by.html", context)
 
     @app.post("/works/{work_id}/arrival", response_class=HTMLResponse)
     def arrival(  # pyright: ignore[reportUnusedFunction]

@@ -111,3 +111,25 @@ def test_a_work_without_citations_stores_none(store_db: Conn, villiger: ParsedWo
     CitationGraphs(store_db).replace(work, CitationGraph(references=[], citations=[]))
 
     assert CitationGraphs(store_db).for_work(work) == []
+
+
+def test_the_citations_linked_to_references_come_back_in_reading_order(
+    store_db: Conn, villiger: ParsedWork
+) -> None:
+    work, graph = _stored(store_db, villiger)
+    linked = [c.link.reference_id for c in graph.citations if c.link]
+    keys = [linked[0], linked[-1]]
+
+    found = CitationGraphs(store_db).linked_to(work, keys)
+
+    assert [s.citation for s in found] == [
+        c for c in graph.citations if c.link and c.link.reference_id in keys
+    ]
+
+
+def test_no_citations_are_linked_to_a_reference_nothing_points_at(
+    store_db: Conn, villiger: ParsedWork
+) -> None:
+    work, _ = _stored(store_db, villiger)
+
+    assert CitationGraphs(store_db).linked_to(work, ["no-such-key"]) == []

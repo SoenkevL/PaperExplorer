@@ -1,7 +1,7 @@
 """Resolutions: each Reference of a Work matched to a Work, or Unchecked, or Unresolved."""
 
 import psycopg
-from psycopg.rows import TupleRow, class_row
+from psycopg.rows import TupleRow, class_row, dict_row
 
 from paperexplorer.domain import Resolution, WorkId
 
@@ -53,6 +53,27 @@ class Resolutions:
     def get(self, work: WorkId, reference: str) -> Resolution | None:
         """One Reference's Resolution, by its key, if it has one."""
         return next((r for r in self.for_work(work) if r.reference == reference), None)
+
+    def citing(self, work: WorkId) -> dict[WorkId, list[str]]:
+        """The other Works whose firm Resolutions name this one, with those Reference keys."""
+        with self._conn.cursor(row_factory=dict_row) as cur:
+            rows = cur.execute(
+                "SELECT r.work_id, r.reference_key AS reference, r.state,"
+                " r.resolved_work_id AS work, r.level, r.confidence, r.evidence, r.layer,"
+                " r.doi_conflict_work_id AS doi_conflict"
+                " FROM resolutions r JOIN work_references w"
+                " ON w.work_id = r.work_id AND w.key = r.reference_key"
+                " WHERE r.resolved_work_id = %s AND r.work_id <> %s"
+                " ORDER BY r.work_id, w.position",
+                (work, work),
+            ).fetchall()
+        citing: dict[WorkId, list[str]] = {}
+        for row in rows:
+            citer = row.pop("work_id")
+            resolution = Resolution.model_validate(row)
+            if resolution.firm:
+                citing.setdefault(citer, []).append(resolution.reference)
+        return citing
 
     def repoint(self, old: WorkId, new: WorkId) -> int:
         """Point every Resolution naming `old` at `new`, as after a merge; how many changed."""

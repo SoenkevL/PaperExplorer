@@ -14,6 +14,7 @@ from paperexplorer_api.schemas import (
     CheckedReference,
     CheckEvent,
     CitationDetail,
+    CitingWork,
     CollectionTree,
     Conversation,
     DuplicateItems,
@@ -117,6 +118,10 @@ class ApiClient:
     def work(self, work_id: int) -> WorkText:
         """One Work with its text and Citation spans; `NotFoundError` if it has no text."""
         return WorkText.model_validate(self._get(f"/works/{work_id}"))
+
+    def cited_by(self, work_id: int) -> list[CitingWork]:
+        """The held Works whose firm Resolutions name this one, newest first."""
+        return [CitingWork.model_validate(c) for c in self._get(f"/works/{work_id}/cited-by")]
 
     def citation(self, citation_id: int) -> CitationDetail:
         """One Citation with its Citation Link and Reference."""

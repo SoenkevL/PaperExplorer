@@ -116,6 +116,38 @@
     return sheet ? sheet.getBoundingClientRect().height / window.innerHeight : 0.5;
   }
 
+  const pillOf = (citation) =>
+    Array.from(document.querySelectorAll("a.citation")).find((a) =>
+      new URL(a.href, location.href).searchParams.getAll("c").includes(String(citation)),
+    );
+
+  // A Jump to a Citation of this Work lands on its pill and opens it; no search, so no strip. A
+  // link kept from before the Citations were extracted again has nothing to land on.
+  function landOn(citation) {
+    const arrival = document.getElementById("arrival");
+    arrival?.replaceChildren();
+    const pill = pillOf(citation);
+    if (pill) {
+      pill.scrollIntoView({ block: "center" });
+      pill.click();
+      return;
+    }
+    document.getElementById("work")?.scrollTo(0, 0);
+    if (!arrival) return;
+    const strip = document.createElement("div");
+    strip.className = "arrival-strip";
+    const close = document.createElement("button");
+    close.className = "arrival-close";
+    close.type = "button";
+    close.setAttribute("aria-label", "Close this note");
+    close.textContent = "×";
+    const note = document.createElement("p");
+    note.className = "note";
+    note.textContent = "That Citation is no longer in this Work. This is the top of the Work.";
+    strip.append(close, note);
+    arrival.append(strip);
+  }
+
   // A Library Match steps through its Citations: each click opens the next, then wraps around.
   function stepThrough(step) {
     const ids = step.dataset.citations.split(" ");
@@ -130,9 +162,7 @@
       url.searchParams.set("citation", ids[at]);
       jump.href = url.pathname + url.search;
     }
-    const pill = Array.from(document.querySelectorAll("a.citation")).find((a) =>
-      new URL(a.href, location.href).searchParams.getAll("c").includes(ids[at]),
-    );
+    const pill = pillOf(ids[at]);
     if (!pill) return;
     pill.scrollIntoView({ block: "center", behavior: "smooth" });
     pill.click();
@@ -161,6 +191,32 @@
   // A Citation opened always shows, even in a pane that was turned off.
   document.addEventListener("htmx:afterSwap", (event) => {
     if (event.detail.target?.id === "panel") setPane("citation", true);
+  });
+
+  // Reading Cited by again (each time its frame is shown) leaves it folded as the reader left it.
+  let citedBy = null;
+  document.addEventListener("htmx:beforeSwap", (event) => {
+    const section = event.detail.target;
+    if (section?.id !== "cited-by") return;
+    citedBy = {
+      closed: section.querySelector(":scope > details.cited-by:not([open])") !== null,
+      open: Array.from(section.querySelectorAll("details.citing-work[open]"), (d) => d.dataset.work),
+    };
+  });
+  document.addEventListener("htmx:afterSwap", (event) => {
+    const section = event.detail.target;
+    if (section?.id !== "cited-by" || !citedBy) return;
+    if (citedBy.closed) section.querySelector(":scope > details.cited-by")?.removeAttribute("open");
+    for (const row of section.querySelectorAll("details.citing-work")) {
+      row.open = citedBy.open.includes(row.dataset.work);
+    }
+  });
+
+  // A frame already open is told where to land (trail.js); one just opened reads it from its page.
+  document.addEventListener("citation:land", (event) => landOn(event.detail));
+  window.addEventListener("load", () => {
+    const at = document.getElementById("arrival")?.dataset.at;
+    if (at) landOn(at);
   });
 
   // Another script (conversation.js) closes an overlay this way, e.g. to show a place in the Work.

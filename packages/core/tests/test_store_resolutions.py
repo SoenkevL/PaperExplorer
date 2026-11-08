@@ -86,3 +86,57 @@ def test_a_work_a_resolution_names_stays_when_its_library_item_goes(store_db: Co
 
     kept = works.get(cited)
     assert kept is not None and kept.zotero_key is None
+
+
+def _citing(conn: Conn, key: str, references: list[Resolution]) -> WorkId:
+    work = _cited(conn, key)
+    printed = [Reference(id=r.reference, text=f"Printed {r.reference}", page=1) for r in references]
+    WorkTexts(conn).replace(
+        work, ParsedWork(text_origin=TextOrigin.PRINTED, blocks=[], references=printed)
+    )
+    Resolutions(conn).replace(work, references)
+    return work
+
+
+def _naming(
+    reference: str, work: WorkId, level: Level = Level.HIGH, layer: Layer = Layer.LIBRARY
+) -> Resolution:
+    return Resolution(
+        reference=reference, state=ResolutionState.RESOLVED, work=work, level=level,
+        confidence=0.9, evidence=["title"], layer=layer,
+    )  # fmt: skip
+
+
+def test_the_works_citing_a_work_are_those_whose_firm_resolutions_name_it(store_db: Conn) -> None:
+    cited = _cited(store_db, "CITED111")
+    other = _cited(store_db, "OTHER222")
+    firm = _citing(store_db, "FIRM1111", [_naming("b0", cited), _naming("b1", other)])
+    chosen = _citing(
+        store_db, "CHOSEN11", [_naming("b0", cited, Level.LOW, Layer.READER)]
+    )  # a Reader's Choice is firm, whatever level it carries
+    _citing(store_db, "LOWLOW11", [_naming("b0", cited, Level.LOW)])
+    _citing(store_db, "ELSEWHRE", [_naming("b0", other)])
+
+    assert Resolutions(store_db).citing(cited) == {firm: ["b0"], chosen: ["b0"]}
+
+
+def test_a_work_cited_by_two_of_a_works_references_has_both(store_db: Conn) -> None:
+    cited = _cited(store_db, "CITED111")
+    twice = _citing(store_db, "TWICE111", [_naming("b0", cited), _naming("b1", cited)])
+
+    assert Resolutions(store_db).citing(cited) == {twice: ["b0", "b1"]}
+
+
+def test_a_work_does_not_cite_itself_in_its_own_list(store_db: Conn) -> None:
+    work = _cited(store_db, "SELF1111")
+    WorkTexts(store_db).replace(
+        work,
+        ParsedWork(
+            text_origin=TextOrigin.PRINTED,
+            blocks=[],
+            references=[Reference(id="b0", text="Printed", page=1)],
+        ),
+    )
+    Resolutions(store_db).replace(work, [_naming("b0", work)])
+
+    assert Resolutions(store_db).citing(work) == {}

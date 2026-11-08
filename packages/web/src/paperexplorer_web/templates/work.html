@@ -17,7 +17,7 @@
 <div class="reader">
 {% include "conversation/sidebar.html" %}
 <main id="work" class="sheet">
-<section id="arrival" class="arrival" aria-label="Where this Jump landed" aria-live="polite"
+<section id="arrival" class="arrival" aria-label="Where this Jump landed" aria-live="polite"{% if at %} data-at="{{ at }}"{% endif %}
   {%- if citation %} hx-post="/works/{{ work.id }}/arrival" hx-vals='{{ {"citation": citation} | tojson }}' hx-trigger="load"{% endif %}>
   {%- if citation %}<p class="note">Searching this Work for the sentence that cited it…</p>{% endif -%}
 </section>
@@ -77,6 +77,7 @@
     </ul>
   </details>
   {% endif %}
+  <section id="cited-by" aria-label="Cited by" hx-get="/works/{{ work.id }}/cited-by" hx-trigger="load, trail:shown from:body"></section>
   <p class="hint">Click a Citation in the Work to see its Reference.</p>
   <div id="panel" class="panel" aria-live="polite"></div>
 </aside>

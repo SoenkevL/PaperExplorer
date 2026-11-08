@@ -13,13 +13,17 @@
   let shownAt = 0;
   let current = null;
 
-  const address = ({ work, citation }) => `/works/${work}${citation ? `?citation=${citation}` : ""}`;
-  const reader = ({ work, citation }) => `/works/${work}/reader${citation ? `?citation=${citation}` : ""}`;
+  // `citation` is one in another Work to search for here; `at`, one in this Work to land on.
+  const landing = ({ citation, at }) => (citation ? `?citation=${citation}` : at ? `?at=${at}` : "");
+  const address = (entry) => `/works/${entry.work}${landing(entry)}`;
+  const reader = (entry) => `/works/${entry.work}/reader${landing(entry)}`;
+  const number = (text) => (text ? Number(text) : null);
 
   const first = host.querySelector("iframe");
   const opened = {
     work: Number(first.dataset.work),
-    citation: first.dataset.citation ? Number(first.dataset.citation) : null,
+    citation: number(first.dataset.citation),
+    at: number(first.dataset.at),
     label: first.dataset.label,
   };
   const kept = history.state?.trail;
@@ -32,7 +36,7 @@
     frame.src = reader(entry);
     frame.addEventListener("load", () => wire(frame));
     host.append(frame);
-    frames.set(entry.work, { frame, shown: 0, citation: entry.citation });
+    frames.set(entry.work, { frame, shown: 0, citation: entry.citation, at: entry.at });
     return frames.get(entry.work);
   }
 
@@ -49,6 +53,11 @@
       held.pending = null;
       ask(held, citation);
     }
+    if (held?.pendingAt) {
+      const at = held.pendingAt;
+      held.pendingAt = null;
+      land(held, at);
+    }
   }
 
   function onClick(event) {
@@ -62,7 +71,8 @@
     }
     jump({
       work: Number(link.dataset.work),
-      citation: Number(link.dataset.citation),
+      citation: number(link.dataset.citation),
+      at: number(link.dataset.at),
       label: link.dataset.label,
     });
   }
@@ -70,12 +80,14 @@
   function jump(entry) {
     trail = [...trail, entry];
     history.pushState({ trail }, "", address(entry));
-    show(entry);
+    show(entry, true);
   }
 
   // A frame open on another Citation asks where this one lands, or asks once it has loaded.
   function ask(held, citation) {
     held.citation = citation;
+    held.at = null;
+    held.pendingAt = null;
     const inFrame = held.frame.contentWindow;
     const strip = held.frame.contentDocument?.getElementById("arrival");
     if (!inFrame?.htmx || !strip) {
@@ -92,10 +104,26 @@
     });
   }
 
-  function show(entry) {
-    const held = frames.get(entry.work) ?? create(entry);
+  // A frame open elsewhere goes to this Citation of its own, or does once it has loaded.
+  function land(held, at) {
+    held.at = at;
+    held.citation = null;
+    held.pending = null;
+    const page = held.frame.contentDocument;
+    if (!page || !wired.has(page) || page.readyState !== "complete") {
+      held.pendingAt = at;
+      return;
+    }
+    page.dispatchEvent(new CustomEvent("citation:land", { detail: at }));
+  }
+
+  // `clicked`: a Jump lands even where the frame already is, as the reader may have scrolled since.
+  function show(entry, clicked = false) {
+    const open = frames.get(entry.work);
+    const held = open ?? create(entry);
     held.shown = ++shownAt;
     if (entry.citation && held.citation !== entry.citation) ask(held, entry.citation);
+    else if (open && entry.at && (clicked || held.at !== entry.at)) land(held, entry.at);
     current = held.frame;
     for (const { frame } of frames.values()) {
       frame.classList.toggle("on", frame === current);
@@ -103,6 +131,8 @@
     }
     render();
     current.contentWindow?.focus();
+    // What changed in another frame may show here (the Cited by list).
+    current.contentDocument?.body?.dispatchEvent(new CustomEvent("trail:shown"));
     evict();
   }
 
@@ -180,7 +210,7 @@
     show(trail.at(-1));
   });
 
-  frames.set(opened.work, { frame: first, shown: ++shownAt, citation: opened.citation });
+  frames.set(opened.work, { frame: first, shown: ++shownAt, citation: opened.citation, at: opened.at });
   current = first;
   first.addEventListener("load", () => wire(first));
   // The frame may have loaded before this script ran.

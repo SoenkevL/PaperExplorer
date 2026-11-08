@@ -132,6 +132,29 @@ def test_a_later_question_rewrites_only_its_own_request() -> None:
     assert conversation.questions == 2
 
 
+def test_by_retrieval_a_later_question_keeps_every_search_and_its_own_call_id() -> None:
+    conversation = _conversation()
+    first = QuestionHistory.retrieval(conversation, "Earlier?", "[#1] Found.")
+    first.answered([*first.request, _said("Earlier.")], "Earlier.")
+    first.commit()
+
+    second = QuestionHistory.retrieval(conversation, QUESTION, "[#2] Found.")
+    second.answered([*second.request, _said("Later.")], "Later.")
+    second.commit()
+
+    assert _prompts(conversation.messages) == ["Earlier?", QUESTION]
+    assert _texts(conversation.messages) == [[], ["Earlier."], [], ["Later."]]
+    calls = [
+        p.tool_call_id
+        for m in conversation.messages
+        if isinstance(m, ModelResponse)
+        for p in m.parts
+        if isinstance(p, ToolCallPart)
+    ]
+    assert calls == ["forced-1", "forced-2"]
+    assert conversation.questions == 2
+
+
 def test_the_conversation_keeps_the_draft_as_cut_and_no_thinking() -> None:
     conversation = _conversation()
     history = QuestionHistory.retrieval(conversation, QUESTION, "[#1] Found.")

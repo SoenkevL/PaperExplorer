@@ -122,6 +122,14 @@
     const next = Number(step.dataset.at ?? -1) + 1;
     const at = next < ids.length ? next : 0;
     step.dataset.at = String(at);
+    // Its Jump goes from the Citation shown (trail.js reads these).
+    const jump = step.closest("li")?.querySelector("a.jump");
+    if (jump) {
+      jump.dataset.citation = ids[at];
+      const url = new URL(jump.href, location.href);
+      url.searchParams.set("citation", ids[at]);
+      jump.href = url.pathname + url.search;
+    }
     const pill = Array.from(document.querySelectorAll("a.citation")).find((a) =>
       new URL(a.href, location.href).searchParams.getAll("c").includes(ids[at]),
     );
@@ -197,6 +205,13 @@
     handle.addEventListener("pointermove", move);
     handle.addEventListener("pointerup", end);
     handle.addEventListener("pointercancel", end);
+  });
+
+  // Another frame on the Trail changed the theme.
+  window.addEventListener("storage", (event) => {
+    if (event.key !== "pe.theme") return;
+    if (event.newValue) document.documentElement.dataset.theme = event.newValue;
+    render();
   });
 
   // Crossing a width turns an overlay back into a column (or the other way): start it closed.

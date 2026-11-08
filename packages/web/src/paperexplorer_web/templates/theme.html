@@ -1,0 +1,8 @@
+{# The theme the reader chose (panes.js stores it), set before the stylesheet paints so the
+   page never flashes the other one. Without a choice the system's light or dark decides. #}
+<script>
+  try {
+    const theme = localStorage.getItem("pe.theme");
+    if (theme === "paper" || theme === "night") document.documentElement.dataset.theme = theme;
+  } catch {}
+</script>

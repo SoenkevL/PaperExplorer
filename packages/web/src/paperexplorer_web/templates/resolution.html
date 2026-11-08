@@ -13,6 +13,9 @@
   <p class="state"><span class="level {{ res.level }}">{{ res.level }}</span> {{ sources[res.layer] }}</p>
   {{ work_brief(res.work) }}
   {% if res.doi_conflict %}{{ pick(res.work) }}{% endif %}
+  {% if res.firm %}
+  {% with source_id = res.work.id, label = work_label(res.work), has_text = res.work.has_text, has_pdf = res.work.has_pdf, running = false, ask_first = true, message = none %}{% include "source.html" %}{% endwith %}
+  {% endif %}
   {% elif res.state == "unchecked" %}
   <p class="state">Unchecked Reference: neither your Library nor an earlier Check knows its Work.</p>
   {% elif res.chosen %}

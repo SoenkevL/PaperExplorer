@@ -2,6 +2,10 @@
 {%- macro work_brief(w) -%}
 <p class="work-brief"><span class="title">{{ w.title or w.zotero_key or w.doi }}</span>
   <span class="byline">{{ w.creators | join("; ") }}{% if w.year %} ({{ w.year }}){% endif %}</span>
-  {%- if w.doi %} · <a href="https://doi.org/{{ w.doi }}">{{ w.doi }}</a>{% endif %}
+  {%- if w.doi %} · <a href="https://doi.org/{{ w.doi }}" target="_blank" rel="noopener">{{ w.doi }}</a>{% endif %}
   {%- if not w.zotero_key %} <span class="note">not in your Library</span>{% endif %}</p>
+{%- endmacro -%}
+{#- A Jump: trail.js takes the click in a frame; alone, it is a link that lands the same way. -#}
+{%- macro jump_link(id, label, citation) -%}
+<a class="jump" href="/works/{{ id }}?citation={{ citation }}" data-work="{{ id }}" data-citation="{{ citation }}" data-label="{{ label }}">Jump to Source</a>
 {%- endmacro -%}

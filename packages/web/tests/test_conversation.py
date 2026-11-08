@@ -94,7 +94,7 @@ class FakeApi:
 
 
 def test_the_work_page_has_the_conversation_sidebar_beside_the_reader() -> None:
-    page = FakeApi().client().get("/works/7").text
+    page = FakeApi().client().get("/works/7/reader").text
 
     sidebar = re.search(r'<aside id="conversation"[^>]*>(.*?)</aside>', page, re.S)
     assert sidebar, "no Conversation sidebar"
@@ -113,7 +113,7 @@ def test_the_work_page_has_the_conversation_sidebar_beside_the_reader() -> None:
 
 
 def test_below_64rem_the_sidebar_is_a_drawer_opened_by_a_button() -> None:
-    page = FakeApi().client().get("/works/7").text
+    page = FakeApi().client().get("/works/7/reader").text
     css = FakeApi().client().get("/static/style.css").text
 
     toggle = re.search(r"<button[^>]*drawer-toggle[^>]*>", page)

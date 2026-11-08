@@ -18,12 +18,21 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from paperexplorer.asking import AskingContext
 from paperexplorer.config import Settings
-from paperexplorer.domain import Attachment, CitationId, LibraryItem, WorkId
+from paperexplorer.domain import (
+    Attachment,
+    CitationId,
+    Layer,
+    Level,
+    LibraryItem,
+    Resolution,
+    ResolutionState,
+    WorkId,
+)
 from paperexplorer.embedding import FakeEmbedder
 from paperexplorer.library import InMemoryLibrary
 from paperexplorer.pipeline import STAGES, StageContext, run_stage
 from paperexplorer.resolution import InMemoryDoiRegistry
-from paperexplorer.store import CitationGraphs, Works
+from paperexplorer.store import CitationGraphs, Resolutions, Works
 from paperexplorer.tracing import Tracing
 from paperexplorer_api.app import Asking
 from paperexplorer_api.app import create_app as create_api
@@ -86,7 +95,7 @@ def test_every_stored_citation_of_the_work_can_be_opened(
 ) -> None:
     work = explored["villiger2024-tandf"]
 
-    page = reader.get(f"/works/{work}").text
+    page = reader.get(f"/works/{work}/reader").text
 
     linked = {int(c) for url in _panel_targets(page) for c in re.findall(r"c=(\d+)", url)}
     stored = {s.id for s in CitationGraphs(store_db).for_work(work)}
@@ -98,7 +107,7 @@ def test_a_clicked_citation_shows_its_reference_as_printed(
     store_db: Conn, explored: dict[str, WorkId], reader: TestClient
 ) -> None:
     work = explored["villiger2024-tandf"]
-    first = _panel_targets(reader.get(f"/works/{work}").text)[0]
+    first = _panel_targets(reader.get(f"/works/{work}/reader").text)[0]
 
     panel = reader.get(first).text
 
@@ -112,7 +121,7 @@ def test_a_clicked_citation_shows_its_reference_as_printed(
 def test_a_scanned_work_is_marked_as_ocr_text(
     explored: dict[str, WorkId], reader: TestClient
 ) -> None:
-    page = reader.get(f"/works/{explored['scan-villiger2024']}").text
+    page = reader.get(f"/works/{explored['scan-villiger2024']}/reader").text
 
     assert "This is OCR Text" in page
     assert _panel_targets(page)
@@ -144,7 +153,7 @@ def test_a_question_in_the_sidebar_streams_into_an_answer_pointing_into_the_read
     explored: dict[str, WorkId], asking_reader: TestClient
 ) -> None:
     work = explored["villiger2024-tandf"]
-    page = asking_reader.get(f"/works/{work}").text
+    page = asking_reader.get(f"/works/{work}/reader").text
     turn = asking_reader.post(
         f"/works/{work}/questions",
         data={"text": "What did the training involve?", "conversation_id": ""},
@@ -162,3 +171,39 @@ def test_a_question_in_the_sidebar_streams_into_an_answer_pointing_into_the_read
     chips = re.findall(r'<a class="pointer (close|weak)" href="#b(\d+)"', body)
     assert len(chips) == 1
     assert f'id="b{chips[0][1]}"' in page
+
+
+def test_a_jump_goes_from_a_citation_to_the_evidence_in_its_source(
+    store_db: Conn, explored: dict[str, WorkId], asking_reader: TestClient
+) -> None:
+    work, source = explored["villiger2024-tandf"], explored["scan-villiger2024"]
+    first = _panel_targets(asking_reader.get(f"/works/{work}/reader").text)[0]
+    citation = int(re.findall(r"c=(\d+)", first)[0])
+    detail = CitationGraphs(store_db).get(CitationId(citation))
+    assert detail is not None and detail.reference is not None
+    Resolutions(store_db).replace(
+        work,
+        [
+            Resolution(
+                reference=detail.reference.id,
+                state=ResolutionState.RESOLVED,
+                work=source,
+                level=Level.CERTAIN,
+                confidence=1.0,
+                layer=Layer.LIBRARY,
+            )
+        ],
+    )
+
+    panel = html.unescape(asking_reader.get(first).text)
+    assert f'href="/works/{source}?citation={citation}"' in panel
+
+    shell = asking_reader.get(f"/works/{source}", params={"citation": citation}).text
+    assert f'src="/works/{source}/reader?citation={citation}"' in shell
+
+    strip = asking_reader.post(f"/works/{source}/arrival", data={"citation": citation}).text
+    places = re.findall(r'data-block="(\d+)"', strip)
+    assert places
+    page = asking_reader.get(f"/works/{source}/reader", params={"citation": citation}).text
+    assert f'id="b{places[0]}"' in page
+    assert detail.citation.citing_sentence in html.unescape(strip)

@@ -4,6 +4,9 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Added
+- Retrieval Runs: `retrieval.find_evidence` searches a Source with a Citation's Citing Sentence and records the ranking (migration 0011), reusing it until the Source's Chunks or the model change. `POST /citations/{id}/retrieval-runs` answers the Evidence or why there is none, and `ApiClient.find_evidence` mirrors it. `Resolution` gains `firm`, `WorkBrief` gains `has_text` and `has_pdf`. The groundwork for Jumps (docs/design-jumping.md, ADR 0015); CONTEXT.md gains Jump and Trail.
+
 ### Fixed
 - API: a Library Item read as a Stage Run ended no longer shows a Stage still `running`. Its run is now read before its Stages, not after, so the Stages read are those the run left.
 - Parsing: an author-year Citation whose PDF links the names and the year apart with `, ` or ` (` between them (`Brown` and `2020` of `(Brown, 2020; …)`) is one Citation marker again. The year stayed a second marker inside GROBID's wider one, so the reader showed the year and the trailing `;` as links of their own (101 doubled Citations on the cached Work `VHI7PT4K`, 1 left: a bare year that is its own Reference). Works parsed before need `parse` re-run.

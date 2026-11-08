@@ -133,6 +133,12 @@ class Chunks:
     def replace(self, work: WorkId, chunks: Sequence[Chunk]) -> None:
         """Store `chunks` as the Work's, dropping any cut before; each must name a stored block."""
         with self._conn.transaction(), self._conn.cursor() as cur:
+            # A Run's ranking stands only for the Chunks it ranked.
+            cur.execute(
+                "DELETE FROM retrieval_runs WHERE id IN"
+                " (SELECT run FROM retrieval_run_works WHERE work = %s)",
+                (work,),
+            )
             cur.execute("DELETE FROM chunks WHERE work_id = %s", (work,))
             cur.executemany(
                 "INSERT INTO chunks (work_id, position, block, span, text, sentences,"

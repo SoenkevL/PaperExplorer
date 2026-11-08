@@ -121,6 +121,8 @@ class WorkBrief(BaseModel):
     creators: list[str]
     year: int | None
     doi: str | None
+    has_text: bool  # parsed, so its page can be read and jumped to
+    has_pdf: bool
 
 
 class StartExploration(BaseModel):
@@ -254,6 +256,28 @@ class Resolution(BaseModel):
     layer: Literal["library", "crossref", "openalex", "reader"] | None
     doi_conflict: WorkBrief | None
     chosen: bool
+    firm: bool
+
+
+class Evidence(BaseModel):
+    """A Chunk a Retrieval Run ranked: its place in a block of the Source, by code points."""
+
+    rank: int
+    block: int
+    start: int
+    end: int
+    page: int
+    heading_path: list[str]
+
+
+class EvidenceSearch(BaseModel):
+    """Where a Jump from a Citation lands: its Source's Evidence, or the `reason` it has none."""
+
+    citation: int
+    citing_sentence: str
+    work: WorkBrief
+    evidence: list[Evidence]
+    reason: Literal["no_chunks", "no_vectors", "embedder_unreachable", "no_match"] | None
 
 
 class Reference(BaseModel):

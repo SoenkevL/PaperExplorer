@@ -17,6 +17,7 @@ from paperexplorer_api.schemas import (
     CollectionTree,
     Conversation,
     DuplicateItems,
+    EvidenceSearch,
     Exploration,
     ExplorationProposal,
     Health,
@@ -120,6 +121,15 @@ class ApiClient:
     def citation(self, citation_id: int) -> CitationDetail:
         """One Citation with its Citation Link and Reference."""
         return CitationDetail.model_validate(self._get(f"/citations/{citation_id}"))
+
+    def find_evidence(self, citation_id: int) -> EvidenceSearch:
+        """Where a Jump from a Citation lands; `ConflictError` with no firm Source with text."""
+        path = f"/citations/{citation_id}/retrieval-runs"
+        # Not a stream, but it can wait as long as one: the Embedder may be loading its model.
+        with self._http.stream("POST", path, json=None, timeout=STREAM_TIMEOUT_S) as response:
+            response.read()
+            _check(response, path)
+            return EvidenceSearch.model_validate(response.json())
 
     def start_conversation(self, work_id: int) -> Conversation:
         """A new Conversation about a Work; `ConflictError` until its Chunks are embedded."""

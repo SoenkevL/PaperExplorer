@@ -10,13 +10,10 @@ never shown; each Question is one `question` trace.
 """
 
 import asyncio
-import hashlib
 import logging
-import re
 import time
 from collections.abc import AsyncIterator, Callable, Container
 from dataclasses import dataclass, replace
-from importlib import resources
 
 import psycopg
 from psycopg.rows import TupleRow
@@ -46,7 +43,7 @@ from pydantic_ai.settings import ModelSettings, merge_model_settings
 from pydantic_ai.tools import ToolDefinition
 from pydantic_ai.usage import UsageLimits
 
-from paperexplorer.asking.answers import resolve_answer
+from paperexplorer.asking.answers import has_words, resolve_answer, wants_handles
 from paperexplorer.asking.conversation import Conversation
 from paperexplorer.asking.draft import DraftCut, answer_draft
 from paperexplorer.asking.events import (
@@ -56,6 +53,15 @@ from paperexplorer.asking.events import (
     ErrorEvent,
     RedraftEvent,
     StepEvent,
+)
+from paperexplorer.asking.prompts import (
+    LAST_REQUEST,
+    NO_TOOLS,
+    PROMPT_VERSION,
+    QUESTION_LABEL,
+    REDRAFT,
+    SYSTEM_PROMPT,
+    WHOLE_SEED,
 )
 from paperexplorer.asking.reading import Reading
 from paperexplorer.asking.tools import SeedTools
@@ -68,46 +74,13 @@ from paperexplorer.tracing import Tracing
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = (resources.files("paperexplorer.asking") / "system-prompt.md").read_text("utf-8")
 # At most this many model requests per Question; the last one offers no tools.
 REQUEST_LIMIT = 6
-LAST_REQUEST = (
-    "This is your last request for this Question: no tools are left. Answer now from what you"
-    " have read, and where it does not settle the Question, say what the Seed does not say."
-)
-# A Seed that fits is read whole instead of searched (ADR 0010): the eval's baseline, unchanged.
-WHOLE_SEED = (
-    "For this Question you have no tools, and no search has run: the Seed's whole text is below,"
-    " every Chunk under its handle. What is said above about searching and reading with tools"
-    " does not apply; read the text below instead. Everything else above does."
-)
-NO_TOOLS = (
-    "You have no tools for this Question: the Seed's whole text is in your instructions. Answer"
-    " now from it, and where it does not settle the Question, say what the Seed does not say."
-)
-# Reading the whole Seed, the request closes with one turn: `NO_TOOLS`, then this, then the
-# Question, last. As a turn of its own after the Question, the note was taken for the reader's
-# message, and another Question answered (docs/eval-2026-10-31.md).
-QUESTION_LABEL = "The reader's Question:"
-# An Answer from the whole Seed that gives no handle is asked for them once more.
-REDRAFT = (
-    "Your Answer above gives no handle. Write it again word for word, and after each sentence"
-    " write the handle of the Chunk it rests on, such as [#7], right after its full stop. A"
-    " sentence that says what the Seed does not say gets no handle. Change nothing else."
-)
 NO_ANSWER = "The model gave no Answer."
-# The prompt's version hashes every text of ours the model reads, so an edit cannot forget it.
-PROMPT_VERSION = hashlib.sha256(
-    "\n\n".join(
-        [SYSTEM_PROMPT, LAST_REQUEST, WHOLE_SEED, NO_TOOLS, QUESTION_LABEL, REDRAFT]
-    ).encode()
-).hexdigest()[:12]
 # Probed on the tower (Ollama 0.40.3, 2026-10-31): `reasoning_effort: "none"` is what Ollama's
 # OpenAI-compatible endpoint honours, so no `reasoning` comes back. pydantic-ai's unified
 # `thinking=False` sends nothing to Ollama, and `think: false` in the body is ignored there.
 _WITHOUT_THINKING = OpenAIChatModelSettings(openai_reasoning_effort="none")
-# "The Seed does not say …", the form the prompt asks for where the Seed does not answer.
-_NOT_SAID = re.compile(r"\bthe seed (?:does not|doesn't|did not|didn't) say\b", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -309,10 +282,10 @@ async def _answer(
     result = await _run(agent, tools, conversation.handles, history, REQUEST_LIMIT, tally, emit)
     draft = answer_draft(result.output)
     answer = _resolve(ctx, tools, conversation, draft)
-    if not any(c.isalnum() for c in answer.text):
+    if not has_words(answer):
         raise _NoAnswerError
     messages, redrafted = _with_draft(result.all_messages(), draft), False
-    if whole and _wants_handles(answer):
+    if whole and wants_handles(answer):
         again = await _redraft(ctx, agent, tools, conversation, messages, draft, tally, emit)
         if again is not None:
             answer, response = again
@@ -380,24 +353,6 @@ def _resolve(
     return answer
 
 
-def _wants_handles(answer: Answer) -> bool:
-    """Whether an Answer gives no handle, yet has a sentence a Pointer should bear out.
-
-    A sentence saying what the Seed does not say needs none, nor the one after it on what the
-    Seed covers nearby, as the prompt asks: an Answer saying the Seed does not cover the
-    Question is not redrafted.
-    """
-    if answer.unknown_handles or any(s.pointers for s in answer.sentences):
-        return False
-    after_gap = False
-    for sentence in answer.sentences:
-        gap = _NOT_SAID.search(answer.text[sentence.start : sentence.end].replace("\u2019", "'"))
-        if sentence.substantive and not gap and not after_gap:
-            return True
-        after_gap = gap is not None
-    return False
-
-
 async def _redraft(
     ctx: AskingContext,
     agent: Agent[SeedTools, str],
@@ -426,7 +381,7 @@ async def _redraft(
         draft = answer_draft(result.output)
         span.update(output=draft)
     answer = _resolve(ctx, tools, conversation, draft)
-    if not any(c.isalnum() for c in answer.text):
+    if not has_words(answer):
         logger.warning("Asked again for its handles, the model gave no Answer")
         return None
     response = _with_draft(result.all_messages(), draft)[-1]

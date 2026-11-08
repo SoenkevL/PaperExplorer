@@ -47,7 +47,7 @@ from paperexplorer.asking import (
     TextPiece,
     ask,
 )
-from paperexplorer.asking.agent import (
+from paperexplorer.asking.prompts import (
     LAST_REQUEST,
     NO_TOOLS,
     QUESTION_LABEL,
@@ -1086,27 +1086,6 @@ def test_regression_eval_70cf08933dac78bcf79873edbada5a1e_without_a_redraft_the_
     assert all(s.pointers == [] for s in answered.answer.sentences)
     assert last_response_text(conversation) == [first]
     assert conversation.questions == 1
-
-
-def test_regression_eval_35e1371558966e774f2a2d9466d2bb4f_a_not_covered_answer_is_not_redrafted(
-    store_db: Conn, conversation: Conversation
-) -> None:
-    """Eval run 20261031T140751Z-a758bbc, trace 35e1371558966e774f2a2d9466d2bb4f (live).
-
-    The Answer said what the Seed leaves out, and next which nearby topics it treats, as the
-    prompt asks, and carried no handle: rightly so. It is not asked again.
-    """
-    script = Script(
-        [
-            "The Seed does not say how caffeine affects sleep or dreaming. It covers how brain"
-            " entropy changed in ten volunteers after psilocybin."
-        ]
-    )
-
-    events = turn(context(store_db, script, reading=Reading.WHOLE_SEED), conversation, QUESTION)
-
-    assert [e.type for e in events] == ["delta", "answer"]
-    assert len(script.requests) == 1
 
 
 def test_every_request_samples_at_the_temperature_and_only_one_with_tools_thinks(

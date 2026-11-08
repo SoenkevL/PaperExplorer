@@ -61,6 +61,56 @@ class LibraryItem(BaseModel):
     collections: list[str] = []  # keys of the Collections it is filed in
 
 
+class NewItem(BaseModel):
+    """A Library Item PaperExplorer will create for a Source: its type and Zotero fields.
+
+    Creators are `Last, First`, as Zotero writes them; `date` is as the registry gives it.
+    """
+
+    item_type: str = "document"  # Zotero's type for a Work no registry typed
+    title: str | None = None
+    creators: list[str] = []
+    date: str | None = None
+    doi: str | None = None
+    publication: str | None = None
+    volume: str | None = None
+    issue: str | None = None
+    pages: str | None = None
+    url: str | None = None
+
+
+class Exploration(BaseModel):
+    """An Exploration: its Seed and the Exploration Collection that mirrors it in Zotero."""
+
+    id: int
+    seed: WorkId
+    collection_key: str
+    name: str
+    created: bool  # Zotero holds the Collection
+    seed_tagged: bool
+    started_at: datetime
+    ended_at: datetime | None = None
+
+
+class FilingState(StrEnum):
+    """Where a Filing stands: its key made, filed, its write failed, or unfiled by the reader."""
+
+    PENDING = "pending"
+    FILED = "filed"
+    FAILED = "failed"
+    REMOVED_BY_READER = "removed_by_reader"
+
+
+class Filing(BaseModel):
+    """A Work PaperExplorer files, or filed, in an Exploration Collection, by its item's key."""
+
+    work: WorkId
+    item_key: str
+    state: FilingState
+    error: str | None = None
+    updated_at: datetime
+
+
 class LibraryChanges(BaseModel):
     """What changed in the Library since a version: items and Collections now, keys that went.
 
@@ -158,6 +208,11 @@ class Resolution(BaseModel):
         if self.layer is Layer.READER:
             return True
         return self.state is ResolutionState.RESOLVED and self.level is not Level.LOW
+
+    @property
+    def awaiting_choice(self) -> bool:
+        """Matched only at low confidence, and the reader has not chosen: it waits for them."""
+        return self.state is ResolutionState.RESOLVED and self.level is Level.LOW and not self.firm
 
     @property
     def library_match(self) -> bool:

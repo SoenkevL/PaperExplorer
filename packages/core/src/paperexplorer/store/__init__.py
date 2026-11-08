@@ -8,6 +8,7 @@ from paperexplorer.store.collections import (
     CollectionCounts,
     Collections,
 )
+from paperexplorer.store.explorations import Explorations, PaperExplorerCollection
 from paperexplorer.store.library_sync import LibraryVersions
 from paperexplorer.store.migrate import migrate
 from paperexplorer.store.readers_choices import ReadersChoices
@@ -27,8 +28,10 @@ __all__ = [
     "CollectionCount",
     "CollectionCounts",
     "Collections",
+    "Explorations",
     "LibraryRow",
     "LibraryVersions",
+    "PaperExplorerCollection",
     "Placing",
     "ReadersChoices",
     "RegistryResponse",

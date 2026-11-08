@@ -5,4 +5,6 @@ Bibliographic metadata, PDFs and Exploration collections live in Zotero, written
 ## Consequences
 
 - Zotero's API does not deduplicate on create, so Postgres keeps an identifier table (DOI / arXiv / OpenAlex → Zotero key) checked before every create, with a Zotero search as final check.
+
+Amended 2026-11-07 by [ADR 0014](0014-zotero-writes-stay-in-the-paperexplorer-collection.md): the Web API cannot search by DOI ([research](../research/2026-11-zotero-writes.md)), so the final check is an incremental sync just before the create, then the identifier table, which reads DOIs from `extra` too.
 - Everything in Postgres and `data/cache/` must be rebuildable from Zotero plus the pipeline.

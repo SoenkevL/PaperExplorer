@@ -8,7 +8,14 @@ from pydantic import BaseModel
 
 from paperexplorer.domain import Work
 from paperexplorer.library.port import ItemNotFoundError, Library, LibraryUnavailableError
-from paperexplorer.store import Collections, LibraryVersions, ReadersChoices, Resolutions, Works
+from paperexplorer.store import (
+    Collections,
+    Explorations,
+    LibraryVersions,
+    ReadersChoices,
+    Resolutions,
+    Works,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +84,11 @@ def sync(conn: psycopg.Connection[TupleRow], library: Library, *, full: bool = F
         gone_collections |= collections.keys() - {c.key for c in changes.collections}
     collections_removed = collections.remove(gone_collections)  # their filing goes with them
     known = collections.keys()
+    explorations = Explorations(conn)
+    for ended in explorations.end_gone(known):
+        logger.info(
+            "Exploration Collection %s went from the Library: its Exploration ends", ended.name
+        )
     for orphan in (c for c in changes.collections if c.parent_key not in known | {None}):
         logger.warning(
             "Collection %s names a parent %s the Library does not hold; it shows as a root",
@@ -102,6 +114,7 @@ def sync(conn: psycopg.Connection[TupleRow], library: Library, *, full: bool = F
             if (old := works.find(replaced)) is not None and old.id != work:
                 moved += Resolutions(conn).repoint(old.id, work)
                 ReadersChoices(conn).repoint(old.id, work)
+    explorations.note_items(items.values())  # a Filing the reader took out in Zotero
     if changes.full:
         gone |= works.zotero_keys() - items.keys()
     for key in gone:

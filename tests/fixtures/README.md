@@ -17,3 +17,5 @@ Open-access papers under Creative Commons Attribution licences, redistributed un
 `handle-forms.json` is the table of handle forms that core's `asking` reads, in the resolved Answer and in the streamed draft (`docs/design-asking.md`, Answers): each draft written for the test around a form an eval run recorded, named by its trace, or a plain one. No words of the Seed or of an Answer are in it.
 
 `zotero/collections.json` and `zotero/deleted.json` are hand-written Web API v3 answers to `GET /collections` and `GET /deleted`, built from Zotero's docs and the dataserver source (`docs/research/2026-11-zotero-collections.md`), not recorded: a root, a nested branch, a trashed Collection (`data.deleted: true`) with a subcollection Zotero does not mark, and a deleted key.
+
+`crossref-neubiorev-2022-104689.json` is Crossref's record for doi:10.1016/j.neubiorev.2022.104689 as the tower's registry cache held it on 2026-11-07, cut to the fields a new Library Item reads and the first three authors. Its `container-title` carries `&amp;`, which the first live Exploration wrote into Zotero as is.

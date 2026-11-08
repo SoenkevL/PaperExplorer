@@ -17,6 +17,8 @@ from paperexplorer_api.schemas import (
     CollectionTree,
     Conversation,
     DuplicateItems,
+    Exploration,
+    ExplorationProposal,
     Health,
     Ingest,
     LibraryPage,
@@ -26,6 +28,7 @@ from paperexplorer_api.schemas import (
     Merged,
     ReadersChoice,
     Resolution,
+    StartExploration,
     WorkBrief,
     WorkSummary,
     WorkText,
@@ -253,8 +256,25 @@ class ApiClient:
         _check(self._http.request("DELETE", path), path)
 
     def resolve_references(self, work_id: int) -> LibraryWork:
-        """Start the Stages that resolve an Ingested Work's References."""
+        """Start the Stages that resolve a parsed Work's References."""
         return LibraryWork.model_validate(self._send("POST", f"/works/{work_id}/resolving"))
+
+    def start_exploration(self, work_id: int, *, check: bool = False) -> Exploration:
+        """Start the Seed's Exploration or resume it; `ConflictError` if it cannot be a Seed now.
+
+        With `check`, a Registry Check of the Unchecked References follows its Stages.
+        """
+        body = StartExploration(check=check).model_dump()
+        return Exploration.model_validate(self._send("POST", f"/works/{work_id}/exploration", body))
+
+    def exploration_proposal(self, work_id: int) -> ExplorationProposal:
+        """What starting the Work's Exploration would make; `ConflictError` if it has no PDF."""
+        path = f"/works/{work_id}/exploration/proposal"
+        return ExplorationProposal.model_validate(self._get(path))
+
+    def exploration(self, work_id: int) -> Exploration:
+        """Where the Seed's Exploration stands; `NotFoundError` if it has none."""
+        return Exploration.model_validate(self._get(f"/works/{work_id}/exploration"))
 
     def _get(self, path: str) -> Any:
         response = self._http.get(path)

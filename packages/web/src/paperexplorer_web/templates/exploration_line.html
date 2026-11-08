@@ -1,0 +1,11 @@
+{#- A Seed's Exploration in a line: its Collection, its counts, what keeps it partial, Resume. -#}
+{%- macro exploration_line(x, work_id, place) -%}
+<p class="exploration">Exploration <span class="name" title="Its Collection in your PaperExplorer Collection">{{ x.exploration.name }}</span>: {{ x.counts }}
+  {%- if x.missing %}<span class="missing">; {{ x.missing | join(", ") }}</span>{% endif %}
+  {%- if x.resume %}
+  <button type="button" hx-post="/works/{{ work_id }}/exploration" hx-vals='{{ {"place": place} | tojson }}' {% if place == "page" %}hx-target="#exploration" hx-swap="innerHTML"{% else %}hx-target="closest li" hx-swap="outerHTML"{% endif %}>Resume Exploration</button>
+  {%- endif %}</p>
+{%- for f in x.exploration.failed %}
+<p class="failed">Not filed: {{ f.work.title or f.work.zotero_key or f.work.doi }}{% if f.error %}: {{ f.error }}{% endif %}</p>
+{%- endfor %}
+{%- endmacro -%}

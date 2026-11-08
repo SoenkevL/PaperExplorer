@@ -1,5 +1,7 @@
 """Readers' Choices: the Work the reader picked for a Reference, or none."""
 
+from datetime import datetime
+
 import psycopg
 from psycopg.rows import TupleRow
 
@@ -15,9 +17,9 @@ class ReadersChoices:
     def choose(self, work: WorkId, printed: str, chosen: WorkId | None) -> None:
         """Record that the Reference printed so names `chosen`, or no Work when `None`."""
         self._conn.execute(
-            "INSERT INTO readers_choices (work_id, printed, chosen_work_id) VALUES (%s, %s, %s)"
-            " ON CONFLICT (work_id, printed) DO UPDATE"
-            " SET chosen_work_id = EXCLUDED.chosen_work_id, chosen_at = now()",
+            "INSERT INTO readers_choices (work_id, printed, chosen_work_id, chosen_at)"
+            " VALUES (%s, %s, %s, clock_timestamp()) ON CONFLICT (work_id, printed) DO UPDATE"
+            " SET chosen_work_id = EXCLUDED.chosen_work_id, chosen_at = clock_timestamp()",
             (work, printed, chosen),
         )
 
@@ -42,3 +44,12 @@ class ReadersChoices:
         return self._conn.execute(
             "UPDATE readers_choices SET chosen_work_id = %s WHERE chosen_work_id = %s", (new, old)
         ).rowcount
+
+    def chosen_at(self, work: WorkId) -> dict[WorkId, datetime]:
+        """When the reader last chose each Work for one of this Work's References."""
+        rows = self._conn.execute(
+            "SELECT chosen_work_id, max(chosen_at) FROM readers_choices"
+            " WHERE work_id = %s AND chosen_work_id IS NOT NULL GROUP BY chosen_work_id",
+            (work,),
+        ).fetchall()
+        return {WorkId(chosen): at for chosen, at in rows}

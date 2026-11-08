@@ -8,23 +8,26 @@ from dataclasses import dataclass
 
 import psycopg
 from fastapi import FastAPI
+from psycopg.rows import TupleRow
 
 from paperexplorer import __version__
 from paperexplorer.config import Settings
-from paperexplorer.library import ZoteroLibrary
+from paperexplorer.domain import WorkId
+from paperexplorer.library import Library, ZoteroLibrary
 from paperexplorer.logs import configure_logging
 from paperexplorer.resolution import DoiOrgRegistry, shared_registries
 from paperexplorer.store import StageStatuses
 from paperexplorer.wiring import Wiring
 from paperexplorer_api.asking_thread import AskingContexts, AskingThread
 from paperexplorer_api.conversations import Conversations
-from paperexplorer_api.routes import Connections, checks, citations, works
+from paperexplorer_api.routes import Connections, checks, citations, explorations, works
 from paperexplorer_api.routes import conversations as conversation_routes
 from paperexplorer_api.routes.checks import Checking
 from paperexplorer_api.routes.ingesting import Ingesting
 from paperexplorer_api.routes.ingesting import router as ingesting_routes
+from paperexplorer_api.routes.views import refile
 from paperexplorer_api.schemas import Health
-from paperexplorer_api.stage_run_thread import StageRunThread
+from paperexplorer_api.stage_run_thread import AfterStage, StageRunThread
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +54,16 @@ def _interrupt_running(connections: Connections) -> None:
         logger.warning("%d Stages were interrupted by a restart", interrupted)
 
 
+def _filing_after_resolve(library: Library) -> AfterStage:
+    """As `resolve` commits, file what changed for the Work's Exploration, if it has one."""
+
+    def after(conn: psycopg.Connection[TupleRow], work: WorkId, stage: str) -> None:
+        if stage == "resolve":
+            refile(conn, library, work)
+
+    return after
+
+
 def create_app(
     connections: Connections,
     asking: Asking | None = None,
@@ -63,7 +76,8 @@ def create_app(
     With `asking`, it also holds Conversations and answers their Questions, each turn on the
     asking thread with a store connection of its own; without, it serves Works and Citations.
     With `checking`, it runs Registry Checks, takes Readers' Choices and lists Duplicate Items.
-    With `ingesting`, it lists the Library and runs Stages on a thread of their own.
+    With `ingesting`, it lists the Library and runs Stages on a thread of their own; with
+    `checking` too, it starts Explorations and files their Sources as their Resolutions change.
     """
     thread = AskingThread(connections, asking.contexts) if asking else None
     stage_run_thread = (
@@ -71,6 +85,7 @@ def create_app(
             connections,
             ingesting.context,
             forget_work=asking.conversations.forget_work if asking else None,
+            after_stage=_filing_after_resolve(ingesting.library),
         )
         if ingesting
         else None
@@ -98,6 +113,10 @@ def create_app(
         app.include_router(checks.router(connections, checking))
     if ingesting is not None and stage_run_thread is not None:
         app.include_router(ingesting_routes(connections, ingesting, stage_run_thread))
+    if ingesting is not None and stage_run_thread is not None and checking is not None:
+        app.include_router(
+            explorations.router(connections, ingesting.library, checking, stage_run_thread)
+        )
     if asking is not None and thread is not None:
         app.include_router(
             conversation_routes.router(connections, asking.contexts, asking.conversations, thread)

@@ -529,3 +529,55 @@ def test_check_refuses_a_work_not_yet_parsed(cli_env: None) -> None:
 
     assert result.exit_code == 1
     assert "run `paperexplorer run parse NOSUCHKY` first" in result.output
+
+
+def _done(url: str, key: str) -> None:
+    """Record every Stage done for the Work, as if it had been Ingested and resolved."""
+    with psycopg.connect(url, autocommit=True) as conn:
+        work = store.Works(conn).ensure(key)
+        for stage in STAGES:
+            store.StageStatuses(conn).start(work, stage)
+            store.StageStatuses(conn).done(work, stage, {})
+
+
+def test_explore_files_the_seed_and_its_firm_sources_in_a_new_exploration_collection(
+    library: InMemoryLibrary, scratch_database_url: str
+) -> None:
+    library.put(
+        LibraryItem(key="SEED1111", title="The Seed", creators=["Seed, Sam"], year=2024,
+                    pdf=Attachment(key="SEEDPDF1", filename="seed.pdf"))
+    )  # fmt: skip
+    _resolved_seed(scratch_database_url)
+    _done(scratch_database_url, "SEED1111")
+
+    result = CliRunner().invoke(app, ["explore", "SEED1111"])
+    shown = CliRunner().invoke(app, ["exploration", "SEED1111"])
+
+    assert result.exit_code == 0, result.output
+    assert "Exploration Collection: Seed 2024 \N{EN DASH} The Seed" in result.stdout
+    assert "2 filed" in result.stdout and "1 Unchecked" in result.stdout
+    (expl,) = [c for c in library.changes(None).collections if c.parent_key is not None]
+    filed = sorted(i.key for i in library.changes(None).items if expl.key in i.collections)
+    assert filed == ["ATTNCOPY", "SEED1111"]
+    assert shown.stdout == result.stdout
+
+
+def test_explore_refuses_a_work_without_a_pdf(library: InMemoryLibrary) -> None:
+    CliRunner().invoke(app, ["sync"])
+
+    result = CliRunner().invoke(app, ["explore", "ATTN2017"])
+
+    assert result.exit_code == 1
+    assert "no Library Item with a PDF" in result.output
+    assert [c for c in library.changes(None).collections] == []
+
+
+def test_exploration_of_a_seed_without_one_says_how_to_start_it(
+    library: InMemoryLibrary,
+) -> None:
+    CliRunner().invoke(app, ["sync"])
+
+    result = CliRunner().invoke(app, ["exploration", "SEED1111"])
+
+    assert result.exit_code == 1
+    assert "paperexplorer explore SEED1111" in result.stdout

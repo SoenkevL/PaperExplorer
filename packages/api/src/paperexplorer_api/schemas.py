@@ -74,8 +74,32 @@ class WorkSummary(BaseModel):
 # The Stages of Ingesting, which make a Work Ingested, and of resolving its References, in order.
 INGESTING_STAGES = ("fetch", "parse", "chunk", "embed", "extract_citations")
 RESOLVING_STAGES = ("verify_dois", "resolve")
+# What each Stage reads, as `pipeline.READS` has it: after `parse` the Stages branch.
+STAGE_READS: dict[str, tuple[str, ...]] = {
+    "fetch": (),
+    "parse": ("fetch",),
+    "chunk": ("parse",),
+    "embed": ("chunk",),
+    "extract_citations": ("parse",),
+    "verify_dois": ("parse",),
+    "resolve": ("parse", "verify_dois"),
+}
 # Running these replaces the Chunks a Conversation holds.
 TEXT_STAGES = ("parse", "chunk")
+
+
+def downstream_of(stage: str) -> tuple[str, ...]:
+    """The Stages that read what `stage` stores, directly or through another, in Stage order."""
+    found = {stage}
+    for later in STAGE_READS:
+        if any(read in found for read in STAGE_READS[later]):
+            found.add(later)
+    return tuple(s for s in STAGE_READS if s in found and s != stage)
+
+
+def rerun_stages(stage: str) -> list[str]:
+    """What re-running an Ingesting Stage runs: it and the Ingesting Stages downstream of it."""
+    return [stage, *(s for s in downstream_of(stage) if s in INGESTING_STAGES)]
 
 
 class StageStatus(BaseModel):
@@ -86,6 +110,54 @@ class StageStatus(BaseModel):
     error: str | None
     started_at: datetime
     finished_at: datetime | None
+
+
+class WorkBrief(BaseModel):
+    """A Work a Resolution names: its Library Item, or a registry's record until it has one."""
+
+    id: int
+    zotero_key: str | None
+    title: str | None
+    creators: list[str]
+    year: int | None
+    doi: str | None
+
+
+class StartExploration(BaseModel):
+    """How to start an Exploration: `check` runs a Registry Check after `resolve`."""
+
+    check: bool = False
+
+
+class ExplorationProposal(BaseModel):
+    """What starting an Exploration would make: its Collection's name."""
+
+    name: str
+
+
+class FailedFiling(BaseModel):
+    """A Source whose Filing failed, and why; the next reconcile tries it again."""
+
+    work: WorkBrief
+    error: str | None
+
+
+class Exploration(BaseModel):
+    """A Seed's Exploration: its Collection in Zotero, its Filings, and what is still missing."""
+
+    seed: int
+    collection_key: str
+    name: str
+    created: bool  # Zotero holds the Exploration Collection
+    filed: int
+    failed: list[FailedFiling]
+    removed_by_reader: int
+    not_filed: int  # firm Sources a reconcile has not reached yet
+    awaiting_choice: int  # Sources matched only at low confidence
+    unchecked: int  # References no Registry Check has looked up
+    stages_not_done: list[str]
+    # The Seed's Stage Run, the Check after it included, until it has ended.
+    run: Literal["queued", "running"] | None
 
 
 class LibraryWork(WorkSummary):
@@ -99,6 +171,8 @@ class LibraryWork(WorkSummary):
     collections: list[str]
     # Whether it sits in the Collection, branch or unfiled part browsed; the whole Library is one.
     in_branch: bool
+    # Its Exploration, when it is the Seed of one under way.
+    exploration: Exploration | None = None
 
 
 class LibraryPage(BaseModel):
@@ -125,6 +199,7 @@ class CollectionCount(BranchCount):
     key: str
     name: str
     parent_key: str | None
+    exploration: bool = False  # it mirrors an Exploration under way
 
 
 class CollectionTree(BaseModel):
@@ -144,20 +219,9 @@ class LibrarySynced(BaseModel):
 
 
 class Ingest(BaseModel):
-    """Start Ingesting: from `from_stage` on, else from the first Stage not done."""
+    """Start Ingesting: `from_stage` and its downstream, else the Stages not done and theirs."""
 
     from_stage: str | None = None
-
-
-class WorkBrief(BaseModel):
-    """A Work a Resolution names: its Library Item, or a registry's record until it has one."""
-
-    id: int
-    zotero_key: str | None
-    title: str | None
-    creators: list[str]
-    year: int | None
-    doi: str | None
 
 
 class LibraryMatch(BaseModel):

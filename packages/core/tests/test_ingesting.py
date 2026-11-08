@@ -1,7 +1,8 @@
 """Ingesting: the five Stages run as a chain, resumed where they stopped."""
 
+import dataclasses
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -10,16 +11,21 @@ import pytest
 from psycopg.rows import TupleRow
 
 from paperexplorer.config import Settings
-from paperexplorer.domain import Attachment, LibraryChanges, LibraryItem
-from paperexplorer.embedding import FakeEmbedder
+from paperexplorer.domain import Attachment, LibraryChanges, LibraryItem, WorkId
+from paperexplorer.embedding import FakeEmbedder, Vector
 from paperexplorer.library import InMemoryLibrary, sync
 from paperexplorer.pipeline import (
     INGESTING,
+    READS,
     RESOLVING,
+    STAGES,
     StageContext,
     StageError,
+    StageResult,
+    downstream,
     remaining,
     run_chain,
+    run_stage,
 )
 from paperexplorer.resolution import InMemoryDoiRegistry
 from paperexplorer.store import StageState, StageStatuses, Works, migrate
@@ -73,7 +79,7 @@ def test_a_chain_runs_its_stages_and_leaves_none_remaining(ctx: StageContext) ->
     assert remaining(StageStatuses(ctx.conn).for_work(work)) == []
 
 
-def test_a_chain_stops_at_the_first_failure_and_resumes_there(ctx: StageContext) -> None:
+def test_a_failed_fetch_skips_every_stage_and_ingesting_resumes_there(ctx: StageContext) -> None:
     work = Works(ctx.conn).ensure("NOPDF234")
 
     with pytest.raises(StageError, match="no PDF"):
@@ -83,6 +89,78 @@ def test_a_chain_stops_at_the_first_failure_and_resumes_there(ctx: StageContext)
     assert list(statuses) == ["fetch"]
     assert statuses["fetch"].state is StageState.FAILED
     assert remaining(statuses) == FIVE
+
+
+class _RateLimitedEmbedder(FakeEmbedder):
+    """An Embedder whose hosted Provider has spent its rate limit."""
+
+    def embed(self, texts: Sequence[str]) -> list[Vector]:
+        raise RuntimeError("429 Too Many Requests")
+
+
+def test_a_failed_embed_ends_only_its_branch_and_the_references_are_still_resolved(
+    ctx: StageContext,
+) -> None:
+    work = Works(ctx.conn).ensure("VILL2024")
+    limited = dataclasses.replace(ctx, embedder=_RateLimitedEmbedder())
+
+    with pytest.raises(RuntimeError, match="429"):
+        run_chain(limited, [*INGESTING, *RESOLVING], work)
+
+    states = {name: s.state for name, s in StageStatuses(ctx.conn).for_work(work).items()}
+    assert states == {
+        "fetch": StageState.DONE,
+        "parse": StageState.DONE,
+        "chunk": StageState.DONE,
+        "embed": StageState.FAILED,
+        "extract_citations": StageState.DONE,
+        "verify_dois": StageState.DONE,
+        "resolve": StageState.DONE,
+    }
+    assert remaining(StageStatuses(ctx.conn).for_work(work)) == ["embed"]
+
+
+def test_a_lost_store_after_a_failure_ends_the_chain_with_the_store_s_error(
+    ctx: StageContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression: the chain once ran on past a lost connection and raised the earlier 429."""
+    work = Works(ctx.conn).ensure("VILL2024")
+    limited = dataclasses.replace(ctx, embedder=_RateLimitedEmbedder())
+
+    def lose_the_store(ctx: StageContext, work: WorkId) -> StageResult:
+        raise psycopg.OperationalError("the connection was lost")
+
+    monkeypatch.setitem(STAGES, "extract_citations", lose_the_store)
+
+    with pytest.raises(psycopg.OperationalError, match="connection was lost"):
+        run_chain(limited, [*INGESTING, *RESOLVING], work)
+
+    assert "verify_dois" not in StageStatuses(ctx.conn).for_work(work)
+
+
+def test_a_rerun_makes_pending_only_the_stages_that_read_it(ctx: StageContext) -> None:
+    work = Works(ctx.conn).ensure("VILL2024")
+    run_chain(ctx, [*INGESTING, *RESOLVING], work)
+
+    run_stage(ctx, "chunk", work)
+
+    states = {name: s.state for name, s in StageStatuses(ctx.conn).for_work(work).items()}
+    assert "embed" not in states
+    assert states["extract_citations"] is StageState.DONE
+    assert states["resolve"] is StageState.DONE
+
+
+def test_each_stage_reads_only_stages_before_it() -> None:
+    order = list(STAGES)
+    for name, reads in READS.items():
+        assert all(order.index(read) < order.index(name) for read in reads), name
+
+
+def test_downstream_names_the_stages_that_read_a_stage_directly_or_further_on() -> None:
+    assert downstream("parse") == ["chunk", "embed", "extract_citations", "verify_dois", "resolve"]
+    assert downstream("chunk") == ["embed"]
+    assert downstream("verify_dois") == ["resolve"]
+    assert downstream("extract_citations") == []
 
 
 def test_a_chain_says_when_each_stage_has_committed_and_never_for_a_failed_one(

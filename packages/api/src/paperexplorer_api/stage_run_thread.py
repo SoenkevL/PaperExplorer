@@ -22,6 +22,12 @@ logger = logging.getLogger(__name__)
 type StageContexts = Callable[[psycopg.Connection[TupleRow]], StageContext]
 """A Stage Run's `StageContext` around the store connection it opened for itself."""
 
+type AfterStage = Callable[[psycopg.Connection[TupleRow], WorkId, str], None]
+"""What runs as each Stage of a Stage Run commits, on its connection."""
+
+type Then = Callable[[psycopg.Connection[TupleRow]], None]
+"""What a Stage Run does once its Stages have ended, however they went, on its connection."""
+
 type Run = Literal["queued", "running"]
 
 # A shutdown does not wait for a long Stage: it rolls back, and the next start says so.
@@ -32,6 +38,7 @@ _STOP_WAIT_S = 2.0
 class _Queued:
     work: WorkId
     stages: Sequence[str]
+    then: Then | None = None
 
 
 class StageRunThread:
@@ -43,10 +50,12 @@ class StageRunThread:
         contexts: StageContexts,
         *,
         forget_work: Callable[[WorkId], None] | None = None,
+        after_stage: AfterStage | None = None,
     ) -> None:
         self._connections = connections
         self._contexts = contexts
         self._forget_work = forget_work
+        self._after_stage = after_stage
         self._changed = threading.Condition()
         self._queue: deque[_Queued] = deque()
         self._running: WorkId | None = None
@@ -60,12 +69,15 @@ class StageRunThread:
                 return "running"
             return "queued" if any(q.work == work for q in self._queue) else None
 
-    def submit(self, work: WorkId, stages: Sequence[str]) -> bool:
-        """Queue a run of the Stages; False, and nothing queued, if the Work already has a run."""
+    def submit(self, work: WorkId, stages: Sequence[str], *, then: Then | None = None) -> bool:
+        """Queue a run of the Stages, and `then`; False, and nothing queued, if one holds the Work.
+
+        `then` runs after the Stages even when one failed, short of the store going away.
+        """
         with self._changed:
             if self._running == work or any(q.work == work for q in self._queue):
                 return False
-            self._queue.append(_Queued(work, stages))
+            self._queue.append(_Queued(work, stages, then))
             if self._thread is None:
                 self._stopping = False
                 self._thread = threading.Thread(target=self._serve, name="ingesting", daemon=True)
@@ -111,23 +123,41 @@ class StageRunThread:
         try:
             with self._connections() as conn:
                 ctx = self._contexts(conn)
+                failed: Exception | None = None
                 try:
                     pipeline.run_chain(
                         ctx,
                         queued.stages,
                         queued.work,
-                        after=lambda name: self._after(queued, name),
+                        after=lambda name: self._after(conn, queued, name),
                     )
+                except psycopg.Error:
+                    raise
+                except Exception as e:  # recorded with its Stage; what follows still runs
+                    failed = e
                 finally:
                     ctx.tracing.flush()
+                if queued.then is not None:
+                    try:
+                        queued.then(conn)
+                    except psycopg.Error:
+                        raise
+                    except Exception:  # no Stage holds it; a Stage's own failure still follows
+                        logger.warning(
+                            "What followed the Stages of Work %d failed", queued.work, exc_info=True
+                        )
+                if failed is not None:
+                    raise failed
         except Exception as e:
             logger.warning("The Stage Run of Work %d ended early: %s", queued.work, e)
             self._record_failure(queued.work, e)
 
-    def _after(self, queued: _Queued, stage: str) -> None:
+    def _after(self, conn: psycopg.Connection[TupleRow], queued: _Queued, stage: str) -> None:
         """Forget Conversations as the Chunks they hold go, not when a long `embed` has ended."""
         if self._forget_work is not None and stage in TEXT_STAGES:
             self._forget_work(queued.work)
+        if self._after_stage is not None:
+            self._after_stage(conn, queued.work, stage)
 
     def _record_failure(self, work: WorkId, error: Exception) -> None:
         """Say why on a connection of its own: `run_stage` cannot once the store has gone away."""

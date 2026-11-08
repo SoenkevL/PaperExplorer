@@ -96,6 +96,7 @@ class Node(BaseModel):
     open: bool = False
     selected: bool = False
     matches: int | None = None  # its branch's matches while searching
+    exploration: bool = False  # it mirrors an Exploration under way
 
     @property
     def collections_within(self) -> int:
@@ -172,6 +173,7 @@ def tree(
             url=address(Selection(collection=c.key), query),
             selected=c.key == selection.collection,
             matches=found[c.key].works if c.key in found else (0 if matches else None),
+            exploration=c.exploration,
         )
         by_key[c.key] = node
         if level < MAX_DEPTH:

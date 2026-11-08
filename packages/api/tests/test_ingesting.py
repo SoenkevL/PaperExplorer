@@ -16,7 +16,7 @@ from paperexplorer.domain import Attachment, Collection, LibraryChanges, Library
 from paperexplorer.embedding import FakeEmbedder
 from paperexplorer.library import InMemoryLibrary, LibraryUnavailableError, sync
 from paperexplorer.parsing import ParsedWork
-from paperexplorer.pipeline import INGESTING, RESOLVING
+from paperexplorer.pipeline import INGESTING, RESOLVING, STAGES, downstream
 from paperexplorer.resolution import InMemoryDoiRegistry, Registries
 from paperexplorer.store import StageStatuses, Works, WorkTexts, migrate
 from paperexplorer.tracing import Tracing
@@ -24,7 +24,12 @@ from paperexplorer.wiring import Wiring
 from paperexplorer_api.app import Asking, Checking, Ingesting, create_app
 from paperexplorer_api.client import ApiClient, ConflictError, NotFoundError
 from paperexplorer_api.conversations import Conversations
-from paperexplorer_api.schemas import INGESTING_STAGES, RESOLVING_STAGES, LibraryWork
+from paperexplorer_api.schemas import (
+    INGESTING_STAGES,
+    RESOLVING_STAGES,
+    LibraryWork,
+    downstream_of,
+)
 
 from .conftest import Script
 
@@ -135,6 +140,8 @@ def harness(
 def test_the_contract_names_the_same_stages_as_the_pipeline() -> None:
     assert INGESTING_STAGES == INGESTING
     assert RESOLVING_STAGES == RESOLVING
+    for stage in STAGES:
+        assert downstream_of(stage) == tuple(downstream(stage))
 
 
 def test_the_library_is_empty_until_it_syncs_then_lists_every_item(harness: Harness) -> None:
@@ -386,7 +393,7 @@ def test_queued_works_run_in_the_order_they_were_started(harness: Harness) -> No
     assert harness.client.work_stages(first).stages["extract_citations"] == "done"
 
 
-def test_a_failure_stops_the_chain_with_its_reason_and_ingesting_resumes_there(
+def test_a_failure_ends_its_branch_with_its_reason_and_ingesting_resumes_there(
     harness: Harness,
 ) -> None:
     work = harness.synced()["VILL2024"]
@@ -398,36 +405,43 @@ def test_a_failure_stops_the_chain_with_its_reason_and_ingesting_resumes_there(
     assert failed.stages["chunk"] == "done"
     assert failed.stages["embed"] == "failed"
     assert failed.stage_statuses["embed"].error == "the Provider went away"
-    assert failed.stages["extract_citations"] == "pending"
+    assert failed.stages["extract_citations"] == "done"
     chunked_at = failed.stage_statuses["chunk"].finished_at
+    linked_at = failed.stage_statuses["extract_citations"].finished_at
 
     harness.client.ingest(work.id)
     resumed = harness.settled(work.id)
 
+    assert resumed.stages["embed"] == "done"
     assert resumed.stage_statuses["chunk"].finished_at == chunked_at
-    assert resumed.stages["extract_citations"] == "done"
+    assert resumed.stage_statuses["extract_citations"].finished_at == linked_at
 
 
-def test_rerunning_a_done_stage_continues_through_the_chain(harness: Harness) -> None:
+def test_rerunning_a_done_stage_runs_only_the_stages_that_read_it(harness: Harness) -> None:
     work = harness.synced()["VILL2024"]
     harness.client.ingest(work.id)
-    fetched_at = harness.settled(work.id).stage_statuses["fetch"].finished_at
+    before = harness.settled(work.id).stage_statuses
 
     harness.client.ingest(work.id, from_stage="chunk")
     again = harness.settled(work.id)
 
-    assert again.stage_statuses["fetch"].finished_at == fetched_at
+    assert again.stage_statuses["fetch"].finished_at == before["fetch"].finished_at
+    assert (
+        again.stage_statuses["extract_citations"].finished_at
+        == before["extract_citations"].finished_at
+    )
     assert [again.stages[s] for s in FIVE] == ["done"] * 5
     assert again.stage_statuses["embed"].counts["embedded"] == 32
 
 
-def test_resolving_needs_an_ingested_work_then_runs_the_last_two_stages(harness: Harness) -> None:
+def test_resolving_needs_a_parsed_work_not_an_embedded_one(harness: Harness) -> None:
     work = harness.synced()["VILL2024"]
 
-    with pytest.raises(ConflictError, match="Ingested"):
+    with pytest.raises(ConflictError, match="parsed"):
         harness.client.resolve_references(work.id)
+    harness.embedder.fail_next = True
     harness.client.ingest(work.id)
-    harness.settled(work.id)
+    assert harness.settled(work.id).stages["embed"] == "failed"
 
     assert harness.client.resolve_references(work.id).run in {"queued", "running"}
     resolved = harness.settled(work.id)

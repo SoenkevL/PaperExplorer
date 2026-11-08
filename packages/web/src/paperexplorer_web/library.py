@@ -11,8 +11,10 @@ from paperexplorer_api.schemas import (
     LibraryPage,
     LibraryWork,
     StageState,
+    rerun_stages,
 )
 from paperexplorer_web.browsing import Selection, Tree
+from paperexplorer_web.explorations import ExplorationView, exploration_view
 
 
 class Pip(BaseModel):
@@ -38,7 +40,9 @@ class Row(BaseModel):
     message: str | None = None
     polling: bool
     start_label: str | None  # "Ingest" or "Resume" when there is something to run
-    resolve_label: str | None  # Resolving References, once Ingested
+    resolve_label: str | None  # Resolving References, once parsed
+    explore: bool  # *Start Exploration*: a Work with a PDF that is the Seed of none
+    exploration: ExplorationView | None  # the Exploration it is the Seed of
     pips: list[Pip]
     stages_label: str  # every Stage and its state, for the strip's aria-label
     errors: list[str]
@@ -49,7 +53,7 @@ class Row(BaseModel):
 
 
 def _confirm(stage: str) -> str:
-    stages = INGESTING_STAGES[INGESTING_STAGES.index(stage) :]
+    stages = rerun_stages(stage)
     named = stages[0] if len(stages) == 1 else f"{', '.join(stages[:-1])} and {stages[-1]}"
     question = f"Re-run {named}?"
     if set(TEXT_STAGES).intersection(stages):
@@ -75,6 +79,7 @@ def row(
     idle = work.run is None and "running" not in states
     ingested = all(work.stages.get(s) == "done" for s in INGESTING_STAGES)
     started = any(work.stages.get(s) != "pending" for s in INGESTING_STAGES)
+    parsed = work.stages.get("parse") == "done"
     resolved = all(work.stages.get(s) == "done" for s in RESOLVING_STAGES)
     may_rerun = idle and work.has_pdf
     pips = [
@@ -92,16 +97,20 @@ def row(
         for key in work.collections
         if key != selected and pane is not None and (node := pane.by_key.get(key)) is not None
     ]
+    explored = exploration_view(work.exploration, idle=idle) if work.exploration else None
     return Row(
         work=work,
         message=message,
         polling=not idle,
+        # *Resume Exploration* runs every Stage not done, so it stands in for *Resume*.
         start_label=None
-        if not idle or not work.has_pdf or ingested
+        if not idle or not work.has_pdf or ingested or (explored is not None and explored.resume)
         else ("Resume" if started else "Ingest"),
         resolve_label=None
-        if not ingested or not idle
+        if not parsed or not idle
         else ("Resolve again" if resolved else "Resolve References"),
+        explore=idle and work.has_pdf and work.exploration is None,
+        exploration=explored,
         pips=pips,
         stages_label="Stages: " + ", ".join(f"{p.stage} {p.state}" for p in pips),
         errors=[

@@ -20,7 +20,14 @@ from paperexplorer.store import StageStatuses
 from paperexplorer.wiring import Wiring
 from paperexplorer_api.asking_thread import AskingContexts, AskingThread
 from paperexplorer_api.conversations import Conversations
-from paperexplorer_api.routes import Connections, checks, citations, explorations, works
+from paperexplorer_api.routes import (
+    Connections,
+    checks,
+    citations,
+    explorations,
+    retrieval_runs,
+    works,
+)
 from paperexplorer_api.routes import conversations as conversation_routes
 from paperexplorer_api.routes.checks import Checking
 from paperexplorer_api.routes.ingesting import Ingesting
@@ -74,7 +81,8 @@ def create_app(
     """Build the API app; each request opens a store connection through `connections`.
 
     With `asking`, it also holds Conversations and answers their Questions, each turn on the
-    asking thread with a store connection of its own; without, it serves Works and Citations.
+    asking thread with a store connection of its own, and finds Evidence for Jumps, as both need
+    the Embedder; without, it serves Works and Citations.
     With `checking`, it runs Registry Checks, takes Readers' Choices and lists Duplicate Items.
     With `ingesting`, it lists the Library and runs Stages on a thread of their own; with
     `checking` too, it starts Explorations and files their Sources as their Resolutions change.
@@ -121,6 +129,7 @@ def create_app(
         app.include_router(
             conversation_routes.router(connections, asking.contexts, asking.conversations, thread)
         )
+        app.include_router(retrieval_runs.router(connections, asking.contexts))
     return app
 
 

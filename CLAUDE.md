@@ -12,6 +12,7 @@ A reader for following a paper's citations into the cited Works' own words. Text
 - `docs/design-resolution.md`: resolving References (Library sync, Registry Checks, limits, cache). Read it before touching `resolution`, `library` sync or the Check routes.
 - `docs/design-collections.md`: Collections in the Library and on the landing page (sync, API, navigator pane, rows). Read it before touching Collections, the landing page or `library_row.html`.
 - `docs/design-explorations.md`: Explorations in Zotero (the PaperExplorer Collection, Filing, the write guard, the reconciler). Read it before touching `catalog`, the `Library` port's writes or the Exploration routes.
+- `docs/design-jumping.md`: Jumps and the Trail (Retrieval Runs, the frames, arrival). Read it before touching `retrieval`, the Work page or `trail.js`.
 
 ## Workflow
 

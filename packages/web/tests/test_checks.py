@@ -29,14 +29,16 @@ TRAINING = WorkBrief(
     creators=["Smith, Ann"],
     year=2020,
     doi="10.1000/xyz123",
+    has_text=True,
+    has_pdf=True,
 )
 NEIGHBOUR = WorkBrief(
     id=22, zotero_key=None, title="A neighbour's paper", creators=["Other, Bo"], year=2019,
-    doi="10.1000/neighbour",
+    doi="10.1000/neighbour", has_text=False, has_pdf=False,
 )  # fmt: skip
 UNCHECKED = Resolution(
     reference="b42", state="unchecked", work=None, level=None, confidence=None, evidence=[],
-    layer=None, doi_conflict=None, chosen=False,
+    layer=None, doi_conflict=None, chosen=False, firm=False,
 )  # fmt: skip
 RESOLVED = UNCHECKED.model_copy(
     update={
@@ -46,6 +48,7 @@ RESOLVED = UNCHECKED.model_copy(
         "confidence": 1.0,
         "evidence": ["doi", "title"],
         "layer": "crossref",
+        "firm": True,
     }
 )
 UNRESOLVED = UNCHECKED.model_copy(update={"state": "unresolved"})

@@ -164,6 +164,16 @@ _Avoid_: Filter, mode, whole collection
 One recorded search for Evidence: the Citing Sentence, the Scope, the parameters and the ranked Evidence returned. The searches a model runs to answer a Question are not Retrieval Runs.
 _Avoid_: Query, search
 
+## Reading across Works
+
+**Jump**:
+Going from a Citation to its Source, landing on the Evidence for its Citing Sentence, or at the Source's top when there is none. The Reference's Resolution must be firm and the Source must have text.
+_Avoid_: Hop, follow, open source
+
+**Trail**:
+The Works the reader has passed through by Jumps in one browser tab, in order. Any Work on it can be returned to as the reader left it.
+_Avoid_: History, breadcrumbs, path
+
 ## Asking
 
 **Conversation**:

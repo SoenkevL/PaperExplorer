@@ -270,7 +270,7 @@ class Evidence(BaseModel):
     heading_path: list[str]
 
 
-class EvidenceSearch(BaseModel):
+class Landing(BaseModel):
     """Where a Jump from a Citation lands: its Source's Evidence, or the `reason` it has none."""
 
     citation: int

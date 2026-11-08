@@ -19,11 +19,11 @@ A reader on a Work can see which Sources they hold but cannot go to them from th
 
 ## Retrieval Runs
 - `retrieval.find_evidence(conn, embedder, citation, scope, k=5)` reuses a recorded Run or searches and records one. A recorded Run is read before the Embedder is called, so it works with Ollama down.
-- A Run is reused for the same Citation, Scope, model, `k` and `depth`. Replacing a Work's Chunks deletes the Runs whose Scope holds it; changing a Citation's Resolution changes the Scope, so it searches again. Failed searches are not recorded.
+- A Run is reused for the same Citation, Scope, model, `k` and `depth`. Replacing a Work's Chunks deletes the Runs whose Scope holds it, and a Run whose Evidence went with a new parse is not reused; changing a Citation's Resolution changes the Scope, so it searches again. Failed searches are not recorded. The Embedder may be slow, so the Chunks are checked again after it answers and held until the Run is recorded, and no Chunk replaced meanwhile ranks on words alone.
 - Migration `0011_retrieval_runs.sql`: `retrieval_runs`, its Scope as rows in `retrieval_run_works`, and `evidence`, one row per Chunk with its ranks and scores.
 
 ## The API
-`POST /citations/{id}/retrieval-runs` answers `{citation, citing_sentence, work, evidence[], reason}`, each Evidence `{block, start, end, rank}`, and `reason` (`no_chunks`, `no_vectors`, `embedder_unreachable`, `no_match`) when there is none. 404 for an unknown Citation; 409 when it has no firm Resolution naming a Work with text. `WorkBrief` gains `has_text` and `has_pdf`; `Resolution` gains `firm`.
+`POST /citations/{id}/retrieval-runs` answers `{citation, citing_sentence, work, evidence[], reason}`, each Evidence `{rank, block, start, end, page, heading_path}`, and `reason` (`no_chunks`, `no_vectors`, `embedder_unreachable`, `no_match`) when there is none. 404 for an unknown Citation; 409 when it has no firm Resolution naming a Work with text. `WorkBrief` gains `has_text` and `has_pdf`; `Resolution` gains `firm`.
 
 ## The web app
 - **Frames:** `/works/{id}` is the shell, one iframe per Work on the Trail, and `/works/{id}/reader` today's page (ADR 0015). The address is `/works/{id}?citation={c}`, so a reload or shared link lands the same way through the recorded Run.

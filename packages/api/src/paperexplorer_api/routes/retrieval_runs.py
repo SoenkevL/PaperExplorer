@@ -16,7 +16,7 @@ def router(connections: Connections, contexts: AskingContexts) -> APIRouter:
     routes = APIRouter(prefix="/citations", tags=["citations"])
 
     @routes.post("/{citation_id}/retrieval-runs")
-    def find_evidence(citation_id: int) -> schemas.EvidenceSearch:  # pyright: ignore[reportUnusedFunction]
+    def find_evidence(citation_id: int) -> schemas.Landing:  # pyright: ignore[reportUnusedFunction]
         with connections() as conn:
             detail = CitationGraphs(conn).get(CitationId(citation_id))
             if detail is None:
@@ -34,14 +34,14 @@ def router(connections: Connections, contexts: AskingContexts) -> APIRouter:
             work = brief(source)
         sentence = detail.citation.citing_sentence
         if isinstance(found, retrieval.NoEvidence):
-            return schemas.EvidenceSearch(
+            return schemas.Landing(
                 citation=citation_id,
                 citing_sentence=sentence,
                 work=work,
                 evidence=[],
                 reason=found.value,
             )
-        return schemas.EvidenceSearch(
+        return schemas.Landing(
             citation=citation_id,
             citing_sentence=found.citing_sentence,
             work=work,

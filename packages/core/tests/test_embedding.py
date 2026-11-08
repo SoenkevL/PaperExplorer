@@ -129,6 +129,14 @@ def test_a_failing_server_says_why() -> None:
         embedder(missing_model).embed(TEXTS)
 
 
+def test_a_server_out_of_reach_is_an_embedding_error() -> None:
+    def refused(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection refused", request=request)
+
+    with pytest.raises(EmbeddingError, match="could not be reached: connection refused"):
+        embedder(refused).embed(TEXTS)
+
+
 def test_an_answer_without_one_vector_per_text_is_an_error() -> None:
     def one_short(request: httpx.Request) -> httpx.Response:
         answer = Server()(request)

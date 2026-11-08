@@ -34,3 +34,5 @@ CREATE TABLE evidence (
     full_text_score double precision,
     PRIMARY KEY (run, rank)
 );
+
+CREATE INDEX evidence_chunk ON evidence (chunk);

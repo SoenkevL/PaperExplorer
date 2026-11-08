@@ -1,5 +1,6 @@
 """`POST /citations/{id}/retrieval-runs`: the Evidence a Jump lands on, or why there is none."""
 
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import psycopg
@@ -8,6 +9,7 @@ from fastapi.testclient import TestClient
 from psycopg.rows import TupleRow
 
 from paperexplorer.chunking import chunk
+from paperexplorer.citations import extract
 from paperexplorer.domain import (
     Attachment,
     Layer,
@@ -15,14 +17,15 @@ from paperexplorer.domain import (
     LibraryItem,
     Resolution,
     ResolutionState,
+    Vector,
     WorkId,
 )
-from paperexplorer.embedding import FakeEmbedder
+from paperexplorer.embedding import EmbeddingError, FakeEmbedder
 from paperexplorer.parsing import Block, BlockKind, ParsedWork, Span, TextOrigin
-from paperexplorer.store import Chunks, Resolutions, Works, WorkTexts
+from paperexplorer.store import Chunks, CitationGraphs, Resolutions, Works, WorkTexts
 from paperexplorer_api.client import ApiClient, ConflictError
 
-from .conftest import Stored
+from .conftest import AppFactory, Script, Stored
 
 Conn = psycopg.Connection[TupleRow]
 
@@ -210,3 +213,55 @@ def test_the_client_finds_evidence_and_raises_conflict_with_no_firm_source(
     source = _source(store_db, "SRC1", [citation["citing_sentence"]])
     _resolve(store_db, villiger.work, citation["reference"]["key"], source)
     assert client.find_evidence(citation["id"]).evidence[0].block == 0
+
+
+def test_a_source_lacking_vectors_gives_the_reason(
+    api: TestClient, store_db: Conn, villiger: Stored
+) -> None:
+    citation = _linked(api, villiger.work)
+    source = _source(store_db, "SRC1", ["Some text."], chunked=False)
+    parsed = WorkTexts(store_db).get(source)
+    assert parsed is not None
+    Chunks(store_db).replace(source, chunk(parsed))
+    _resolve(store_db, villiger.work, citation["reference"]["key"], source)
+
+    run = api.post(f"/citations/{citation['id']}/retrieval-runs").json()
+
+    assert (run["reason"], run["evidence"]) == ("no_vectors", [])
+
+
+def test_an_embedder_out_of_reach_gives_the_reason(
+    make_app: AppFactory, store_db: Conn, villiger: Stored
+) -> None:
+    class Unreachable(FakeEmbedder):
+        def embed(self, texts: Sequence[str]) -> list[Vector]:
+            raise EmbeddingError("refused")
+
+    api = TestClient(make_app(Script().model(), embedder=Unreachable()))
+    citation = _linked(api, villiger.work)
+    source = _source(store_db, "SRC1", ["Some text."])
+    _resolve(store_db, villiger.work, citation["reference"]["key"], source)
+    stored = Chunks(store_db).for_work(source)
+    vectors = FakeEmbedder().embed([s.chunk.text for s in stored])
+    Chunks(store_db).record_embeddings(
+        source, Unreachable().model, {s.id: v for s, v in zip(stored, vectors, strict=True)}
+    )
+
+    run = api.post(f"/citations/{citation['id']}/retrieval-runs").json()
+
+    assert (run["reason"], run["evidence"]) == ("embedder_unreachable", [])
+
+
+def test_an_unlinked_citation_cannot_be_jumped_from(
+    api: TestClient, store_db: Conn, parse_fixture: Callable[[str], ParsedWork]
+) -> None:
+    parsed = parse_fixture("villiger2024-tandf")
+    work = Works(store_db).ensure("VILL2024")
+    WorkTexts(store_db).replace(work, parsed)
+    graph = extract(parsed)
+    graph.citations[0].link = None
+    CitationGraphs(store_db).replace(work, graph)
+    first = api.get(f"/works/{work}").json()["blocks"]
+    span = next(c for b in first for c in b["citations"] if c["confidence_level"] == "unlinked")
+
+    assert api.post(f"/citations/{span['id']}/retrieval-runs").status_code == 409

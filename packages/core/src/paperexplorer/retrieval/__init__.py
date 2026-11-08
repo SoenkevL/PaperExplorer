@@ -3,7 +3,6 @@
 import logging
 from enum import StrEnum
 
-import httpx
 import psycopg
 from psycopg.rows import TupleRow
 
@@ -50,7 +49,7 @@ def search(
     if not text.strip():
         return []
     [vector] = embedder.embed([text])
-    found = Chunks(conn).search(scope.works, embedder.model, vector, text, k=k, depth=max(k, DEPTH))
+    found = Chunks(conn).search(scope.works, embedder.model, vector, text, k=k, depth=_depth(k))
     logger.debug("Search %r in Works %s: %d Chunks", text, sorted(scope.works), len(found))
     return found
 
@@ -71,30 +70,48 @@ def find_evidence(
     scope: Scope,
     k: int = EVIDENCE_K,
 ) -> RetrievalRun | NoEvidence:
-    """The Run for this Citation over the Scope: a recorded one, else a new search, recorded.
-
-    A recorded Run is read before the Embedder is asked. A search needs every Chunk of the Scope
-    to have a Vector from the Embedder's model; one that cannot run, or finds nothing, says why
-    and is not recorded.
-    """
+    """The Run for this Citation over the Scope, recorded or new, or why there can be none."""
     runs = RetrievalRuns(conn)
-    depth = max(k, DEPTH)
-    recorded = runs.find(citation.id, scope, embedder.model, k=k, depth=depth)
+    chunks = Chunks(conn)
+    model = embedder.model
+    depth = _depth(k)
+    recorded = runs.find(citation.id, scope, model, k=k, depth=depth)
     if recorded is not None:
         return recorded
-    chunks = Chunks(conn)
+    sentence = citation.citation.citing_sentence
+    if (reason := _unsearchable(chunks, scope, model)) is not None:
+        return _none(citation, reason)
+    if not sentence.strip():
+        return _none(citation, NoEvidence.NO_MATCH)
+    try:
+        [vector] = embedder.embed([sentence])
+    except EmbeddingError as e:
+        logger.warning("Citation %d: the Embedder failed: %s", citation.id, e)
+        return NoEvidence.EMBEDDER_UNREACHABLE
+    # The Embedder may take a while, and Chunks replaced meanwhile would rank on words alone. So
+    # they are looked at again, and held until the Run is recorded.
+    with conn.transaction():
+        chunks.hold(scope.works)
+        if (reason := _unsearchable(chunks, scope, model)) is not None:
+            return _none(citation, reason)
+        found = chunks.search(scope.works, model, vector, sentence, k=k, depth=depth)
+        if not found:
+            return _none(citation, NoEvidence.NO_MATCH)
+        return runs.record(citation.id, sentence, scope, model, k=k, depth=depth, evidence=found)
+
+
+def _depth(k: int) -> int:
+    return max(k, DEPTH)
+
+
+def _unsearchable(chunks: Chunks, scope: Scope, model: str) -> NoEvidence | None:
     if any(not chunks.for_work(work) for work in scope.works):
         return NoEvidence.NO_CHUNKS
-    if any(chunks.without_embedding(work, embedder.model) for work in scope.works):
+    if any(chunks.without_embedding(work, model) for work in scope.works):
         return NoEvidence.NO_VECTORS
-    sentence = citation.citation.citing_sentence
-    try:
-        found = search(conn, embedder, sentence, scope, k=k)
-    except (EmbeddingError, httpx.HTTPError) as e:
-        logger.warning("No Evidence for Citation %d: %s", citation.id, e)
-        return NoEvidence.EMBEDDER_UNREACHABLE
-    if not found:
-        return NoEvidence.NO_MATCH
-    return runs.record(
-        citation.id, sentence, scope, embedder.model, k=k, depth=depth, evidence=found
-    )
+    return None
+
+
+def _none(citation: CitationDetail, reason: NoEvidence) -> NoEvidence:
+    logger.warning("Citation %d has no Evidence: %s", citation.id, reason.value)
+    return reason

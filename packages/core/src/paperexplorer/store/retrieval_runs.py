@@ -16,6 +16,7 @@ class RetrievalRun(BaseModel):
     id: int
     citation: CitationId
     citing_sentence: str
+    scope: Scope
     model: str
     k: int
     depth: int
@@ -49,6 +50,9 @@ class RetrievalRuns:
                 " FROM evidence WHERE run = %s ORDER BY rank",
                 (row["id"],),
             ).fetchall()
+        # Parsing a Work again takes its Chunks and so this Evidence, leaving the Run empty.
+        if not ranked:
+            return None
         chunks = Chunks(self._conn)
         evidence: list[ScoredChunk] = []
         for e in ranked:
@@ -63,7 +67,7 @@ class RetrievalRuns:
                     full_text=_placing(e["full_text_rank"], e["full_text_score"]),
                 )
             )
-        return RetrievalRun(**row, evidence=evidence)
+        return RetrievalRun(**row, scope=scope, evidence=evidence)
 
     def record(
         self,
@@ -110,6 +114,7 @@ class RetrievalRuns:
             id=run,
             citation=citation,
             citing_sentence=citing_sentence,
+            scope=scope,
             model=model,
             k=k,
             depth=depth,

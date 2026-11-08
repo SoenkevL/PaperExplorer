@@ -5,9 +5,7 @@ The small Seed's Citations are the Citing Sentences; each Source here is built t
 
 from collections.abc import Sequence
 
-import httpx
 import psycopg
-import pytest
 from psycopg.rows import TupleRow
 
 from paperexplorer import chunking, retrieval
@@ -36,7 +34,22 @@ def _citation(conn: Conn, seed: Work) -> CitationDetail:
 
 def _source(conn: Conn, key: str, texts: list[str], *, embed: bool = True) -> WorkId:
     """A Source of one paragraph per text, each its own Chunk, embedded unless told otherwise."""
-    parsed = ParsedWork(
+    parsed = _parsed(texts)
+    work = Works(conn).ensure(key)
+    WorkTexts(conn).replace(work, parsed)
+    Chunks(conn).replace(work, chunking.chunk(parsed))
+    if embed:
+        embedder = FakeEmbedder()
+        stored = Chunks(conn).for_work(work)
+        vectors = embedder.embed([s.chunk.text for s in stored])
+        Chunks(conn).record_embeddings(
+            work, embedder.model, {s.id: v for s, v in zip(stored, vectors, strict=True)}
+        )
+    return work
+
+
+def _parsed(texts: list[str]) -> ParsedWork:
+    return ParsedWork(
         text_origin=TextOrigin.PRINTED,
         blocks=[
             Block(
@@ -51,17 +64,6 @@ def _source(conn: Conn, key: str, texts: list[str], *, embed: bool = True) -> Wo
         ],
         references=[],
     )
-    work = Works(conn).ensure(key)
-    WorkTexts(conn).replace(work, parsed)
-    Chunks(conn).replace(work, chunking.chunk(parsed))
-    if embed:
-        embedder = FakeEmbedder()
-        stored = Chunks(conn).for_work(work)
-        vectors = embedder.embed([s.chunk.text for s in stored])
-        Chunks(conn).record_embeddings(
-            work, embedder.model, {s.id: v for s, v in zip(stored, vectors, strict=True)}
-        )
-    return work
 
 
 def test_a_citations_evidence_is_the_sources_chunks_nearest_its_citing_sentence(
@@ -146,16 +148,15 @@ def test_a_source_with_a_chunk_lacking_a_vector_says_so_and_never_searches_on_wo
     assert embedder.calls == []
 
 
-@pytest.mark.parametrize("failure", [EmbeddingError("answered 500"), httpx.ConnectError("refused")])
 def test_an_unreachable_embedder_says_so_and_records_nothing(
-    store_db: Conn, small_seed: Work, failure: Exception
+    store_db: Conn, small_seed: Work
 ) -> None:
     citation = _citation(store_db, small_seed)
     source = _source(store_db, "SRC1", [citation.citation.citing_sentence])
 
     class Failing(FakeEmbedder):
         def embed(self, texts: Sequence[str]) -> list[Vector]:
-            raise failure
+            raise EmbeddingError("refused")
 
     found = retrieval.find_evidence(store_db, Failing(), citation, Scope.of(source))
     assert found is retrieval.NoEvidence.EMBEDDER_UNREACHABLE
@@ -169,6 +170,59 @@ def test_a_citing_sentence_with_no_words_finds_no_match(store_db: Conn, small_se
     citation.citation.citing_sentence = "  "
     source = _source(store_db, "SRC1", ["Some text."])
 
-    found = retrieval.find_evidence(store_db, FakeEmbedder(), citation, Scope.of(source))
+    embedder = FakeEmbedder()
+    found = retrieval.find_evidence(store_db, embedder, citation, Scope.of(source))
 
     assert found is retrieval.NoEvidence.NO_MATCH
+    assert embedder.calls == []
+
+
+def test_a_source_parsed_again_has_no_chunks_though_a_run_was_recorded(
+    store_db: Conn, small_seed: Work
+) -> None:
+    citation = _citation(store_db, small_seed)
+    source = _source(store_db, "SRC1", [citation.citation.citing_sentence])
+    retrieval.find_evidence(store_db, FakeEmbedder(), citation, Scope.of(source))
+
+    WorkTexts(store_db).replace(source, _parsed(["The text as parsed again."]))
+    found = retrieval.find_evidence(store_db, FakeEmbedder(), citation, Scope.of(source))
+
+    assert found is retrieval.NoEvidence.NO_CHUNKS
+
+
+def test_chunks_replaced_while_the_embedder_runs_never_record_a_run_on_words_alone(
+    store_db: Conn, small_seed: Work
+) -> None:
+    citation = _citation(store_db, small_seed)
+    sentence = citation.citation.citing_sentence
+    source = _source(store_db, "SRC1", [sentence])
+
+    class Slow(FakeEmbedder):
+        def embed(self, texts: Sequence[str]) -> list[Vector]:
+            Chunks(store_db).replace(source, chunking.chunk(_parsed([sentence])))
+            return super().embed(texts)
+
+    found = retrieval.find_evidence(store_db, Slow(), citation, Scope.of(source))
+    assert found is retrieval.NoEvidence.NO_VECTORS
+
+    embedder = FakeEmbedder()
+    stored = Chunks(store_db).for_work(source)
+    vectors = embedder.embed([s.chunk.text for s in stored])
+    Chunks(store_db).record_embeddings(
+        source, embedder.model, {s.id: v for s, v in zip(stored, vectors, strict=True)}
+    )
+    run = retrieval.find_evidence(store_db, embedder, citation, Scope.of(source))
+    assert isinstance(run, RetrievalRun)
+    assert run.evidence[0].vector is not None
+
+
+def test_a_run_names_its_scope(store_db: Conn, small_seed: Work) -> None:
+    citation = _citation(store_db, small_seed)
+    source = _source(store_db, "SRC1", [citation.citation.citing_sentence])
+    embedder = FakeEmbedder()
+
+    first = retrieval.find_evidence(store_db, embedder, citation, Scope.of(source))
+    second = retrieval.find_evidence(store_db, embedder, citation, Scope.of(source))
+
+    assert isinstance(first, RetrievalRun) and isinstance(second, RetrievalRun)
+    assert first.scope == second.scope == Scope.of(source)

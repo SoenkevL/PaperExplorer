@@ -222,6 +222,12 @@ class Chunks:
             )
             return [ChunkEmbedding.model_validate(row) for row in rows]
 
+    def hold(self, works: Collection[WorkId]) -> None:
+        """Keep these Works' Chunks from being replaced until the caller's transaction ends."""
+        self._conn.execute(
+            "SELECT 1 FROM chunks WHERE work_id = ANY(%s::bigint[]) FOR SHARE", (list(works),)
+        )
+
     def search(
         self,
         works: Collection[WorkId],

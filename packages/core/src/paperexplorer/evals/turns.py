@@ -46,25 +46,7 @@ METRICS = (
     "latency_s",
 )
 
-# "The Seed does not say …", as the prompt asks the model to put it, and its near variants.
-_SUBJECT = r"(?:seed|review|paper|article|text|work|authors?|it|they)"
-_VERB = (
-    r"(?:say|state|cover|address|discuss|mention|report|describe|give|provide|include|contain"
-    r"|answer|specify|examine|investigate|tell|recommend|list|name|offer|consider|deal)"
-)
-_NOT_COVERED = re.compile(
-    rf"\b{_SUBJECT}\s+(?:does|do|did)(?:\s+not|n't)\s+(?:\w+\s+)?{_VERB}\b"
-    r"|\bnot\s+(?:covered|addressed|discussed|mentioned|stated|specified)\b"
-    r"|\bno\s+(?:information|mention)\b"
-    r"|\bsays?\s+nothing\b",
-    re.IGNORECASE,
-)
 _HYPHEN_BREAK = re.compile(r"(?<=[^\W\d_])[-\u2010\u2011]\s*(?=[^\W\d_])")
-
-
-def says_not_covered(text: str) -> bool:
-    """Whether an Answer says the Seed does not cover the Question: a heuristic, for the eval."""
-    return _NOT_COVERED.search(text.replace("\u2019", "'")) is not None
 
 
 async def ask_turn(
@@ -136,7 +118,7 @@ async def ask_turn(
         search=search,
         pointers=_pointers(answer, chunks, blocks) if answer else [],
         quotes=_quotes(answer, list(chunks.values()), blocks) if answer else [],
-        says_not_covered=answer is not None and says_not_covered(answer.text),
+        says_not_covered=answer is not None and asking.says_not_covered(answer.text),
         redrafted=redrafted,
         model_requests=requests if answer else None,
         tool_calls=tool_calls,

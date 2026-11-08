@@ -1,0 +1,12 @@
+{#- Where a Jump landed: the sentence it came from, and the places a search offers, or why none. -#}
+<div class="arrival-strip">
+  <button class="arrival-close" type="button" aria-label="Close this note">×</button>
+  {% if sentence %}<p class="from" title="{{ sentence }}"><span class="label">Jumped here from</span> <q>{{ sentence }}</q></p>{% endif %}
+  {% if evidence %}
+  <p class="places"><span>A search's candidates, not the places the authors relied on:</span>
+    {% for e in evidence %}<a class="place" href="#b{{ e.block }}" data-block="{{ e.block }}" data-start="{{ e.start }}" data-end="{{ e.end }}" title="Page {{ e.page }}{% if e.heading_path %}: {{ e.heading_path | join(' > ') }}{% endif %}" aria-label="Candidate {{ e.rank }}, page {{ e.page }}">{{ e.rank }}</a>
+    {% endfor %}<a class="to-top" href="#work">Top of Source</a></p>
+  {% else %}
+  <p class="note">{{ why }} This is the top of the Source.</p>
+  {% endif %}
+</div>

@@ -104,7 +104,16 @@ def test_a_refused_start_says_why_on_the_row() -> None:
 
 
 def test_a_partial_exploration_names_what_is_missing_beside_resume() -> None:
-    cited = WorkBrief(id=9, zotero_key=None, title="A Source", creators=[], year=None, doi=None)
+    cited = WorkBrief(
+        id=9,
+        zotero_key=None,
+        title="A Source",
+        creators=[],
+        year=None,
+        doi=None,
+        has_text=False,
+        has_pdf=False,
+    )
     partial = _exploration(
         stages_not_done=["embed"], failed=[FailedFiling(work=cited, error="413 too long")]
     )

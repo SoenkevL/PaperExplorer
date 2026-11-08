@@ -29,14 +29,16 @@ TRAINING = WorkBrief(
     creators=["Smith, Ann"],
     year=2020,
     doi="10.1000/xyz123",
+    has_text=True,
+    has_pdf=True,
 )
 NEIGHBOUR = WorkBrief(
     id=22, zotero_key=None, title="A neighbour's paper", creators=["Other, Bo"], year=2019,
-    doi="10.1000/neighbour",
+    doi="10.1000/neighbour", has_text=False, has_pdf=False,
 )  # fmt: skip
 UNCHECKED = Resolution(
     reference="b42", state="unchecked", work=None, level=None, confidence=None, evidence=[],
-    layer=None, doi_conflict=None, chosen=False,
+    layer=None, doi_conflict=None, chosen=False, firm=False,
 )  # fmt: skip
 RESOLVED = UNCHECKED.model_copy(
     update={
@@ -46,6 +48,7 @@ RESOLVED = UNCHECKED.model_copy(
         "confidence": 1.0,
         "evidence": ["doi", "title"],
         "layer": "crossref",
+        "firm": True,
     }
 )
 UNRESOLVED = UNCHECKED.model_copy(update={"state": "unresolved"})
@@ -256,7 +259,7 @@ def _stream(*events: dict[str, object]) -> httpx.Response:
 def test_the_work_page_loads_the_checks_cost_after_the_text() -> None:
     web, sent = _web({COST: _cost()})
 
-    page = web.get("/works/7").text
+    page = web.get("/works/7/reader").text
 
     assert re.search(r'hx-get="/works/7/check"[^>]*hx-trigger="load"', page)
     assert not any(r.url.path == COST[1] for r in sent)  # OpenAlex is asked only once it loads

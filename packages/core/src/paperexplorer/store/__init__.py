@@ -14,6 +14,7 @@ from paperexplorer.store.migrate import migrate
 from paperexplorer.store.readers_choices import ReadersChoices
 from paperexplorer.store.registry_responses import RegistryResponse, RegistryResponses
 from paperexplorer.store.resolutions import Resolutions
+from paperexplorer.store.retrieval_runs import RetrievalRun, RetrievalRuns
 from paperexplorer.store.stages import StageState, StageStatus, StageStatuses
 from paperexplorer.store.texts import WorkTexts
 from paperexplorer.store.works import Branch, LibraryRow, Works
@@ -37,6 +38,8 @@ __all__ = [
     "RegistryResponse",
     "RegistryResponses",
     "Resolutions",
+    "RetrievalRun",
+    "RetrievalRuns",
     "ScoredChunk",
     "StageState",
     "StageStatus",

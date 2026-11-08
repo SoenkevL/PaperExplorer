@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{# A frame of the shell may show this; its links leave the frame. #}
+{% block head %}<base target="_top">{% endblock %}
 {% block content %}
 <h1>Not found</h1>
 <p>{{ message }}</p>

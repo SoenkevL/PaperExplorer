@@ -1,0 +1,18 @@
+<!doctype html>
+{# One frame per Work on the Trail, so each keeps its scroll, Citation and Conversation (ADR 0015).
+   Without trail.js the frame still reads, and a Jump is an ordinary link to the next shell. #}
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ work.title or work.zotero_key }} · PaperExplorer</title>
+  {% include "theme.html" %}
+  <link rel="stylesheet" href="{{ static_url('style.css') }}">
+  <script src="{{ static_url('trail.js') }}" defer></script>
+</head>
+<body class="shell">
+  <div id="frames" class="frames">
+    <iframe class="on" title="{{ work.title or work.zotero_key }}" src="/works/{{ work.id }}/reader{% if citation %}?citation={{ citation }}{% endif %}" data-work="{{ work.id }}" data-citation="{{ citation or '' }}" data-label="{{ work_label(work) }}"></iframe>
+  </div>
+</body>
+</html>

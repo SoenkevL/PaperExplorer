@@ -21,7 +21,8 @@ def brief(work: Work) -> schemas.WorkBrief:
     """A Work as a Resolution names it."""
     return schemas.WorkBrief(
         id=work.id, zotero_key=work.zotero_key, title=work.title, creators=work.creators,
-        year=work.year, doi=work.doi,
+        year=work.year, doi=work.doi, has_text=work.text_origin is not None,
+        has_pdf=work.pdf is not None,
     )  # fmt: skip
 
 
@@ -43,6 +44,7 @@ def resolution_view(conn: Conn, r: Resolution) -> schemas.Resolution:
         layer=r.layer.value if r.layer else None,
         doi_conflict=named(r.doi_conflict),
         chosen=r.layer is Layer.READER,
+        firm=r.firm,
     )
 
 

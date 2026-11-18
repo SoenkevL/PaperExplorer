@@ -15,6 +15,7 @@ from paperexplorer.library import (
     InMemoryLibrary,
     ItemNotFoundError,
     Library,
+    LibraryNotConfiguredError,
     LibraryUnavailableError,
     ZoteroLibrary,
 )
@@ -164,6 +165,8 @@ def test_zotero_needs_a_library_id_and_an_api_key(tmp_path: Path) -> None:
     settings = Settings(_env_file=None, data_dir=tmp_path, zotero_api_key=SecretStr("k"))  # pyright: ignore[reportCallIssue]
 
     with pytest.raises(ValueError, match="PE_ZOTERO_LIBRARY_ID"):
+        ZoteroLibrary.from_settings(settings)
+    with pytest.raises(LibraryNotConfiguredError, match="PE_ZOTERO_API_KEY"):
         ZoteroLibrary.from_settings(settings)
 
 

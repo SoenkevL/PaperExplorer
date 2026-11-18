@@ -15,6 +15,15 @@ class LibraryUnavailableError(Exception):
     """The library cannot be read now (unreachable, failing, or answering out of protocol)."""
 
 
+class LibraryNotConfiguredError(ValueError):
+    """No Library is configured: Zotero's keys are absent from the Settings."""
+
+    def __init__(
+        self, message: str = "Zotero needs PE_ZOTERO_LIBRARY_ID and PE_ZOTERO_API_KEY"
+    ) -> None:
+        super().__init__(message)
+
+
 class OutsidePaperExplorerError(ValueError):
     """A write named a Collection outside the PaperExplorer Collection's branch (ADR 0014)."""
 

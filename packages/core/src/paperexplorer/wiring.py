@@ -41,10 +41,10 @@ class Wiring:
         model: Model | None = None,
     ) -> None:
         """Prefer `from_settings`; an adapter left `None` here is built from `settings` on use."""
-        self.settings = settings
-        self.library = library
-        self.doi_registry = doi_registry
-        self.registries = registries
+        self._settings = settings
+        self._library = library
+        self._doi_registry = doi_registry
+        self._registries = registries
         self._tracing = tracing
         self._embedder = embedder
         self._model = model
@@ -80,6 +80,26 @@ class Wiring:
             embedder=embedder,
             model=model,
         )
+
+    @property
+    def settings(self) -> Settings:
+        """The Settings every adapter not given was built from."""
+        return self._settings
+
+    @property
+    def library(self) -> Library | None:
+        """The Library; None when Zotero's keys are absent."""
+        return self._library
+
+    @property
+    def doi_registry(self) -> DoiRegistry:
+        """The DOI registry `verify_dois` asks."""
+        return self._doi_registry
+
+    @property
+    def registries(self) -> Callable[[], Registries]:
+        """Fresh `Registries` for each Registry Check, all within one process-wide set of limits."""
+        return self._registries
 
     @property
     def tracing(self) -> Tracing:

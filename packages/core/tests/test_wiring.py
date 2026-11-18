@@ -1,4 +1,5 @@
 import threading
+import uuid
 from collections.abc import Iterator
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -103,6 +104,7 @@ def test_each_registry_check_gets_fresh_registries_within_one_set_of_limits() ->
     # The limits are Registries' own; their sharing across Checks is shown on the wire in
     # test_resolution_check, so here it is enough that both Checks hold the same limiters.
     assert first._crossref is second._crossref  # pyright: ignore[reportPrivateUsage]
+    assert first._crossref_single is second._crossref_single  # pyright: ignore[reportPrivateUsage]
     assert first._openalex is second._openalex  # pyright: ignore[reportPrivateUsage]
 
 
@@ -167,7 +169,7 @@ def test_using_only_the_library_builds_neither_tracing_nor_the_chat_model(
     url, probes = langfuse
     settings = _settings(
         **ZOTERO_KEYS,
-        langfuse_public_key="pk",
+        langfuse_public_key=f"pk-lf-test-{uuid.uuid4()}",
         langfuse_secret_key="sk",
         langfuse_base_url=url,
         provider="no-such-provider",  # building the Embedder or the chat model raises
@@ -183,7 +185,11 @@ def test_using_only_the_library_builds_neither_tracing_nor_the_chat_model(
 
 def test_tracing_is_built_on_first_use_and_then_kept(langfuse: tuple[str, _Probes]) -> None:
     url, probes = langfuse
-    settings = _settings(langfuse_public_key="pk", langfuse_secret_key="sk", langfuse_base_url=url)
+    settings = _settings(
+        langfuse_public_key=f"pk-lf-test-{uuid.uuid4()}",
+        langfuse_secret_key="sk",
+        langfuse_base_url=url,
+    )
     wiring = Wiring.from_settings(settings, embedder=FakeEmbedder())
 
     tracing = wiring.tracing

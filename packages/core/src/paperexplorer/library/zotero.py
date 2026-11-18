@@ -22,6 +22,7 @@ from paperexplorer.library.port import (
     PAPEREXPLORER,
     SEED_TAG,
     ItemNotFoundError,
+    LibraryNotConfiguredError,
     LibraryUnavailableError,
     LibraryWriteError,
     OutsidePaperExplorerError,
@@ -69,7 +70,7 @@ class ZoteroLibrary:
     def from_settings(cls, settings: Settings) -> Self:
         """The library named by the `PE_ZOTERO_*` settings."""
         if not settings.zotero_library_id or settings.zotero_api_key is None:
-            raise ValueError("Zotero needs PE_ZOTERO_LIBRARY_ID and PE_ZOTERO_API_KEY")
+            raise LibraryNotConfiguredError
         api = httpx.Client(
             base_url=f"{API}/{settings.zotero_library_type}s/{settings.zotero_library_id}",
             headers={

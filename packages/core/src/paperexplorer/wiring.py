@@ -1,6 +1,7 @@
-"""The adapters a process works with, built once from Settings: tracing, Embedder, chat model."""
+"""The adapters a process works with, built once from Settings, and the contexts built from them."""
 
-from dataclasses import dataclass
+import logging
+from collections.abc import Callable
 from typing import Self
 
 import psycopg
@@ -11,17 +12,42 @@ from paperexplorer import inference
 from paperexplorer.asking import AskingContext, Reading
 from paperexplorer.config import Settings
 from paperexplorer.embedding import Embedder
+from paperexplorer.library import Library, LibraryNotConfiguredError, ZoteroLibrary
+from paperexplorer.pipeline.stage import StageContext
+from paperexplorer.resolution import DoiOrgRegistry, DoiRegistry, Registries, shared_registries
 from paperexplorer.tracing import Tracing, configure_tracing
 
+logger = logging.getLogger(__name__)
 
-@dataclass(frozen=True)
+
 class Wiring:
-    """Tracing, the Embedder and the chat model, with the Settings they were built from."""
+    """Every adapter a process works with, and the Settings they were built from.
 
-    settings: Settings
-    tracing: Tracing
-    embedder: Embedder
-    model: Model
+    The Library, the DOI registry and the source of `Registries` are built with the `Wiring`:
+    none touches the network. Tracing (which probes Langfuse), the Embedder and the chat model
+    (which can raise `ProviderError`) are built on first use and then kept, so a command that
+    needs none of them never builds them.
+    """
+
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        library: Library | None,
+        doi_registry: DoiRegistry,
+        registries: Callable[[], Registries],
+        tracing: Tracing | None = None,
+        embedder: Embedder | None = None,
+        model: Model | None = None,
+    ) -> None:
+        """Prefer `from_settings`; an adapter left `None` here is built from `settings` on use."""
+        self.settings = settings
+        self.library = library
+        self.doi_registry = doi_registry
+        self.registries = registries
+        self._tracing = tracing
+        self._embedder = embedder
+        self._model = model
 
     @classmethod
     def from_settings(
@@ -31,18 +57,50 @@ class Wiring:
         tracing: Tracing | None = None,
         embedder: Embedder | None = None,
         model: Model | None = None,
+        library: Library | None = None,
+        doi_registry: DoiRegistry | None = None,
+        registries: Callable[[], Registries] | None = None,
     ) -> Self:
-        """Each adapter not given is built from `settings`; the Embedder traces to `tracing`."""
-        if tracing is None:
-            tracing = configure_tracing(settings)
-        if embedder is None:
-            embedder = inference.embedder(settings, tracing)
+        """Each adapter not given is built from `settings`; the Library is None without Zotero."""
+        if library is None:
+            try:
+                library = ZoteroLibrary.from_settings(settings)
+            except LibraryNotConfiguredError as error:
+                logger.info("No Library: %s", error)
+        if doi_registry is None:
+            doi_registry = DoiOrgRegistry.from_settings(settings)
+        if registries is None:
+            registries = shared_registries(settings)
         return cls(
-            settings=settings,
+            settings,
+            library=library,
+            doi_registry=doi_registry,
+            registries=registries,
             tracing=tracing,
             embedder=embedder,
-            model=inference.chat_model(settings) if model is None else model,
+            model=model,
         )
+
+    @property
+    def tracing(self) -> Tracing:
+        """Tracing, configured on first use: that probes the tower's Langfuse."""
+        if self._tracing is None:
+            self._tracing = configure_tracing(self.settings)
+        return self._tracing
+
+    @property
+    def embedder(self) -> Embedder:
+        """The Embedder of `PE_PROVIDER`, built on first use; it traces to `tracing`."""
+        if self._embedder is None:
+            self._embedder = inference.embedder(self.settings, self.tracing)
+        return self._embedder
+
+    @property
+    def model(self) -> Model:
+        """The chat model of `PE_PROVIDER`, built on first use."""
+        if self._model is None:
+            self._model = inference.chat_model(self.settings)
+        return self._model
 
     def asking(
         self,
@@ -59,3 +117,21 @@ class Wiring:
             tracing=self.tracing,
             reading=reading,
         )
+
+    def stages(self, conn: psycopg.Connection[TupleRow]) -> StageContext:
+        """A Stage's `StageContext` around a store connection; every Stage needs the Library."""
+        if self.library is None:
+            raise LibraryNotConfiguredError
+        return StageContext(
+            conn=conn,
+            settings=self.settings,
+            library=self.library,
+            embedder=self.embedder,
+            tracing=self.tracing,
+            doi_registry=self.doi_registry,
+        )
+
+    def flush(self) -> None:
+        """Send every finished trace now, if tracing was built; otherwise do nothing."""
+        if self._tracing is not None:
+            self._tracing.flush()

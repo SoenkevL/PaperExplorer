@@ -1,4 +1,5 @@
-"""A small hand-built Seed for the asking tests: an abstract, three sections, two References."""
+"""Shared test fixtures: small hand-built Seeds (an abstract, three sections, two References),
+tracing into memory, and a stand-in Langfuse host."""
 
 import json
 import threading
@@ -131,7 +132,7 @@ def in_memory_tracing() -> tuple[Tracing, InMemorySpanExporter, list[dict[str, o
     exporter = InMemorySpanExporter()
     scores: list[dict[str, object]] = []
 
-    def langfuse(request: httpx.Request) -> httpx.Response:
+    def langfuse_api(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/api/public/scores":
             scores.extend(json.loads(request.content))
             return httpx.Response(200, json={})
@@ -144,7 +145,7 @@ def in_memory_tracing() -> tuple[Tracing, InMemorySpanExporter, list[dict[str, o
             langfuse_secret_key="sk-lf-test",
             langfuse_base_url="http://langfuse.test",
         ),
-        http=httpx.Client(transport=httpx.MockTransport(langfuse)),
+        http=httpx.Client(transport=httpx.MockTransport(langfuse_api)),
         span_exporter=exporter,
     )
     return tracing, exporter, scores

@@ -9,7 +9,7 @@ import psycopg
 import pytest
 from pydantic_ai.messages import ModelMessage
 from pydantic_ai.models.function import AgentInfo, FunctionModel
-from typer.testing import CliRunner
+from typer.testing import CliRunner, Result
 
 from paperexplorer import chunking, store
 from paperexplorer.cli import StageName, app
@@ -442,17 +442,30 @@ def library(cli_env: None, monkeypatch: pytest.MonkeyPatch) -> InMemoryLibrary:
     )
 
 
+Invoke = Callable[..., Result]
+
+
+@pytest.fixture
+def cli(library: InMemoryLibrary) -> Invoke:
+    """Run a command wired with `library`, answering its prompts with `input`."""
+
+    def invoke(args: list[str], input: str | None = None) -> Result:
+        return CliRunner().invoke(app, args, input=input, obj=_wired(library=library))
+
+    return invoke
+
+
 def _works(url: str) -> dict[str, str | None]:
     with psycopg.connect(url) as conn:
         return {w.zotero_key or f"#{w.id}": w.title for w in store.Works(conn).list()}
 
 
 def test_sync_makes_every_library_item_a_work(
-    library: InMemoryLibrary, scratch_database_url: str
+    cli: Invoke, library: InMemoryLibrary, scratch_database_url: str
 ) -> None:
-    first = CliRunner().invoke(app, ["sync"], obj=_wired(library=library))
+    first = cli(["sync"])
     library.put(LibraryItem(key="NEWW2026", title="Added later"))
-    second = CliRunner().invoke(app, ["sync"], obj=_wired(library=library))
+    second = cli(["sync"])
 
     assert first.exit_code == 0, first.output
     assert "3 Library Items" in first.stdout
@@ -460,14 +473,12 @@ def test_sync_makes_every_library_item_a_work(
     assert set(_works(scratch_database_url)) == {"SEED1111", "ATTN2017", "ATTNCOPY", "NEWW2026"}
 
 
-def test_duplicates_lists_each_works_duplicate_items_standing_item_first(
-    library: InMemoryLibrary,
-) -> None:
-    CliRunner().invoke(app, ["sync"], obj=_wired(library=library))
+def test_duplicates_lists_each_works_duplicate_items_standing_item_first(cli: Invoke) -> None:
+    cli(["sync"])
 
-    listed = CliRunner().invoke(app, ["duplicates"], obj=_wired(library=library))
-    CliRunner().invoke(app, ["duplicates", "--stand", "ATTN2017"], obj=_wired(library=library))
-    let = CliRunner().invoke(app, ["duplicates"], obj=_wired(library=library))
+    listed = cli(["duplicates"])
+    cli(["duplicates", "--stand", "ATTN2017"])
+    let = cli(["duplicates"])
 
     assert listed.exit_code == 0, listed.output
     doi, first, second = listed.stdout.splitlines()[:3]
@@ -477,57 +488,51 @@ def test_duplicates_lists_each_works_duplicate_items_standing_item_first(
     assert let.stdout.splitlines()[1].split()[:2] == ["*", "ATTN2017"]
 
 
-def _resolved_seed(url: str, library: InMemoryLibrary) -> None:
-    refs = [
-        Reference(id="b0", text="Vaswani 2017. Attention is all you need.", page=9,
-                  title="Attention is all you need", surnames=["Vaswani"], year="2017"),
-        Reference(id="b1", text="Nobody 1999. Unknown.", page=9, title="Unknown things"),
-    ]  # fmt: skip
+def _parsed_seed(url: str, refs: list[Reference]) -> None:
     with psycopg.connect(url, autocommit=True) as conn:
         store.migrate(conn)
         seed = store.Works(conn).ensure("SEED1111")
         store.WorkTexts(conn).replace(
             seed, ParsedWork(text_origin=TextOrigin.PRINTED, blocks=[], references=refs)
         )
-    result = CliRunner().invoke(app, ["run", "resolve", "SEED1111"], obj=_wired(library=library))
+
+
+def _resolved_seed(url: str, cli: Invoke) -> None:
+    _parsed_seed(
+        url,
+        [Reference(id="b0", text="Vaswani 2017. Attention is all you need.", page=9,
+                   title="Attention is all you need", surnames=["Vaswani"], year="2017"),
+         Reference(id="b1", text="Nobody 1999. Unknown.", page=9, title="Unknown things")],
+    )  # fmt: skip
+    result = cli(["run", "resolve", "SEED1111"])
     assert result.exit_code == 0, result.output
 
 
 def test_a_merge_asks_first_then_merges_in_the_library_and_moves_the_resolutions(
-    library: InMemoryLibrary, scratch_database_url: str
+    cli: Invoke, library: InMemoryLibrary, scratch_database_url: str
 ) -> None:
-    _resolved_seed(scratch_database_url, library)
+    _resolved_seed(scratch_database_url, cli)
 
-    declined = CliRunner().invoke(
-        app,
-        ["duplicates", "--merge", "ATTN2017", "ATTNCOPY"],
-        input="n\n",
-        obj=_wired(library=library),
-    )
+    declined = cli(["duplicates", "--merge", "ATTN2017", "ATTNCOPY"], input="n\n")
     assert declined.exit_code == 1
     assert library.item("ATTNCOPY").key == "ATTNCOPY"
 
-    merged = CliRunner().invoke(
-        app,
-        ["duplicates", "--merge", "ATTN2017", "ATTNCOPY"],
-        input="y\n",
-        obj=_wired(library=library),
-    )
+    merged = cli(["duplicates", "--merge", "ATTN2017", "ATTNCOPY"], input="y\n")
 
     assert merged.exit_code == 0, merged.output
     assert library.item("ATTN2017").pdf == ATTENTION_COPY.pdf
     assert "ATTNCOPY" not in _works(scratch_database_url)
-    listed = CliRunner().invoke(app, ["resolutions", "SEED1111"], obj=_wired(library=library))
+    listed = cli(["resolutions", "SEED1111"])
     assert "ATTN2017" in listed.stdout.splitlines()[1]
 
 
 def test_resolutions_lists_each_reference_with_its_state_and_work(
-    library: InMemoryLibrary, scratch_database_url: str
+    cli: Invoke, scratch_database_url: str
 ) -> None:
-    _resolved_seed(scratch_database_url, library)
+    _resolved_seed(scratch_database_url, cli)
 
-    result = CliRunner().invoke(app, ["resolutions", "SEED1111"], obj=_wired(library=library))
-    low = CliRunner().invoke(app, ["resolutions", "SEED1111", "--low"], obj=_wired(library=library))
+    result = cli(["resolutions", "SEED1111"])
+    low = cli(["resolutions", "SEED1111", "--low"])
 
     assert result.exit_code == 0, result.output
     header, first, second, *_ = result.stdout.splitlines()
@@ -539,8 +544,8 @@ def test_resolutions_lists_each_reference_with_its_state_and_work(
     assert low.stdout.splitlines()[1:] == []
 
 
-def test_resolutions_of_an_unknown_work_fail(library: InMemoryLibrary) -> None:
-    result = CliRunner().invoke(app, ["resolutions", "NOPE2345"], obj=_wired(library=library))
+def test_resolutions_of_an_unknown_work_fail(cli: Invoke) -> None:
+    result = cli(["resolutions", "NOPE2345"])
 
     assert result.exit_code == 1
     assert "NOPE2345" in result.output
@@ -563,17 +568,17 @@ def _done(url: str, key: str) -> None:
 
 
 def test_explore_files_the_seed_and_its_firm_sources_in_a_new_exploration_collection(
-    library: InMemoryLibrary, scratch_database_url: str
+    cli: Invoke, library: InMemoryLibrary, scratch_database_url: str
 ) -> None:
     library.put(
         LibraryItem(key="SEED1111", title="The Seed", creators=["Seed, Sam"], year=2024,
                     pdf=Attachment(key="SEEDPDF1", filename="seed.pdf"))
     )  # fmt: skip
-    _resolved_seed(scratch_database_url, library)
+    _resolved_seed(scratch_database_url, cli)
     _done(scratch_database_url, "SEED1111")
 
-    result = CliRunner().invoke(app, ["explore", "SEED1111"], obj=_wired(library=library))
-    shown = CliRunner().invoke(app, ["exploration", "SEED1111"], obj=_wired(library=library))
+    result = cli(["explore", "SEED1111"])
+    shown = cli(["exploration", "SEED1111"])
 
     assert result.exit_code == 0, result.output
     assert "Exploration Collection: Seed 2024 \N{EN DASH} The Seed" in result.stdout
@@ -584,37 +589,26 @@ def test_explore_files_the_seed_and_its_firm_sources_in_a_new_exploration_collec
     assert shown.stdout == result.stdout
 
 
-def test_explore_refuses_a_work_without_a_pdf(library: InMemoryLibrary) -> None:
-    CliRunner().invoke(app, ["sync"], obj=_wired(library=library))
+def test_explore_refuses_a_work_without_a_pdf(cli: Invoke, library: InMemoryLibrary) -> None:
+    cli(["sync"])
 
-    result = CliRunner().invoke(app, ["explore", "ATTN2017"], obj=_wired(library=library))
+    result = cli(["explore", "ATTN2017"])
 
     assert result.exit_code == 1
     assert "no Library Item with a PDF" in result.output
     assert [c for c in library.changes(None).collections] == []
 
 
-def test_exploration_of_a_seed_without_one_says_how_to_start_it(
-    library: InMemoryLibrary,
-) -> None:
-    CliRunner().invoke(app, ["sync"], obj=_wired(library=library))
+def test_exploration_of_a_seed_without_one_says_how_to_start_it(cli: Invoke) -> None:
+    cli(["sync"])
 
-    result = CliRunner().invoke(app, ["exploration", "SEED1111"], obj=_wired(library=library))
+    result = cli(["exploration", "SEED1111"])
 
     assert result.exit_code == 1
     assert "paperexplorer explore SEED1111" in result.stdout
 
 
-def _parsed_seed(url: str, refs: list[Reference]) -> None:
-    with psycopg.connect(url, autocommit=True) as conn:
-        store.migrate(conn)
-        seed = store.Works(conn).ensure("SEED1111")
-        store.WorkTexts(conn).replace(
-            seed, ParsedWork(text_origin=TextOrigin.PRINTED, blocks=[], references=refs)
-        )
-
-
-RESNET = {
+RESNET: dict[str, object] = {
     "DOI": "10.1109/CVPR.2016.90",
     "type": "journal-article",
     "title": ["Deep Residual Learning for Image Recognition"],
@@ -623,27 +617,36 @@ RESNET = {
 }
 
 
+def _registries(
+    crossref: list[dict[str, object]], sent: list[httpx.Request]
+) -> Callable[[], Registries]:
+    """Registries whose Crossref answers every DOI batch with `crossref`, OpenAlex with none;
+    each request is recorded in `sent`."""
+
+    def registry(request: httpx.Request) -> httpx.Response:
+        sent.append(request)
+        if request.url.host == "api.crossref.org":
+            return httpx.Response(200, json={"message": {"items": crossref}})
+        budget = {"x-ratelimit-remaining-usd": "0.0900"}
+        return httpx.Response(200, json={"results": []}, headers=budget)
+
+    return shared_registries(
+        Settings(_env_file=None),  # pyright: ignore[reportCallIssue]
+        transport=httpx.MockTransport(registry),
+    )
+
+
 def test_check_prints_each_reference_as_its_registry_check_lands(
     library: InMemoryLibrary, scratch_database_url: str
 ) -> None:
     _parsed_seed(
         scratch_database_url,
         [Reference(id="b0", text="He 2016. Deep residual learning.", page=9,
-                   doi="10.1109/CVPR.2016.90", title=RESNET["title"][0], surnames=["He"])],
+                   doi="10.1109/CVPR.2016.90", surnames=["He"],
+                   title="Deep Residual Learning for Image Recognition")],
     )  # fmt: skip
     sent: list[httpx.Request] = []
-
-    def registry(request: httpx.Request) -> httpx.Response:
-        sent.append(request)
-        if request.url.host == "api.crossref.org":
-            return httpx.Response(200, json={"message": {"items": [RESNET]}})
-        budget = {"x-ratelimit-remaining-usd": "0.0900"}
-        return httpx.Response(200, json={"results": []}, headers=budget)
-
-    registries = shared_registries(
-        Settings(_env_file=None),  # pyright: ignore[reportCallIssue]
-        transport=httpx.MockTransport(registry),
-    )
+    registries = _registries([RESNET], sent)
 
     result = CliRunner().invoke(
         app, ["check", "SEED1111"], obj=_wired(library=library, registries=registries)
@@ -720,13 +723,41 @@ def test_search_needs_no_zotero() -> None:
     assert "1 Chunk for" in result.stdout
 
 
-@pytest.mark.parametrize("command", ["sync", "duplicates"])
+@pytest.mark.usefixtures("embedded_seed", "no_zotero")
+def test_ask_needs_no_zotero() -> None:
+    result = CliRunner().invoke(
+        app, ["ask", "YAAC9XCX", "How was entropy measured?"], obj=_wired("Measured. [#1]")
+    )
+
+    assert result.exit_code == 0, result.output
+    assert result.stdout.splitlines()[-1].startswith("summary: whole_seed,")
+
+
+@pytest.mark.usefixtures("embedded_seed", "no_zotero")
+def test_eval_needs_no_zotero(eval_files: Path) -> None:
+    result = CliRunner().invoke(
+        app,
+        ["eval", "YAAC9XCX", "--questions", str(eval_files / "questions.yaml"),
+         "--summary-dir", str(eval_files / "evals" / "runs"),
+         "--no-retrieval", "--only", "method-entropy"],
+        obj=_wired("Measured. [#1]"),
+    )  # fmt: skip
+
+    assert result.exit_code == 0, result.output
+    assert ": 1 Question, live, run " in result.stdout.splitlines()[0]
+
+
+@pytest.mark.parametrize("args", [["sync"], ["duplicates"], ["check", "SEED1111"]])
 def test_a_library_command_contacts_neither_langfuse_nor_the_provider(
-    command: str,
+    args: list[str],
     library: InMemoryLibrary,
+    scratch_database_url: str,
     langfuse: tuple[str, list[str]],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    _parsed_seed(scratch_database_url, [Reference(id="b0", text="Nobody 1999.", page=9)])
+    sent: list[httpx.Request] = []
+    registries = _registries([], sent)
     url, probes = langfuse
     monkeypatch.setenv("PE_LANGFUSE_PUBLIC_KEY", f"pk-lf-test-{uuid.uuid4()}")
     monkeypatch.setenv("PE_LANGFUSE_SECRET_KEY", "sk")
@@ -734,7 +765,9 @@ def test_a_library_command_contacts_neither_langfuse_nor_the_provider(
     monkeypatch.setenv("PE_PROVIDER", "no-such-provider")  # building a model would raise
 
     result = CliRunner().invoke(
-        app, [command], obj=lambda settings: Wiring.from_settings(settings, library=library)
+        app,
+        args,
+        obj=lambda settings: Wiring.from_settings(settings, library=library, registries=registries),
     )
 
     assert result.exit_code == 0, result.output

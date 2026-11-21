@@ -1,22 +1,30 @@
 import json
+import uuid
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
+import httpx
 import psycopg
 import pytest
 from pydantic_ai.messages import ModelMessage
 from pydantic_ai.models.function import AgentInfo, FunctionModel
-from typer.testing import CliRunner
+from typer.testing import CliRunner, Result
 
 from paperexplorer import chunking, store
 from paperexplorer.cli import StageName, app
 from paperexplorer.config import Settings
 from paperexplorer.domain import Attachment, LibraryItem
 from paperexplorer.embedding import FakeEmbedder
-from paperexplorer.library import InMemoryLibrary, ZoteroLibrary
+from paperexplorer.library import InMemoryLibrary, Library
 from paperexplorer.parsing import Block, BlockKind, ParsedWork, Reference, Span, TextOrigin
 from paperexplorer.pipeline import STAGES
+from paperexplorer.resolution import (
+    DoiRegistry,
+    InMemoryDoiRegistry,
+    Registries,
+    shared_registries,
+)
 from paperexplorer.wiring import Wiring
 
 
@@ -117,9 +125,14 @@ def embedded_seed(
         )
 
 
-def _wired(*responses: str) -> Callable[[Settings], Wiring]:
-    """The CLI's wiring: the fake Embedder, and a chat model answering each request with the
-    next of `responses`."""
+def _wired(
+    *responses: str,
+    library: Library | None = None,
+    doi_registry: DoiRegistry | None = None,
+    registries: Callable[[], Registries] | None = None,
+) -> Callable[[Settings], Wiring]:
+    """The CLI's wiring: the fake Embedder, a chat model answering each request with the next of
+    `responses`, and the Library, DOI registry and Registries given; the rest from settings."""
     queue = list(responses)
 
     async def stream(messages: list[ModelMessage], info: AgentInfo) -> AsyncIterator[str]:
@@ -129,6 +142,9 @@ def _wired(*responses: str) -> Callable[[Settings], Wiring]:
         settings,
         embedder=FakeEmbedder("bge-m3"),
         model=FunctionModel(stream_function=stream, model_name="paperexplorer-chat"),
+        library=library,
+        doi_registry=doi_registry,
+        registries=registries,
     )
 
 
@@ -421,11 +437,22 @@ ATTENTION_COPY = ATTENTION.model_copy(
 def library(cli_env: None, monkeypatch: pytest.MonkeyPatch) -> InMemoryLibrary:
     """The Library every command reads, in memory instead of Zotero."""
     monkeypatch.setenv("PE_LOG_LEVEL", "WARNING")
-    held = InMemoryLibrary(
+    return InMemoryLibrary(
         [LibraryItem(key="SEED1111", title="The Seed"), ATTENTION, ATTENTION_COPY], {}
     )
-    monkeypatch.setattr(ZoteroLibrary, "from_settings", lambda settings: held)
-    return held
+
+
+Invoke = Callable[..., Result]
+
+
+@pytest.fixture
+def cli(library: InMemoryLibrary) -> Invoke:
+    """Run a command wired with `library`, answering its prompts with `input`."""
+
+    def invoke(args: list[str], input: str | None = None) -> Result:
+        return CliRunner().invoke(app, args, input=input, obj=_wired(library=library))
+
+    return invoke
 
 
 def _works(url: str) -> dict[str, str | None]:
@@ -434,11 +461,11 @@ def _works(url: str) -> dict[str, str | None]:
 
 
 def test_sync_makes_every_library_item_a_work(
-    library: InMemoryLibrary, scratch_database_url: str
+    cli: Invoke, library: InMemoryLibrary, scratch_database_url: str
 ) -> None:
-    first = CliRunner().invoke(app, ["sync"])
+    first = cli(["sync"])
     library.put(LibraryItem(key="NEWW2026", title="Added later"))
-    second = CliRunner().invoke(app, ["sync"])
+    second = cli(["sync"])
 
     assert first.exit_code == 0, first.output
     assert "3 Library Items" in first.stdout
@@ -446,14 +473,12 @@ def test_sync_makes_every_library_item_a_work(
     assert set(_works(scratch_database_url)) == {"SEED1111", "ATTN2017", "ATTNCOPY", "NEWW2026"}
 
 
-def test_duplicates_lists_each_works_duplicate_items_standing_item_first(
-    library: InMemoryLibrary,
-) -> None:
-    CliRunner().invoke(app, ["sync"])
+def test_duplicates_lists_each_works_duplicate_items_standing_item_first(cli: Invoke) -> None:
+    cli(["sync"])
 
-    listed = CliRunner().invoke(app, ["duplicates"])
-    CliRunner().invoke(app, ["duplicates", "--stand", "ATTN2017"])
-    let = CliRunner().invoke(app, ["duplicates"])
+    listed = cli(["duplicates"])
+    cli(["duplicates", "--stand", "ATTN2017"])
+    let = cli(["duplicates"])
 
     assert listed.exit_code == 0, listed.output
     doi, first, second = listed.stdout.splitlines()[:3]
@@ -463,49 +488,51 @@ def test_duplicates_lists_each_works_duplicate_items_standing_item_first(
     assert let.stdout.splitlines()[1].split()[:2] == ["*", "ATTN2017"]
 
 
-def _resolved_seed(url: str) -> None:
-    refs = [
-        Reference(id="b0", text="Vaswani 2017. Attention is all you need.", page=9,
-                  title="Attention is all you need", surnames=["Vaswani"], year="2017"),
-        Reference(id="b1", text="Nobody 1999. Unknown.", page=9, title="Unknown things"),
-    ]  # fmt: skip
+def _parsed_seed(url: str, refs: list[Reference]) -> None:
     with psycopg.connect(url, autocommit=True) as conn:
         store.migrate(conn)
         seed = store.Works(conn).ensure("SEED1111")
         store.WorkTexts(conn).replace(
             seed, ParsedWork(text_origin=TextOrigin.PRINTED, blocks=[], references=refs)
         )
-    result = CliRunner().invoke(app, ["run", "resolve", "SEED1111"])
+
+
+def _resolved_seed(url: str, cli: Invoke) -> None:
+    _parsed_seed(
+        url,
+        [Reference(id="b0", text="Vaswani 2017. Attention is all you need.", page=9,
+                   title="Attention is all you need", surnames=["Vaswani"], year="2017"),
+         Reference(id="b1", text="Nobody 1999. Unknown.", page=9, title="Unknown things")],
+    )  # fmt: skip
+    result = cli(["run", "resolve", "SEED1111"])
     assert result.exit_code == 0, result.output
 
 
 def test_a_merge_asks_first_then_merges_in_the_library_and_moves_the_resolutions(
-    library: InMemoryLibrary, scratch_database_url: str
+    cli: Invoke, library: InMemoryLibrary, scratch_database_url: str
 ) -> None:
-    _resolved_seed(scratch_database_url)
+    _resolved_seed(scratch_database_url, cli)
 
-    declined = CliRunner().invoke(
-        app, ["duplicates", "--merge", "ATTN2017", "ATTNCOPY"], input="n\n"
-    )
+    declined = cli(["duplicates", "--merge", "ATTN2017", "ATTNCOPY"], input="n\n")
     assert declined.exit_code == 1
     assert library.item("ATTNCOPY").key == "ATTNCOPY"
 
-    merged = CliRunner().invoke(app, ["duplicates", "--merge", "ATTN2017", "ATTNCOPY"], input="y\n")
+    merged = cli(["duplicates", "--merge", "ATTN2017", "ATTNCOPY"], input="y\n")
 
     assert merged.exit_code == 0, merged.output
     assert library.item("ATTN2017").pdf == ATTENTION_COPY.pdf
     assert "ATTNCOPY" not in _works(scratch_database_url)
-    listed = CliRunner().invoke(app, ["resolutions", "SEED1111"])
+    listed = cli(["resolutions", "SEED1111"])
     assert "ATTN2017" in listed.stdout.splitlines()[1]
 
 
 def test_resolutions_lists_each_reference_with_its_state_and_work(
-    library: InMemoryLibrary, scratch_database_url: str
+    cli: Invoke, scratch_database_url: str
 ) -> None:
-    _resolved_seed(scratch_database_url)
+    _resolved_seed(scratch_database_url, cli)
 
-    result = CliRunner().invoke(app, ["resolutions", "SEED1111"])
-    low = CliRunner().invoke(app, ["resolutions", "SEED1111", "--low"])
+    result = cli(["resolutions", "SEED1111"])
+    low = cli(["resolutions", "SEED1111", "--low"])
 
     assert result.exit_code == 0, result.output
     header, first, second, *_ = result.stdout.splitlines()
@@ -517,8 +544,8 @@ def test_resolutions_lists_each_reference_with_its_state_and_work(
     assert low.stdout.splitlines()[1:] == []
 
 
-def test_resolutions_of_an_unknown_work_fail(library: InMemoryLibrary) -> None:
-    result = CliRunner().invoke(app, ["resolutions", "NOPE2345"])
+def test_resolutions_of_an_unknown_work_fail(cli: Invoke) -> None:
+    result = cli(["resolutions", "NOPE2345"])
 
     assert result.exit_code == 1
     assert "NOPE2345" in result.output
@@ -541,17 +568,17 @@ def _done(url: str, key: str) -> None:
 
 
 def test_explore_files_the_seed_and_its_firm_sources_in_a_new_exploration_collection(
-    library: InMemoryLibrary, scratch_database_url: str
+    cli: Invoke, library: InMemoryLibrary, scratch_database_url: str
 ) -> None:
     library.put(
         LibraryItem(key="SEED1111", title="The Seed", creators=["Seed, Sam"], year=2024,
                     pdf=Attachment(key="SEEDPDF1", filename="seed.pdf"))
     )  # fmt: skip
-    _resolved_seed(scratch_database_url)
+    _resolved_seed(scratch_database_url, cli)
     _done(scratch_database_url, "SEED1111")
 
-    result = CliRunner().invoke(app, ["explore", "SEED1111"])
-    shown = CliRunner().invoke(app, ["exploration", "SEED1111"])
+    result = cli(["explore", "SEED1111"])
+    shown = cli(["exploration", "SEED1111"])
 
     assert result.exit_code == 0, result.output
     assert "Exploration Collection: Seed 2024 \N{EN DASH} The Seed" in result.stdout
@@ -562,22 +589,186 @@ def test_explore_files_the_seed_and_its_firm_sources_in_a_new_exploration_collec
     assert shown.stdout == result.stdout
 
 
-def test_explore_refuses_a_work_without_a_pdf(library: InMemoryLibrary) -> None:
-    CliRunner().invoke(app, ["sync"])
+def test_explore_refuses_a_work_without_a_pdf(cli: Invoke, library: InMemoryLibrary) -> None:
+    cli(["sync"])
 
-    result = CliRunner().invoke(app, ["explore", "ATTN2017"])
+    result = cli(["explore", "ATTN2017"])
 
     assert result.exit_code == 1
     assert "no Library Item with a PDF" in result.output
     assert [c for c in library.changes(None).collections] == []
 
 
-def test_exploration_of_a_seed_without_one_says_how_to_start_it(
-    library: InMemoryLibrary,
-) -> None:
-    CliRunner().invoke(app, ["sync"])
+def test_exploration_of_a_seed_without_one_says_how_to_start_it(cli: Invoke) -> None:
+    cli(["sync"])
 
-    result = CliRunner().invoke(app, ["exploration", "SEED1111"])
+    result = cli(["exploration", "SEED1111"])
 
     assert result.exit_code == 1
     assert "paperexplorer explore SEED1111" in result.stdout
+
+
+RESNET: dict[str, object] = {
+    "DOI": "10.1109/CVPR.2016.90",
+    "type": "journal-article",
+    "title": ["Deep Residual Learning for Image Recognition"],
+    "author": [{"family": "He", "given": "A."}],
+    "issued": {"date-parts": [[2016, 3]]},
+}
+
+
+def _registries(
+    crossref: list[dict[str, object]], sent: list[httpx.Request]
+) -> Callable[[], Registries]:
+    """Registries whose Crossref answers every DOI batch with `crossref`, OpenAlex with none;
+    each request is recorded in `sent`."""
+
+    def registry(request: httpx.Request) -> httpx.Response:
+        sent.append(request)
+        if request.url.host == "api.crossref.org":
+            return httpx.Response(200, json={"message": {"items": crossref}})
+        budget = {"x-ratelimit-remaining-usd": "0.0900"}
+        return httpx.Response(200, json={"results": []}, headers=budget)
+
+    return shared_registries(
+        Settings(_env_file=None),  # pyright: ignore[reportCallIssue]
+        transport=httpx.MockTransport(registry),
+    )
+
+
+def test_check_prints_each_reference_as_its_registry_check_lands(
+    library: InMemoryLibrary, scratch_database_url: str
+) -> None:
+    _parsed_seed(
+        scratch_database_url,
+        [Reference(id="b0", text="He 2016. Deep residual learning.", page=9,
+                   doi="10.1109/CVPR.2016.90", surnames=["He"],
+                   title="Deep Residual Learning for Image Recognition")],
+    )  # fmt: skip
+    sent: list[httpx.Request] = []
+    registries = _registries([RESNET], sent)
+
+    result = CliRunner().invoke(
+        app, ["check", "SEED1111"], obj=_wired(library=library, registries=registries)
+    )
+
+    assert result.exit_code == 0, result.output
+    checked, finished = result.stdout.splitlines()
+    assert checked.split() == ["b0", "certain", "crossref"]
+    assert finished.startswith("Checked 1 References in ")
+    assert finished.endswith(
+        " s: 1 certain, 0 high, 0 low, 0 unchecked, 0 unresolved, 0 doi_conflicts"
+    )
+    assert {r.url.host for r in sent} == {"api.crossref.org", "api.openalex.org"}
+
+
+def test_run_verify_dois_asks_the_doi_registry_it_is_wired_with(
+    library: InMemoryLibrary, scratch_database_url: str
+) -> None:
+    _parsed_seed(
+        scratch_database_url,
+        [Reference(id="b0", text="Vaswani 2017.", page=9, doi="10.5555/attention"),
+         Reference(id="b1", text="Cut 2020.", page=9, doi="10.5555/cut.shor")],
+    )  # fmt: skip
+    registry = InMemoryDoiRegistry(registered={"10.5555/attention"})
+
+    result = CliRunner().invoke(
+        app,
+        ["run", "verify_dois", "SEED1111"],
+        obj=_wired(library=library, doi_registry=registry),
+    )
+
+    assert result.exit_code == 0, result.output
+    assert result.stdout.strip() == (
+        "verify_dois SEED1111: dois 2, registered 1, unregistered 1, unverified 0"
+    )
+    assert registry.asked == ["10.5555/attention", "10.5555/cut.shor"]
+
+
+@pytest.fixture
+def no_zotero(cli_env: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Settings without Zotero's keys."""
+    monkeypatch.setenv("PE_LOG_LEVEL", "WARNING")
+    monkeypatch.setenv("PE_ZOTERO_LIBRARY_ID", "")
+    monkeypatch.setenv("PE_ZOTERO_API_KEY", "")
+
+
+NAMED = "Zotero needs PE_ZOTERO_LIBRARY_ID and PE_ZOTERO_API_KEY"
+
+
+@pytest.mark.usefixtures("no_zotero")
+@pytest.mark.parametrize(
+    "args", [["sync"], ["duplicates"], ["check", "SEED1111"], ["explore", "SEED1111"]]
+)
+def test_a_command_that_needs_zotero_names_its_settings_without_them(args: list[str]) -> None:
+    result = CliRunner().invoke(app, args, obj=_wired())
+
+    assert result.exit_code == 1
+    assert result.stderr.splitlines() == [NAMED]
+
+
+@pytest.mark.usefixtures("no_zotero")
+def test_run_names_zoteros_settings_without_them() -> None:
+    result = CliRunner().invoke(app, ["run", "resolve", "SEED1111"], obj=_wired())
+
+    assert result.exit_code == 1
+    assert result.stderr.splitlines() == [f"resolve failed for SEED1111: {NAMED}"]
+
+
+@pytest.mark.usefixtures("embedded_seed", "no_zotero")
+def test_search_needs_no_zotero() -> None:
+    result = CliRunner().invoke(app, ["search", "YAAC9XCX", "entropy", "-k", "1"], obj=_wired())
+
+    assert result.exit_code == 0, result.output
+    assert "1 Chunk for" in result.stdout
+
+
+@pytest.mark.usefixtures("embedded_seed", "no_zotero")
+def test_ask_needs_no_zotero() -> None:
+    result = CliRunner().invoke(
+        app, ["ask", "YAAC9XCX", "How was entropy measured?"], obj=_wired("Measured. [#1]")
+    )
+
+    assert result.exit_code == 0, result.output
+    assert result.stdout.splitlines()[-1].startswith("summary: whole_seed,")
+
+
+@pytest.mark.usefixtures("embedded_seed", "no_zotero")
+def test_eval_needs_no_zotero(eval_files: Path) -> None:
+    result = CliRunner().invoke(
+        app,
+        ["eval", "YAAC9XCX", "--questions", str(eval_files / "questions.yaml"),
+         "--summary-dir", str(eval_files / "evals" / "runs"),
+         "--no-retrieval", "--only", "method-entropy"],
+        obj=_wired("Measured. [#1]"),
+    )  # fmt: skip
+
+    assert result.exit_code == 0, result.output
+    assert ": 1 Question, live, run " in result.stdout.splitlines()[0]
+
+
+@pytest.mark.parametrize("args", [["sync"], ["duplicates"], ["check", "SEED1111"]])
+def test_a_library_command_contacts_neither_langfuse_nor_the_provider(
+    args: list[str],
+    library: InMemoryLibrary,
+    scratch_database_url: str,
+    langfuse: tuple[str, list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _parsed_seed(scratch_database_url, [Reference(id="b0", text="Nobody 1999.", page=9)])
+    sent: list[httpx.Request] = []
+    registries = _registries([], sent)
+    url, probes = langfuse
+    monkeypatch.setenv("PE_LANGFUSE_PUBLIC_KEY", f"pk-lf-test-{uuid.uuid4()}")
+    monkeypatch.setenv("PE_LANGFUSE_SECRET_KEY", "sk")
+    monkeypatch.setenv("PE_LANGFUSE_BASE_URL", url)
+    monkeypatch.setenv("PE_PROVIDER", "no-such-provider")  # building a model would raise
+
+    result = CliRunner().invoke(
+        app,
+        args,
+        obj=lambda settings: Wiring.from_settings(settings, library=library, registries=registries),
+    )
+
+    assert result.exit_code == 0, result.output
+    assert probes == []

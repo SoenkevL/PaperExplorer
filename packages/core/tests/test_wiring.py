@@ -1,7 +1,4 @@
-import threading
 import uuid
-from collections.abc import Iterator
-from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import psycopg
 import pytest
@@ -135,36 +132,8 @@ def test_a_stages_context_needs_a_library(store_db: psycopg.Connection[TupleRow]
         wiring.stages(store_db)
 
 
-class _Probes:
-    """A Langfuse host that only counts what reaches it."""
-
-    def __init__(self) -> None:
-        self.paths: list[str] = []
-
-
-@pytest.fixture
-def langfuse() -> Iterator[tuple[str, _Probes]]:
-    probes = _Probes()
-
-    class Handler(BaseHTTPRequestHandler):
-        def do_GET(self) -> None:
-            probes.paths.append(self.path)
-            self.send_response(200)
-            self.end_headers()
-
-        def log_message(self, format: str, *args: object) -> None:
-            pass
-
-    server = HTTPServer(("127.0.0.1", 0), Handler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    yield f"http://127.0.0.1:{server.server_port}", probes
-    server.shutdown()
-    server.server_close()
-
-
 def test_using_only_the_library_builds_neither_tracing_nor_the_chat_model(
-    langfuse: tuple[str, _Probes],
+    langfuse: tuple[str, list[str]],
 ) -> None:
     url, probes = langfuse
     settings = _settings(
@@ -180,10 +149,10 @@ def test_using_only_the_library_builds_neither_tracing_nor_the_chat_model(
     wiring.registries()
     wiring.flush()
 
-    assert probes.paths == []
+    assert probes == []
 
 
-def test_tracing_is_built_on_first_use_and_then_kept(langfuse: tuple[str, _Probes]) -> None:
+def test_tracing_is_built_on_first_use_and_then_kept(langfuse: tuple[str, list[str]]) -> None:
     url, probes = langfuse
     settings = _settings(
         langfuse_public_key=f"pk-lf-test-{uuid.uuid4()}",
@@ -196,7 +165,7 @@ def test_tracing_is_built_on_first_use_and_then_kept(langfuse: tuple[str, _Probe
 
     assert tracing.base_url == url
     assert wiring.tracing is tracing
-    assert probes.paths == ["/api/public/health"]
+    assert probes == ["/api/public/health"]
 
 
 class _CountedFlushes(Tracing):

@@ -1,7 +1,10 @@
 """A small hand-built Seed for the asking tests: an abstract, three sections, two References."""
 
 import json
+import threading
 import uuid
+from collections.abc import Iterator
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import httpx
 import psycopg
@@ -178,3 +181,25 @@ def small_seed(store_db: psycopg.Connection[TupleRow]) -> Work:
 def unnumbered_seed(store_db: psycopg.Connection[TupleRow]) -> Work:
     """The small Seed citing by author and year: no Reference of it carries a printed label."""
     return _stored_seed(store_db, "SEED0002", AUTHOR_YEAR_SEED_TEXT)
+
+
+@pytest.fixture
+def langfuse() -> Iterator[tuple[str, list[str]]]:
+    """A stand-in Langfuse host, and the paths of every request that reached it."""
+    paths: list[str] = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            paths.append(self.path)
+            self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, format: str, *args: object) -> None:
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield f"http://127.0.0.1:{server.server_port}", paths
+    server.shutdown()
+    server.server_close()

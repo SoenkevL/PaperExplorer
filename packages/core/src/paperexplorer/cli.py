@@ -31,10 +31,11 @@ from paperexplorer.citations import ConfidenceLevel, confidence_level
 from paperexplorer.config import Settings
 from paperexplorer.domain import Answer, Level, Resolution, ResolutionState, Scope, Work, WorkId
 from paperexplorer.library import (
+    Library,
+    LibraryNotConfiguredError,
     LibraryWriteError,
     NotDuplicateItemsError,
     OutsidePaperExplorerError,
-    ZoteroLibrary,
     check_duplicates,
     sync,
 )
@@ -59,6 +60,14 @@ def _wiring(ctx: typer.Context, settings: Settings) -> Wiring:
     """The command's adapters: from `settings`, unless the caller's `obj` builds them."""
     build: Callable[[Settings], Wiring] = ctx.obj or Wiring.from_settings
     return build(settings)
+
+
+def _library_or_exit(wiring: Wiring) -> Library:
+    """The Wiring's Library; without Zotero's keys, exit 1 naming them."""
+    if wiring.library is None:
+        typer.echo(str(LibraryNotConfiguredError()), err=True)
+        raise typer.Exit(1)
+    return wiring.library
 
 
 @contextmanager
@@ -156,21 +165,13 @@ def run_command(
         wiring = None
         try:
             wiring = _wiring(ctx, settings)
-            stage_ctx = pipeline.StageContext(
-                conn=conn,
-                settings=settings,
-                library=ZoteroLibrary.from_settings(settings),
-                embedder=wiring.embedder,
-                tracing=wiring.tracing,
-                doi_registry=resolution.DoiOrgRegistry.from_settings(settings),
-            )
-            result = pipeline.run_stage(stage_ctx, stage.value, work_id)
+            result = pipeline.run_stage(wiring.stages(conn), stage.value, work_id)
         except Exception as e:
             typer.echo(f"{stage.value} failed for {work}: {e}", err=True)
             raise typer.Exit(1) from e
         finally:
             if wiring is not None:
-                wiring.tracing.flush()
+                wiring.flush()
     counts = ", ".join(f"{k} {v}" for k, v in result.counts.items())
     typer.echo(f"{stage.value} {work}: {counts}")
 
@@ -180,13 +181,14 @@ def _items(n: int) -> str:
 
 
 @app.command("sync")
-def sync_command() -> None:
+def sync_command(ctx: typer.Context) -> None:
     """Read the whole Zotero Library again into the Works; `resolve` syncs only its changes."""
     settings = Settings()
+    library = _library_or_exit(_wiring(ctx, settings))
     with psycopg.connect(settings.database_url, autocommit=True) as conn:
         store.migrate(conn)
         with conn.transaction():
-            result = sync(conn, ZoteroLibrary.from_settings(settings), full=True)
+            result = sync(conn, library, full=True)
     if result.stale:
         typer.echo("Zotero could not be reached; the last copy of the Library stands", err=True)
         raise typer.Exit(1)
@@ -201,6 +203,7 @@ def _key(work: Work | None) -> str:
 
 @app.command("duplicates")
 def duplicates_command(
+    ctx: typer.Context,
     stand: Annotated[
         str | None,
         typer.Option("--stand", metavar="KEY", help="Let this Duplicate Item stand for its DOI."),
@@ -216,7 +219,7 @@ def duplicates_command(
 ) -> None:
     """List each Work's Duplicate Items, its Standing Item first; let another stand, or merge."""
     settings = Settings()
-    library = ZoteroLibrary.from_settings(settings)
+    library = _library_or_exit(_wiring(ctx, settings))
     with psycopg.connect(settings.database_url, autocommit=True) as conn:
         store.migrate(conn)
         works = store.Works(conn)
@@ -317,6 +320,7 @@ def _placing(placing: retrieval.Placing | None) -> str:
 
 @app.command("check")
 def check_command(
+    ctx: typer.Context,
     work: Annotated[str, typer.Argument(help="The Work's Zotero item key, e.g. YAAC9XCX.")],
     reference: Annotated[
         str | None, typer.Option("--reference", help="Check only this Reference, by its key.")
@@ -327,6 +331,8 @@ def check_command(
 ) -> None:
     """Look a Work's References up in Crossref and OpenAlex: a Registry Check (ADR 0011)."""
     settings = Settings()
+    wiring = _wiring(ctx, settings)
+    library = _library_or_exit(wiring)
     with psycopg.connect(settings.database_url, autocommit=True) as conn:
         store.migrate(conn)
         found = store.Works(conn).find(work)
@@ -341,10 +347,10 @@ def check_command(
             typer.echo(f"{work} prints no Reference {reference}", err=True)
             raise typer.Exit(1)
         with conn.transaction():
-            if sync(conn, ZoteroLibrary.from_settings(settings)).stale:
+            if sync(conn, library).stale:
                 typer.echo("Zotero could not be reached; checking against the last copy", err=True)
-        checked = _registry_check(conn, settings, found.id, refs, refresh=refresh)
-        filed = catalog.reconcile(conn, ZoteroLibrary.from_settings(settings), found.id)
+        checked = _registry_check(conn, wiring, found.id, refs, refresh=refresh)
+        filed = catalog.reconcile(conn, library, found.id)
     if filed is not None:
         typer.echo(_filed(filed))
     if not checked:
@@ -353,7 +359,7 @@ def check_command(
 
 def _registry_check(
     conn: psycopg.Connection[TupleRow],
-    settings: Settings,
+    wiring: Wiring,
     work: WorkId,
     refs: list[parsing.Reference],
     *,
@@ -363,7 +369,7 @@ def _registry_check(
 
     What landed before a stop is kept, so the caller files it either way.
     """
-    registries = resolution.Registries(settings)
+    registries = wiring.registries()
 
     async def run() -> resolution.RegistryCheckEvent | None:
         last: resolution.RegistryCheckEvent | None = None
@@ -423,7 +429,8 @@ def explore_command(
 ) -> None:
     """Start or resume the Seed's Exploration: its Collection in Zotero, the Stages not done."""
     settings = Settings()
-    library = ZoteroLibrary.from_settings(settings)
+    wiring = _wiring(ctx, settings)
+    library = _library_or_exit(wiring)
     with psycopg.connect(settings.database_url, autocommit=True) as conn:
         store.migrate(conn)
         with conn.transaction():
@@ -448,27 +455,18 @@ def explore_command(
         ]
         failed = False
         if stages:
-            wiring = _wiring(ctx, settings)
-            stage_ctx = pipeline.StageContext(
-                conn=conn,
-                settings=settings,
-                library=library,
-                embedder=wiring.embedder,
-                tracing=wiring.tracing,
-                doi_registry=resolution.DoiOrgRegistry.from_settings(settings),
-            )
 
             def after(name: str) -> None:
                 if name == "resolve":
                     catalog.reconcile(conn, library, found.id)
 
             try:
-                pipeline.run_chain(stage_ctx, stages, found.id, after=after)
+                pipeline.run_chain(wiring.stages(conn), stages, found.id, after=after)
             except Exception as e:  # each failure is recorded with its Stage
                 typer.echo(f"A Stage failed for {work}: {e}", err=True)
                 failed = True
             finally:
-                wiring.tracing.flush()
+                wiring.flush()
         parsed = store.WorkTexts(conn).get(found.id)
         if check and parsed is not None:
             unchecked = {
@@ -477,7 +475,7 @@ def explore_command(
                 if r.state is ResolutionState.UNCHECKED
             }
             refs = [r for r in parsed.references if r.id in unchecked]
-            if refs and not _registry_check(conn, settings, found.id, refs):
+            if refs and not _registry_check(conn, wiring, found.id, refs):
                 failed = True
         catalog.reconcile(conn, library, found.id)
         state = catalog.state(conn, found.id)
@@ -521,7 +519,7 @@ def search_command(
             ):
                 results = retrieval.search(conn, wiring.embedder, query, Scope.of(found.id), k=k)
         finally:
-            wiring.tracing.flush()
+            wiring.flush()
     chunks = "Chunk" if len(results) == 1 else "Chunks"
     typer.echo(f"{work}: {len(results)} {chunks} for {query!r} ({wiring.embedder.model})")
     for i, r in enumerate(results, start=1):
@@ -550,7 +548,7 @@ def ask_command(
             answered = asyncio.run(_stream_answer(wiring.asking(conn), conversation, question))
             latency = time.monotonic() - started
         finally:
-            wiring.tracing.flush()
+            wiring.flush()
         blocks = [b.text for b in (store.WorkTexts(conn).get(found.id) or _NO_TEXT).blocks]
     _print_answer(answered.answer, conversation, blocks)
     counts = answered.answer.counts()
@@ -655,7 +653,7 @@ def eval_command(
         try:
             report = asyncio.run(evals.run_eval(wiring.asking(conn), found, dataset, info, modes))
         finally:
-            wiring.tracing.flush()
+            wiring.flush()
     summary = evals.summarize(report)
     written = evals.write_run(report, summary, settings.data_dir / "eval", summary_dir)
     for check in summary.bar:
